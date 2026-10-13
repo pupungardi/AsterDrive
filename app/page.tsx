@@ -50,11 +50,19 @@ import {
   Lock,
   Smartphone,
   ExternalLink,
-  Pencil
+  Pencil,
+  Play,
+  Monitor,
+  Laptop,
+  UploadCloud,
+  CheckCircle2,
+  RefreshCw,
+  Maximize2
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+import { StorageAnalyticsChart } from '@/components/StorageAnalyticsChart';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -96,9 +104,113 @@ interface DriveItem {
   starred?: boolean;
   trashed?: boolean;
   source?: 'drive' | 'computer';
+  videoUrl?: string;
+  computerDevice?: string;
+  folderPath?: string;
 }
 
-const initialData: DriveItem[] = [];
+const SAMPLE_VIDEO_URL = "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4";
+const SECONDARY_VIDEO_URL = "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4";
+
+const initialData: DriveItem[] = [
+  {
+    id: 'video-demo-1',
+    parentId: 'root',
+    name: 'Product_Launch_Demo.mp4',
+    type: 'video',
+    size: 84 * 1024 * 1024,
+    updatedAt: '2026-10-13T09:30:00.000Z',
+    owner: 'me',
+    starred: true,
+    source: 'drive',
+    videoUrl: SAMPLE_VIDEO_URL
+  },
+  {
+    id: 'folder-proj-1',
+    parentId: 'root',
+    name: 'Project_Workspace_2026',
+    type: 'folder',
+    updatedAt: '2026-10-13T08:15:00.000Z',
+    owner: 'me',
+    starred: false,
+    source: 'drive'
+  },
+  {
+    id: 'doc-summary-1',
+    parentId: 'root',
+    name: 'Quarterly_Strategy_Brief.pdf',
+    type: 'document',
+    size: 4.8 * 1024 * 1024,
+    updatedAt: '2026-10-13T06:00:00.000Z',
+    owner: 'me',
+    starred: false,
+    source: 'drive'
+  },
+  {
+    id: 'sheet-budget-1',
+    parentId: 'root',
+    name: 'Marketing_Budget_Q4.xlsx',
+    type: 'spreadsheet',
+    size: 2.3 * 1024 * 1024,
+    updatedAt: '2026-10-13T04:20:00.000Z',
+    owner: 'me',
+    starred: false,
+    source: 'drive'
+  },
+  {
+    id: 'video-tutorial-2',
+    parentId: 'root',
+    name: 'Tutorial_Feature_Walkthrough.mp4',
+    type: 'video',
+    size: 142 * 1024 * 1024,
+    updatedAt: '2026-10-12T18:00:00.000Z',
+    owner: 'me',
+    starred: false,
+    source: 'drive',
+    videoUrl: SECONDARY_VIDEO_URL
+  },
+  {
+    id: 'pc-video-1',
+    parentId: 'root',
+    name: 'Windows_Tutorial_Walkthrough_4K.mp4',
+    type: 'video',
+    size: 320 * 1024 * 1024,
+    updatedAt: '2026-10-12T15:45:00.000Z',
+    owner: 'me',
+    starred: false,
+    source: 'computer',
+    videoUrl: SAMPLE_VIDEO_URL,
+    computerDevice: 'Windows 11 Workstation',
+    folderPath: 'C:\\Users\\Workspace\\Videos'
+  },
+  {
+    id: 'mac-video-1',
+    parentId: 'root',
+    name: 'Mac_Screen_Recording_AppDemo.mp4',
+    type: 'video',
+    size: 240 * 1024 * 1024,
+    updatedAt: '2026-10-12T12:30:00.000Z',
+    owner: 'me',
+    starred: true,
+    source: 'computer',
+    videoUrl: SECONDARY_VIDEO_URL,
+    computerDevice: 'MacBook Pro (M3)',
+    folderPath: '~/Movies/Screen_Recordings'
+  },
+  {
+    id: 'mac-deck-1',
+    parentId: 'root',
+    name: 'Keynote_Deck_Product_Pitch.pdf',
+    type: 'document',
+    size: 18 * 1024 * 1024,
+    updatedAt: '2026-10-12T11:00:00.000Z',
+    owner: 'me',
+    starred: false,
+    source: 'computer',
+    computerDevice: 'MacBook Pro (M3)',
+    folderPath: '~/Documents/Pitch'
+  }
+];
 
 function formatBytes(bytes?: number, decimals = 1) {
   if (bytes === undefined || bytes === null || isNaN(bytes) || bytes === 0) return '0 B';
@@ -167,6 +279,25 @@ export default function AsterDriveApp() {
   // Rename modal state
   const [itemToRename, setItemToRename] = useState<DriveItem | null>(null);
   const [renameInput, setRenameInput] = useState('');
+
+  // Video player modal state
+  const [previewVideoItem, setPreviewVideoItem] = useState<DriveItem | null>(null);
+  const [videoPlaybackSpeed, setVideoPlaybackSpeed] = useState<number>(1);
+  const [videoLoadError, setVideoLoadError] = useState(false);
+  const videoPlayerRef = React.useRef<HTMLVideoElement>(null);
+
+  const openVideoPreview = (item: DriveItem) => {
+    setVideoLoadError(false);
+    setVideoPlaybackSpeed(1);
+    setPreviewVideoItem(item);
+  };
+
+  // Computer sync modal state
+  const [isSyncModalOpen, setIsSyncModalOpen] = useState(false);
+
+  // Drag-and-drop state
+  const [isDraggingOver, setIsDraggingOver] = useState(false);
+  const dragCounter = React.useRef(0);
 
   // Close menus on scroll or window resize
   React.useEffect(() => {
@@ -298,6 +429,8 @@ export default function AsterDriveApp() {
 
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const folderInputRef = React.useRef<HTMLInputElement>(null);
+  const computerFileInputRef = React.useRef<HTMLInputElement>(null);
+  const computerFolderInputRef = React.useRef<HTMLInputElement>(null);
 
   // Set webkitdirectory on client safely to prevent SSR attribute mismatch
   React.useEffect(() => {
@@ -305,7 +438,36 @@ export default function AsterDriveApp() {
       folderInputRef.current.setAttribute('webkitdirectory', '');
       folderInputRef.current.setAttribute('directory', '');
     }
+    if (computerFolderInputRef.current) {
+      computerFolderInputRef.current.setAttribute('webkitdirectory', '');
+      computerFolderInputRef.current.setAttribute('directory', '');
+    }
   }, []);
+
+  // Keyboard shortcut listener (Escape to close video modal, Space for play/pause)
+  React.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setPreviewVideoItem(null);
+        setIsSyncModalOpen(false);
+      }
+      if (previewVideoItem && e.code === 'Space') {
+        const target = e.target as HTMLElement | null;
+        if (target?.tagName !== 'INPUT' && target?.tagName !== 'TEXTAREA') {
+          e.preventDefault();
+          if (videoPlayerRef.current) {
+            if (videoPlayerRef.current.paused) {
+              videoPlayerRef.current.play().catch(() => {});
+            } else {
+              videoPlayerRef.current.pause();
+            }
+          }
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [previewVideoItem]);
 
   // Storage calculations
   const totalUsedBytes = useMemo(() => {
@@ -317,7 +479,7 @@ export default function AsterDriveApp() {
     return Math.min(100, Math.max(0, (totalUsedBytes / currentPlan.maxBytes) * 100));
   }, [totalUsedBytes, currentPlan.maxBytes]);
 
-  // Upload handler with quota enforcement
+  // Upload handler with quota enforcement, folder picker tree preservation, and video object URLs
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
       const filesArray = Array.from(e.target.files);
@@ -336,19 +498,134 @@ export default function AsterDriveApp() {
         return;
       }
 
-      const newItems: DriveItem[] = filesArray.map(file => ({
-        id: Math.random().toString(36).substring(7),
-        parentId: currentFolderId,
-        name: file.name,
-        type: file.type.includes('image') ? 'image' : 
-              file.type.includes('video') ? 'video' : 
-              file.type.includes('spreadsheet') || file.name.endsWith('.xlsx') || file.name.endsWith('.csv') ? 'spreadsheet' :
-              file.type.includes('zip') || file.name.endsWith('.zip') || file.name.endsWith('.rar') ? 'archive' : 'document',
-        size: file.size,
-        updatedAt: new Date().toISOString(),
-        owner: activeNav === 'shared' ? 'colleague@example.com' : 'me',
-        source: activeNav === 'computers' ? 'computer' : 'drive'
-      }));
+      // Check if uploaded items originate from folder picker (webkitRelativePath present)
+      const hasRelativePaths = filesArray.some(f => (f as any).webkitRelativePath && (f as any).webkitRelativePath.includes('/'));
+
+      if (hasRelativePaths) {
+        interface DiscoveredFolder {
+          fullPath: string;
+          name: string;
+          parentPath: string;
+        }
+        const discoveredFolders: DiscoveredFolder[] = [];
+        const filesWithFolder: { file: File; folderPath: string }[] = [];
+
+        for (const file of filesArray) {
+          const relPath = (file as any).webkitRelativePath;
+          let folderPath = '';
+          if (relPath && relPath.includes('/')) {
+            const parts = relPath.split('/');
+            folderPath = parts.slice(0, -1).join('/');
+            let accum = '';
+            for (let p = 0; p < parts.length - 1; p++) {
+              const prev = accum;
+              accum = accum ? `${accum}/${parts[p]}` : parts[p];
+              if (!discoveredFolders.some(f => f.fullPath === accum)) {
+                discoveredFolders.push({
+                  fullPath: accum,
+                  name: parts[p],
+                  parentPath: prev
+                });
+              }
+            }
+          }
+          filesWithFolder.push({ file, folderPath });
+        }
+
+        const targetRootFolderId = activeNav === 'trash' ? 'root' : currentFolderId;
+        discoveredFolders.sort((a, b) => a.fullPath.split('/').length - b.fullPath.split('/').length);
+        const folderIdMap = new Map<string, string>();
+        folderIdMap.set('', targetRootFolderId);
+
+        const newFolderItems: DriveItem[] = [];
+        for (const folder of discoveredFolders) {
+          const parentId = folderIdMap.get(folder.parentPath) || targetRootFolderId;
+          const folderId = Math.random().toString(36).substring(2, 9);
+          folderIdMap.set(folder.fullPath, folderId);
+
+          newFolderItems.push({
+            id: folderId,
+            parentId: parentId,
+            name: folder.name,
+            type: 'folder',
+            updatedAt: new Date().toISOString(),
+            owner: activeNav === 'shared' ? 'colleague@example.com' : 'me',
+            source: activeNav === 'computers' ? 'computer' : 'drive',
+            computerDevice: activeNav === 'computers' ? 'This PC' : undefined,
+            folderPath: folder.name
+          });
+        }
+
+        const newFileItems: DriveItem[] = filesWithFolder.map(({ file, folderPath }) => {
+          const isVideo = file.type.includes('video') || !!file.name.match(/\.(mp4|mov|webm|mkv|avi|m4v)$/i);
+          let videoUrl: string | undefined = undefined;
+          if (isVideo) {
+            try {
+              videoUrl = URL.createObjectURL(file);
+            } catch (err) {
+              console.error('Error creating object URL for video', err);
+            }
+          }
+
+          const parentId = folderIdMap.get(folderPath) || targetRootFolderId;
+
+          return {
+            id: Math.random().toString(36).substring(2, 9),
+            parentId: parentId,
+            name: file.name,
+            type: file.type.includes('image') ? 'image' : 
+                  isVideo ? 'video' : 
+                  file.type.includes('spreadsheet') || file.name.endsWith('.xlsx') || file.name.endsWith('.csv') ? 'spreadsheet' :
+                  file.type.includes('zip') || file.name.endsWith('.zip') || file.name.endsWith('.rar') || file.name.endsWith('.7z') ? 'archive' : 'document',
+            size: file.size,
+            updatedAt: new Date().toISOString(),
+            owner: activeNav === 'shared' ? 'colleague@example.com' : 'me',
+            source: activeNav === 'computers' ? 'computer' : 'drive',
+            videoUrl,
+            computerDevice: activeNav === 'computers' ? 'This PC' : undefined,
+            folderPath: folderPath || undefined
+          };
+        });
+
+        setDriveItems(prev => [...prev, ...newFolderItems, ...newFileItems]);
+        setShowUploadMenu(false);
+        showToast({
+          type: 'success',
+          title: 'Folder Upload Complete',
+          message: `${newFileItems.length} file(s) and ${newFolderItems.length} folder(s) (${formatBytes(incomingBytes)}) added to AsterDrive.`
+        });
+        e.target.value = '';
+        return;
+      }
+
+      const newItems: DriveItem[] = filesArray.map(file => {
+        const isVideo = file.type.includes('video') || !!file.name.match(/\.(mp4|mov|webm|mkv|avi|m4v)$/i);
+        let videoUrl: string | undefined = undefined;
+        if (isVideo) {
+          try {
+            videoUrl = URL.createObjectURL(file);
+          } catch (err) {
+            console.error('Error creating object URL for video', err);
+          }
+        }
+
+        return {
+          id: Math.random().toString(36).substring(7),
+          parentId: currentFolderId,
+          name: file.name,
+          type: file.type.includes('image') ? 'image' : 
+                isVideo ? 'video' : 
+                file.type.includes('spreadsheet') || file.name.endsWith('.xlsx') || file.name.endsWith('.csv') ? 'spreadsheet' :
+                file.type.includes('zip') || file.name.endsWith('.zip') || file.name.endsWith('.rar') ? 'archive' : 'document',
+          size: file.size,
+          updatedAt: new Date().toISOString(),
+          owner: activeNav === 'shared' ? 'colleague@example.com' : 'me',
+          source: activeNav === 'computers' ? 'computer' : 'drive',
+          videoUrl,
+          computerDevice: activeNav === 'computers' ? 'This PC' : undefined,
+          folderPath: activeNav === 'computers' ? 'Uploaded from PC' : undefined
+        };
+      });
 
       setDriveItems(prev => [...prev, ...newItems]);
       setShowUploadMenu(false);
@@ -359,6 +636,392 @@ export default function AsterDriveApp() {
       });
       e.target.value = '';
     }
+  };
+
+  // Full-Window Drag and Drop Handlers with recursive folder structure preservation
+  const handleWindowDragEnter = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounter.current += 1;
+    if (e.dataTransfer && (e.dataTransfer.types.includes('Files') || (e.dataTransfer.items && e.dataTransfer.items.length > 0))) {
+      setIsDraggingOver(true);
+    }
+  };
+
+  const handleWindowDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.dataTransfer) {
+      e.dataTransfer.dropEffect = 'copy';
+    }
+  };
+
+  const handleWindowDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounter.current -= 1;
+    if (dragCounter.current <= 0) {
+      dragCounter.current = 0;
+      setIsDraggingOver(false);
+    }
+  };
+
+  const processDroppedDataTransfer = async (dataTransfer: DataTransfer) => {
+    interface DiscoveredFolder {
+      fullPath: string;
+      name: string;
+      parentPath: string;
+    }
+    interface DiscoveredFile {
+      file: File;
+      folderPath: string;
+    }
+
+    const discoveredFolders: DiscoveredFolder[] = [];
+    const discoveredFiles: DiscoveredFile[] = [];
+
+    const traverseEntry = async (entry: any, parentPath: string = '') => {
+      if (!entry) return;
+      if (entry.isFile) {
+        await new Promise<void>((resolve) => {
+          entry.file((file: File) => {
+            discoveredFiles.push({ file, folderPath: parentPath });
+            resolve();
+          }, () => resolve());
+        });
+      } else if (entry.isDirectory) {
+        const currentPath = parentPath ? `${parentPath}/${entry.name}` : entry.name;
+        if (!discoveredFolders.some(f => f.fullPath === currentPath)) {
+          discoveredFolders.push({
+            fullPath: currentPath,
+            name: entry.name,
+            parentPath: parentPath
+          });
+        }
+
+        const reader = entry.createReader();
+        const readEntries = async (): Promise<any[]> => {
+          return new Promise((resolve) => {
+            reader.readEntries((entries: any[]) => {
+              resolve(entries || []);
+            }, () => resolve([]));
+          });
+        };
+
+        let batch: any[];
+        do {
+          batch = await readEntries();
+          for (const child of batch) {
+            await traverseEntry(child, currentPath);
+          }
+        } while (batch && batch.length > 0);
+      }
+    };
+
+    const items = dataTransfer.items;
+    if (items && items.length > 0) {
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        if (item.kind === 'file') {
+          const entry = (item as any).webkitGetAsEntry ? (item as any).webkitGetAsEntry() : null;
+          if (entry) {
+            await traverseEntry(entry, '');
+          } else {
+            const file = item.getAsFile();
+            if (file) {
+              discoveredFiles.push({ file, folderPath: '' });
+            }
+          }
+        }
+      }
+    } else if (dataTransfer.files && dataTransfer.files.length > 0) {
+      const filesArray = Array.from(dataTransfer.files);
+      for (const file of filesArray) {
+        const relPath = (file as any).webkitRelativePath;
+        let folderPath = '';
+        if (relPath && relPath.includes('/')) {
+          const parts = relPath.split('/');
+          folderPath = parts.slice(0, -1).join('/');
+          let accum = '';
+          for (let p = 0; p < parts.length - 1; p++) {
+            const prev = accum;
+            accum = accum ? `${accum}/${parts[p]}` : parts[p];
+            if (!discoveredFolders.some(f => f.fullPath === accum)) {
+              discoveredFolders.push({
+                fullPath: accum,
+                name: parts[p],
+                parentPath: prev
+              });
+            }
+          }
+        }
+        discoveredFiles.push({ file, folderPath });
+      }
+    }
+
+    if (discoveredFiles.length === 0 && discoveredFolders.length === 0) {
+      return;
+    }
+
+    const totalIncomingBytes = discoveredFiles.reduce((acc, f) => acc + (f.file.size || 0), 0);
+
+    if (totalUsedBytes + totalIncomingBytes > currentPlan.maxBytes) {
+      showToast({
+        type: 'warning',
+        title: 'Storage Quota Exceeded',
+        message: `Uploading ${discoveredFiles.length} file(s) (${formatBytes(totalIncomingBytes)}) exceeds your ${currentPlan.name} limit (${currentPlan.storage}). Currently using ${formatBytes(totalUsedBytes)} of ${currentPlan.storage}.`
+      });
+      setIsUpgradeModalOpen(true);
+      return;
+    }
+
+    const targetRootFolderId = activeNav === 'trash' ? 'root' : currentFolderId;
+
+    discoveredFolders.sort((a, b) => a.fullPath.split('/').length - b.fullPath.split('/').length);
+    const folderIdMap = new Map<string, string>();
+    folderIdMap.set('', targetRootFolderId);
+
+    const newFolderItems: DriveItem[] = [];
+    for (const folder of discoveredFolders) {
+      const parentId = folderIdMap.get(folder.parentPath) || targetRootFolderId;
+      const folderId = Math.random().toString(36).substring(2, 9);
+      folderIdMap.set(folder.fullPath, folderId);
+
+      newFolderItems.push({
+        id: folderId,
+        parentId: parentId,
+        name: folder.name,
+        type: 'folder',
+        updatedAt: new Date().toISOString(),
+        owner: activeNav === 'shared' ? 'colleague@example.com' : 'me',
+        source: activeNav === 'computers' ? 'computer' : 'drive',
+        computerDevice: activeNav === 'computers' ? 'This PC' : undefined,
+        folderPath: folder.name
+      });
+    }
+
+    const newFileItems: DriveItem[] = discoveredFiles.map(({ file, folderPath }) => {
+      const isVideo = file.type.includes('video') || !!file.name.match(/\.(mp4|mov|webm|mkv|avi|m4v)$/i);
+      let videoUrl: string | undefined = undefined;
+      if (isVideo) {
+        try {
+          videoUrl = URL.createObjectURL(file);
+        } catch (err) {
+          console.error('Error creating object URL for video', err);
+        }
+      }
+
+      const parentId = folderIdMap.get(folderPath) || targetRootFolderId;
+
+      return {
+        id: Math.random().toString(36).substring(2, 9),
+        parentId: parentId,
+        name: file.name,
+        type: file.type.includes('image') ? 'image' : 
+              isVideo ? 'video' : 
+              file.type.includes('spreadsheet') || file.name.endsWith('.xlsx') || file.name.endsWith('.csv') ? 'spreadsheet' :
+              file.type.includes('zip') || file.name.endsWith('.zip') || file.name.endsWith('.rar') || file.name.endsWith('.7z') ? 'archive' : 'document',
+        size: file.size,
+        updatedAt: new Date().toISOString(),
+        owner: activeNav === 'shared' ? 'colleague@example.com' : 'me',
+        source: activeNav === 'computers' ? 'computer' : 'drive',
+        videoUrl,
+        computerDevice: activeNav === 'computers' ? 'This PC' : undefined,
+        folderPath: folderPath || undefined
+      };
+    });
+
+    setDriveItems(prev => [...prev, ...newFolderItems, ...newFileItems]);
+    showToast({
+      type: 'success',
+      title: 'Upload Successful',
+      message: `${newFileItems.length} file(s)${newFolderItems.length > 0 ? ` and ${newFolderItems.length} folder(s)` : ''} (${formatBytes(totalIncomingBytes)}) added to AsterDrive.`
+    });
+  };
+
+  const handleWindowDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounter.current = 0;
+    setIsDraggingOver(false);
+    await processDroppedDataTransfer(e.dataTransfer);
+  };
+
+  // Dedicated Computer Sync & Backup Upload handler
+  const handleComputerUpload = (e: React.ChangeEvent<HTMLInputElement>, deviceName: string = 'My Computer') => {
+    if (e.target.files && e.target.files.length > 0) {
+      const filesArray = Array.from(e.target.files);
+      const incomingBytes = filesArray.reduce((acc, file) => acc + (file.size || 0), 0);
+
+      if (totalUsedBytes + incomingBytes > currentPlan.maxBytes) {
+        showToast({
+          type: 'warning',
+          title: 'Storage Quota Exceeded',
+          message: `Backing up ${filesArray.length} file(s) (${formatBytes(incomingBytes)}) exceeds your ${currentPlan.name} limit (${currentPlan.storage}). Currently using ${formatBytes(totalUsedBytes)} of ${currentPlan.storage}.`
+        });
+        setIsUpgradeModalOpen(true);
+        e.target.value = '';
+        return;
+      }
+
+      const newItems: DriveItem[] = filesArray.map(file => {
+        const isVideo = file.type.includes('video') || !!file.name.match(/\.(mp4|mov|webm|mkv|avi|m4v)$/i);
+        let videoUrl: string | undefined = undefined;
+        if (isVideo) {
+          try {
+            videoUrl = URL.createObjectURL(file);
+          } catch (err) {
+            console.error('Error creating object URL for video', err);
+          }
+        }
+        const relPath = (file as any).webkitRelativePath;
+        const folderName = relPath && relPath.includes('/') ? relPath.split('/')[0] : 'Synced Backup Folder';
+
+        return {
+          id: Math.random().toString(36).substring(7),
+          parentId: 'root',
+          name: file.name,
+          type: file.type.includes('image') ? 'image' : 
+                isVideo ? 'video' : 
+                file.type.includes('spreadsheet') || file.name.endsWith('.xlsx') || file.name.endsWith('.csv') ? 'spreadsheet' :
+                file.type.includes('zip') || file.name.endsWith('.zip') || file.name.endsWith('.rar') ? 'archive' : 'document',
+          size: file.size,
+          updatedAt: new Date().toISOString(),
+          owner: 'me',
+          source: 'computer',
+          videoUrl,
+          computerDevice: deviceName,
+          folderPath: folderName
+        };
+      });
+
+      setDriveItems(prev => [...prev, ...newItems]);
+      setIsSyncModalOpen(false);
+      showToast({
+        type: 'success',
+        title: 'Computer Sync Completed',
+        message: `${newItems.length} file(s) from "${deviceName}" successfully backed up and synced.`
+      });
+      e.target.value = '';
+    }
+  };
+
+  // Instant 1-click Preset Sync simulation for Windows PC & MacBook
+  const handleSyncPreset = (deviceType: 'windows' | 'mac') => {
+    const isWindows = deviceType === 'windows';
+    const deviceName = isWindows ? 'Windows 11 Workstation' : 'MacBook Pro (M3)';
+    const folderPath = isWindows ? 'C:\\Users\\Workspace\\Videos & Backups' : '~/Movies/Screen_Recordings';
+
+    const presetItems: DriveItem[] = isWindows ? [
+      {
+        id: Math.random().toString(36).substring(7),
+        parentId: 'root',
+        name: 'Project_Tutorial_4K.mp4',
+        type: 'video',
+        size: 320 * 1024 * 1024,
+        updatedAt: new Date(Date.now() - 3600000).toISOString(),
+        owner: 'me',
+        source: 'computer',
+        videoUrl: SAMPLE_VIDEO_URL,
+        computerDevice: deviceName,
+        folderPath
+      },
+      {
+        id: Math.random().toString(36).substring(7),
+        parentId: 'root',
+        name: 'Weekly_Client_Demo.mp4',
+        type: 'video',
+        size: 150 * 1024 * 1024,
+        updatedAt: new Date(Date.now() - 7200000).toISOString(),
+        owner: 'me',
+        source: 'computer',
+        videoUrl: SECONDARY_VIDEO_URL,
+        computerDevice: deviceName,
+        folderPath
+      },
+      {
+        id: Math.random().toString(36).substring(7),
+        parentId: 'root',
+        name: 'Windows_System_Backup.zip',
+        type: 'archive',
+        size: 80 * 1024 * 1024,
+        updatedAt: new Date(Date.now() - 14400000).toISOString(),
+        owner: 'me',
+        source: 'computer',
+        computerDevice: deviceName,
+        folderPath
+      },
+      {
+        id: Math.random().toString(36).substring(7),
+        parentId: 'root',
+        name: 'Sync_Backup_Summary.pdf',
+        type: 'document',
+        size: 15 * 1024 * 1024,
+        updatedAt: new Date(Date.now() - 18000000).toISOString(),
+        owner: 'me',
+        source: 'computer',
+        computerDevice: deviceName,
+        folderPath
+      }
+    ] : [
+      {
+        id: Math.random().toString(36).substring(7),
+        parentId: 'root',
+        name: 'Mac_Screen_Recording_AppDemo.mp4',
+        type: 'video',
+        size: 240 * 1024 * 1024,
+        updatedAt: new Date(Date.now() - 1800000).toISOString(),
+        owner: 'me',
+        source: 'computer',
+        videoUrl: SAMPLE_VIDEO_URL,
+        computerDevice: deviceName,
+        folderPath
+      },
+      {
+        id: Math.random().toString(36).substring(7),
+        parentId: 'root',
+        name: 'FinalCut_Render_Preview.mp4',
+        type: 'video',
+        size: 160 * 1024 * 1024,
+        updatedAt: new Date(Date.now() - 5400000).toISOString(),
+        owner: 'me',
+        source: 'computer',
+        videoUrl: SECONDARY_VIDEO_URL,
+        computerDevice: deviceName,
+        folderPath
+      },
+      {
+        id: Math.random().toString(36).substring(7),
+        parentId: 'root',
+        name: 'Keynote_Deck_Q4.pdf',
+        type: 'document',
+        size: 25 * 1024 * 1024,
+        updatedAt: new Date(Date.now() - 10800000).toISOString(),
+        owner: 'me',
+        source: 'computer',
+        computerDevice: deviceName,
+        folderPath
+      }
+    ];
+
+    const presetBytes = presetItems.reduce((acc, item) => acc + (item.size || 0), 0);
+    if (totalUsedBytes + presetBytes > currentPlan.maxBytes) {
+      showToast({
+        type: 'warning',
+        title: 'Storage Limit Reached',
+        message: `Syncing preset (${formatBytes(presetBytes)}) exceeds your ${currentPlan.name} quota (${currentPlan.storage}). Upgrade storage to add more synced computers.`
+      });
+      setIsUpgradeModalOpen(true);
+      return;
+    }
+
+    setDriveItems(prev => [...prev, ...presetItems]);
+    setIsSyncModalOpen(false);
+    showToast({
+      type: 'success',
+      title: `${deviceName} Synced`,
+      message: `${presetItems.length} items (${formatBytes(presetBytes)}) synced and backed up to AsterDrive.`
+    });
   };
 
   // Helper to add simulated files for easy quota and upgrade testing
@@ -382,7 +1045,8 @@ export default function AsterDriveApp() {
       size,
       updatedAt: new Date().toISOString(),
       owner: 'me',
-      source: 'drive'
+      source: 'drive',
+      videoUrl: type === 'video' ? SAMPLE_VIDEO_URL : undefined
     };
 
     setDriveItems(prev => [...prev, newItem]);
@@ -500,6 +1164,8 @@ export default function AsterDriveApp() {
     if (item.type === 'folder' && activeNav !== 'trash') {
       setCurrentFolderId(item.id);
       setSelectedItems(new Set());
+    } else if (item.type === 'video' && !item.trashed) {
+      openVideoPreview(item);
     } else {
       toggleSelection(item.id);
     }
@@ -517,6 +1183,16 @@ export default function AsterDriveApp() {
     });
   };
 
+  const handleNavSelect = (itemId: string) => {
+    setActiveNav(itemId);
+    setSearchQuery('');
+    setSelectedItems(new Set());
+    if (itemId === 'my-drive') {
+      setCurrentFolderId('root');
+    }
+    setIsMobileMenuOpen(false);
+  };
+
   const navigation = [
     { id: 'my-drive', label: 'My Drive', icon: HardDrive },
     { id: 'computers', label: 'Computers', icon: Computer },
@@ -531,7 +1207,52 @@ export default function AsterDriveApp() {
     : null;
 
   return (
-    <div className="flex h-screen bg-slate-50 font-sans text-slate-800 overflow-hidden select-none" suppressHydrationWarning>
+    <div 
+      className="flex h-screen bg-slate-50 font-sans text-slate-800 overflow-hidden select-none relative" 
+      suppressHydrationWarning
+      onDragEnter={handleWindowDragEnter}
+      onDragOver={handleWindowDragOver}
+      onDragLeave={handleWindowDragLeave}
+      onDrop={handleWindowDrop}
+    >
+      {/* FULL-WINDOW DRAG AND DROP OVERLAY */}
+      <AnimatePresence>
+        {isDraggingOver && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.15 }}
+            className="fixed inset-0 z-[100] bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-6 sm:p-10 pointer-events-none"
+          >
+            <motion.div
+              initial={{ scale: 0.9, y: 15 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.9, y: 15 }}
+              transition={{ type: "spring", stiffness: 350, damping: 25 }}
+              className="max-w-lg w-full bg-white/95 backdrop-blur-xl border-2 border-dashed border-blue-500 rounded-3xl p-8 sm:p-10 text-center shadow-2xl flex flex-col items-center"
+            >
+              <div className="w-20 h-20 rounded-2xl bg-blue-100 text-blue-600 flex items-center justify-center mb-5 shadow-inner animate-bounce">
+                <UploadCloud className="w-10 h-10" />
+              </div>
+              <h2 className="text-xl sm:text-2xl font-bold text-slate-900 mb-2">
+                Drop files or folders here
+              </h2>
+              <p className="text-slate-600 text-sm mb-4 max-w-sm">
+                Release anywhere to upload into{' '}
+                <span className="font-semibold text-blue-600">
+                  {currentFolderId === 'root' ? (activeNav === 'computers' ? 'Synced Computers' : 'My Drive') : (driveItems.find(i => i.id === currentFolderId)?.name || 'Current Folder')}
+                </span>
+              </p>
+              <div className="flex items-center gap-2 text-xs font-medium text-slate-600 bg-slate-100/90 px-3.5 py-2 rounded-full border border-slate-200/60">
+                <Folder className="w-4 h-4 text-blue-500" />
+                <span>Entire nested folder structures are preserved automatically</span>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* MOBILE MENU OVERLAY */}
       <AnimatePresence>
         {isMobileMenuOpen && (
@@ -539,7 +1260,7 @@ export default function AsterDriveApp() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-40 bg-slate-900/50 lg:hidden"
+            className="fixed inset-0 z-40 bg-slate-900/50 backdrop-blur-xs lg:hidden cursor-pointer"
             onClick={() => setIsMobileMenuOpen(false)}
           />
         )}
@@ -548,17 +1269,24 @@ export default function AsterDriveApp() {
       {/* SIDEBAR */}
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-50 w-64 bg-slate-50 border-r border-slate-200 transform transition-transform duration-200 ease-in-out lg:relative lg:translate-x-0 flex flex-col",
-          isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"
+          "w-64 bg-slate-50 border-r border-slate-200 flex flex-col transition-transform duration-200 ease-in-out shrink-0 select-none",
+          "fixed inset-y-0 left-0 z-50 lg:static lg:inset-auto lg:z-0 lg:translate-x-0",
+          isMobileMenuOpen ? "translate-x-0 shadow-2xl" : "-translate-x-full lg:translate-x-0"
         )}
       >
-        <div className="h-16 flex items-center justify-between px-6 border-b border-transparent">
-          <div className="flex items-center gap-2 text-blue-600 font-display font-semibold text-xl tracking-tight">
+        <div className="h-16 flex items-center justify-between px-6 border-b border-transparent shrink-0">
+          <button
+            type="button"
+            onClick={() => handleNavSelect('my-drive')}
+            className="flex items-center gap-2 text-blue-600 font-display font-semibold text-xl tracking-tight cursor-pointer hover:opacity-90 transition-opacity"
+            title="AsterDrive - Home"
+          >
             <Cloud className="w-7 h-7 fill-blue-100 stroke-blue-600" />
             AsterDrive
-          </div>
+          </button>
           <button 
-            className="lg:hidden text-slate-400 hover:text-slate-600 hover:bg-slate-200 p-1.5 rounded-lg transition-colors"
+            type="button"
+            className="lg:hidden text-slate-400 hover:text-slate-600 hover:bg-slate-200 p-2 rounded-xl transition-colors cursor-pointer"
             onClick={() => setIsMobileMenuOpen(false)}
             aria-label="Close menu"
           >
@@ -566,93 +1294,49 @@ export default function AsterDriveApp() {
           </button>
         </div>
 
-        <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-          {navigation.map((item) => (
-            <button
-              key={item.id}
-              onClick={() => {
-                setActiveNav(item.id);
-                setSearchQuery('');
-                if (item.id === 'my-drive') setCurrentFolderId('root');
-                if (window.innerWidth < 1024) setIsMobileMenuOpen(false);
-              }}
-              className={cn(
-                "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors text-left",
-                activeNav === item.id 
-                  ? "bg-blue-100/60 text-blue-700 font-semibold" 
-                  : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
-              )}
-            >
-              <item.icon className={cn("w-5 h-5", activeNav === item.id ? "text-blue-600" : "text-slate-400")} />
-              {item.label}
-            </button>
-          ))}
+        <nav className="flex-1 px-3 py-4 space-y-1.5 overflow-y-auto pointer-events-auto touch-manipulation">
+          {navigation.map((item) => {
+            const isActive = activeNav === item.id;
+            const Icon = item.icon;
+            return (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => handleNavSelect(item.id)}
+                className={cn(
+                  "w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all duration-150 text-left select-none cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-blue-500",
+                  "active:scale-[0.98] active:bg-slate-200/80",
+                  isActive
+                    ? "bg-blue-100/70 text-blue-700 font-semibold shadow-xs border border-blue-200/50"
+                    : "text-slate-600 hover:bg-slate-100/90 hover:text-slate-900"
+                )}
+                aria-current={isActive ? 'page' : undefined}
+              >
+                <Icon className={cn("w-5 h-5 shrink-0 transition-colors", isActive ? "text-blue-600" : "text-slate-500")} />
+                <span className="truncate flex-1">{item.label}</span>
+                {item.id === 'trash' && driveItems.some(i => i.trashed) && (
+                  <span className="w-2 h-2 rounded-full bg-rose-500 shrink-0" title="Trash contains files" />
+                )}
+              </button>
+            );
+          })}
         </nav>
-
-        {/* SIDEBAR STORAGE WIDGET */}
-        <div className="p-4 m-4 bg-white rounded-xl border border-slate-200 shadow-sm">
-          <div className="flex items-center justify-between mb-2">
-            <div className="flex items-center gap-2 text-sm font-semibold text-slate-700">
-              <Cloud className="w-4 h-4 text-blue-600" />
-              Storage
-            </div>
-            {currentPlan.isFree ? (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                Free Plan
-              </span>
-            ) : (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-blue-50 text-blue-700 border border-blue-200">
-                <Sparkles className="w-3 h-3 text-blue-600" />
-                {currentPlan.storage} Plan
-              </span>
-            )}
-          </div>
-          
-          <div className="w-full bg-slate-100 rounded-full h-2 mb-2 overflow-hidden">
-            <div 
-              className={cn(
-                "h-2 rounded-full transition-all duration-500 ease-out",
-                storagePercentage >= 95 ? "bg-rose-500" :
-                storagePercentage >= 80 ? "bg-amber-500" :
-                "bg-blue-600"
-              )}
-              style={{ width: `${storagePercentage}%` }}
-              suppressHydrationWarning
-            />
-          </div>
-
-          <div className="flex items-center justify-between text-xs text-slate-500 font-medium mb-3">
-            <span>{totalUsedBytes === 0 ? '0 B' : formatBytes(totalUsedBytes)} of {currentPlan.storage} used</span>
-            <span className="text-slate-400 font-mono">{Math.round(storagePercentage)}%</span>
-          </div>
-
-          <button 
-            onClick={() => {
-              setIsMobileMenuOpen(false);
-              setIsUpgradeModalOpen(true);
-            }}
-            className="w-full px-4 py-2 text-sm text-blue-600 border border-blue-200 rounded-lg font-medium hover:bg-blue-50 transition-colors cursor-pointer active:bg-blue-100 flex items-center justify-center gap-1.5"
-          >
-            <Sparkles className="w-4 h-4 text-blue-600" />
-            {currentPlan.isFree ? 'Upgrade storage' : 'Change plan'}
-          </button>
-        </div>
       </aside>
 
       {/* MAIN CONTENT */}
       <div className="flex-1 flex flex-col min-w-0 bg-white rounded-tl-2xl border-t border-l border-slate-200 shadow-sm overflow-hidden lg:my-2 lg:mr-2">
         {/* HEADER */}
-        <header className="h-16 flex items-center justify-between px-4 lg:px-6 border-b border-slate-100 gap-4 shrink-0">
-          <div className="flex items-center gap-3 flex-1 max-w-2xl">
+        <header className="h-16 flex items-center justify-between px-4 lg:px-6 border-b border-slate-100 gap-4 shrink-0" suppressHydrationWarning>
+          <div className="flex items-center gap-3 flex-1 max-w-2xl" suppressHydrationWarning>
             <button 
-              className="lg:hidden text-slate-500 hover:bg-slate-100 p-2 rounded-lg transition-colors -ml-2 shrink-0"
+              type="button"
+              className="lg:hidden text-slate-500 hover:bg-slate-100 p-2 rounded-xl transition-colors -ml-2 shrink-0 cursor-pointer"
               onClick={() => setIsMobileMenuOpen(true)}
               aria-label="Open sidebar"
             >
               <Menu className="w-5 h-5" />
             </button>
-            <div className="relative w-full">
+            <div className="relative w-full" suppressHydrationWarning>
               <Search className="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
               <input
                 type="text"
@@ -660,6 +1344,7 @@ export default function AsterDriveApp() {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full pl-10 pr-4 py-2 bg-slate-100/80 hover:bg-slate-100 focus:bg-white border border-transparent focus:border-slate-300 rounded-xl text-sm outline-none transition-all"
+                suppressHydrationWarning
               />
               {searchQuery && (
                 <button 
@@ -876,7 +1561,14 @@ export default function AsterDriveApp() {
             {searchQuery ? (
               <span className="font-medium text-slate-800 text-lg">Search results for &ldquo;{searchQuery}&rdquo;</span>
             ) : activeNav !== 'my-drive' ? (
-              <span className="font-medium text-slate-800 text-lg capitalize">{activeNav.replace('-', ' ')}</span>
+              <div className="flex items-center gap-2">
+                <span className="font-semibold text-slate-800 text-xl">
+                  {navigation.find(n => n.id === activeNav)?.label || activeNav}
+                </span>
+                <span className="text-xs px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-500 font-medium">
+                  {displayedItems.length} {displayedItems.length === 1 ? 'item' : 'items'}
+                </span>
+              </div>
             ) : (
               <div className="flex items-center flex-wrap gap-1">
                 {breadcrumbs.map((crumb, idx) => (
@@ -963,44 +1655,244 @@ export default function AsterDriveApp() {
         {/* FILE LIST AREA */}
         <div className="flex-1 flex overflow-hidden">
           <div className="flex-1 overflow-y-auto px-4 lg:px-6 pb-6">
-            {displayedItems.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-full text-center px-4">
-                <div className="w-24 h-24 bg-slate-50 rounded-full flex items-center justify-center mb-4">
-                  {activeNav === 'computers' ? <Computer className="w-10 h-10 text-slate-300" /> :
-                   activeNav === 'shared' ? <Users className="w-10 h-10 text-slate-300" /> :
-                   activeNav === 'recent' ? <Clock className="w-10 h-10 text-slate-300" /> :
-                   activeNav === 'starred' ? <Star className="w-10 h-10 text-slate-300" /> :
-                   activeNav === 'trash' ? <Trash2 className="w-10 h-10 text-slate-300" /> :
-                   <FolderOpen className="w-10 h-10 text-slate-300" />}
+            {/* QUICK DRAG-AND-DROP UPLOAD CALLOUT BAR */}
+            {(activeNav === 'my-drive' || activeNav === 'computers') && (
+              <div 
+                onClick={() => fileInputRef.current?.click()}
+                className="mb-4 py-2.5 px-4 bg-slate-50/90 hover:bg-blue-50/60 border border-dashed border-slate-200 hover:border-blue-400 rounded-2xl flex items-center justify-between text-xs text-slate-600 hover:text-blue-700 transition-all cursor-pointer group shadow-2xs"
+              >
+                <div className="flex items-center gap-2.5">
+                  <div className="w-6 h-6 rounded-lg bg-blue-100/80 text-blue-600 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
+                    <UploadCloud className="w-3.5 h-3.5" />
+                  </div>
+                  <span className="font-medium">
+                    Drag &amp; drop files or entire folders here to upload directly
+                  </span>
                 </div>
-                <h3 className="text-lg font-semibold text-slate-900 mb-1">
-                  {activeNav === 'computers' ? 'No computers syncing' :
-                   activeNav === 'shared' ? 'Nothing shared with you' :
-                   activeNav === 'recent' ? 'No recent files' :
-                   activeNav === 'starred' ? 'No starred files' :
-                   activeNav === 'trash' ? 'Trash is empty' :
-                   'Your drive is empty'}
-                </h3>
-                <p className="text-slate-500 max-w-sm text-sm">
-                  {activeNav === 'trash' 
-                    ? 'Files in trash are kept safely before being emptied.'
-                    : 'Use the "+" button at the bottom right to upload files, folders, or simulate file storage under your Free Plan (1 GB).'}
-                </p>
-                <div className="mt-4 flex items-center gap-2">
+                <div className="flex items-center gap-2 text-[11px] text-slate-400 group-hover:text-blue-600 shrink-0">
+                  <span className="hidden sm:inline">Nested trees preserved</span>
+                  <span className="font-semibold underline">Browse computer</span>
+                </div>
+              </div>
+            )}
+
+            {/* COMPUTERS TOP STATUS BANNER (When synced items exist) */}
+            {activeNav === 'computers' && displayedItems.length > 0 && (
+              <div className="mb-5 p-4 bg-gradient-to-r from-blue-50/90 via-indigo-50/40 to-slate-50 border border-blue-100 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-3 shadow-2xs">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-sm shadow-blue-500/20">
+                    <Computer className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-semibold text-slate-900 text-sm">Computer Sync &amp; Backup</span>
+                      <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-emerald-700 bg-emerald-100/70 px-2 py-0.5 rounded-full">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                        Real-time Backup Active
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      {displayedItems.length} synced files • Total backed up {formatBytes(displayedItems.reduce((acc, i) => acc + (i.size || 0), 0))}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 flex-wrap shrink-0">
                   <button 
-                    onClick={() => fileInputRef.current?.click()}
-                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors shadow-sm"
+                    type="button"
+                    onClick={() => computerFolderInputRef.current?.click()}
+                    className="px-3 py-1.5 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-lg text-xs font-semibold transition-colors shadow-2xs flex items-center gap-1.5 cursor-pointer"
                   >
-                    Upload files
+                    <Folder className="w-3.5 h-3.5 text-amber-500" />
+                    Sync Folder
                   </button>
                   <button 
-                    onClick={() => handleAddSimulatedFile('Project_Assets.zip', 400 * 1024 * 1024, 'archive')}
-                    className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-sm font-medium transition-colors"
+                    type="button"
+                    onClick={() => computerFileInputRef.current?.click()}
+                    className="px-3 py-1.5 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-lg text-xs font-semibold transition-colors shadow-2xs flex items-center gap-1.5 cursor-pointer"
                   >
-                    + Add 400 MB test file
+                    <UploadCloud className="w-3.5 h-3.5 text-blue-600" />
+                    Sync File
+                  </button>
+                  <button 
+                    type="button"
+                    onClick={() => setIsSyncModalOpen(true)}
+                    className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold transition-colors shadow-2xs flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <Monitor className="w-3.5 h-3.5" />
+                    Presets
                   </button>
                 </div>
               </div>
+            )}
+
+            {displayedItems.length === 0 ? (
+              activeNav === 'computers' ? (
+                <div className="flex flex-col items-center justify-center py-10 px-4 max-w-xl mx-auto text-center">
+                  <div className="w-20 h-20 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center mb-5 shadow-sm">
+                    <Computer className="w-10 h-10" />
+                  </div>
+                  <h3 className="text-xl font-bold text-slate-900 mb-2">
+                    Sync &amp; Backup from your computer
+                  </h3>
+                  <p className="text-slate-600 text-sm leading-relaxed mb-6 max-w-md">
+                    Safely backup videos, photos, and project folders directly from your PC or Mac. Any synced files are accessible anytime, anywhere on AsterDrive.
+                  </p>
+
+                  {/* Preset Cards & Actions */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full mb-6 text-left">
+                    <div 
+                      onClick={() => handleSyncPreset('windows')}
+                      className="p-4 rounded-xl border border-slate-200 hover:border-blue-400 bg-white hover:bg-blue-50/40 shadow-xs transition-all cursor-pointer group"
+                    >
+                      <div className="flex items-center gap-3 mb-2">
+                        <div className="w-9 h-9 rounded-lg bg-blue-100/70 text-blue-700 flex items-center justify-center font-bold">
+                          <Monitor className="w-5 h-5" />
+                        </div>
+                        <div>
+                          <h4 className="font-semibold text-slate-900 text-sm group-hover:text-blue-700 transition-colors">Windows PC Sync</h4>
+                          <span className="text-[11px] text-slate-500">Preset • 4K Videos &amp; Docs</span>
+                        </div>
+                      </div>
+                      <p className="text-xs text-slate-500 mb-3">Syncs sample 4K videos and workstation backups (~565 MB).</p>
+                      <button 
+                        type="button" 
+                        className="text-xs font-semibold text-blue-600 group-hover:text-blue-700 flex items-center gap-1"
+                      >
+                        ⚡ Sync Windows PC now →
+                      </button>
+                    </div>
+
+                    <div 
+                      onClick={() => handleSyncPreset('mac')}
+                      className="p-4 rounded-xl border border-slate-200 hover:border-purple-400 bg-white hover:bg-purple-50/40 shadow-xs transition-all cursor-pointer group"
+                    >
+                      <div className="flex items-center gap-3 mb-2">
+                        <div className="w-9 h-9 rounded-lg bg-purple-100/70 text-purple-700 flex items-center justify-center font-bold">
+                          <Laptop className="w-5 h-5" />
+                        </div>
+                        <div>
+                          <h4 className="font-semibold text-slate-900 text-sm group-hover:text-purple-700 transition-colors">MacBook Sync</h4>
+                          <span className="text-[11px] text-slate-500">Preset • Screen Recordings</span>
+                        </div>
+                      </div>
+                      <p className="text-xs text-slate-500 mb-3">Syncs sample app demo videos and keynote decks (~425 MB).</p>
+                      <button 
+                        type="button" 
+                        className="text-xs font-semibold text-purple-600 group-hover:text-purple-700 flex items-center gap-1"
+                      >
+                        ⚡ Sync MacBook now →
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Real Folder / File Sync Buttons */}
+                  <div className="flex items-center gap-2.5 flex-wrap justify-center">
+                    <button 
+                      type="button"
+                      onClick={() => computerFolderInputRef.current?.click()}
+                      className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-semibold transition-colors shadow-sm cursor-pointer flex items-center gap-2"
+                    >
+                      <Folder className="w-4 h-4 text-blue-200" />
+                      Sync Folder from this Computer
+                    </button>
+                    <button 
+                      type="button"
+                      onClick={() => computerFileInputRef.current?.click()}
+                      className="px-4 py-2.5 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-xl text-sm font-medium transition-colors cursor-pointer flex items-center gap-2"
+                    >
+                      <UploadCloud className="w-4 h-4 text-slate-500" />
+                      Sync File
+                    </button>
+                    <button 
+                      type="button"
+                      onClick={() => handleNavSelect('my-drive')}
+                      className="px-3.5 py-2.5 text-slate-500 hover:text-slate-800 text-sm font-medium transition-colors cursor-pointer"
+                    >
+                      ← Back to My Drive
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center h-full text-center px-4">
+                  <div className="w-24 h-24 bg-slate-50 rounded-full flex items-center justify-center mb-4">
+                    {activeNav === 'shared' ? <Users className="w-10 h-10 text-slate-300" /> :
+                     activeNav === 'recent' ? <Clock className="w-10 h-10 text-slate-300" /> :
+                     activeNav === 'starred' ? <Star className="w-10 h-10 text-slate-300" /> :
+                     activeNav === 'trash' ? <Trash2 className="w-10 h-10 text-slate-300" /> :
+                     <FolderOpen className="w-10 h-10 text-slate-300" />}
+                  </div>
+                  <h3 className="text-lg font-semibold text-slate-900 mb-1">
+                    {activeNav === 'shared' ? 'Nothing shared with you' :
+                     activeNav === 'recent' ? 'No recent files' :
+                     activeNav === 'starred' ? 'No starred files' :
+                     activeNav === 'trash' ? 'Trash is empty' :
+                     'Your drive is empty'}
+                  </h3>
+                  <p className="text-slate-500 max-w-sm text-sm">
+                    {activeNav === 'trash' 
+                      ? 'Files in trash are kept safely before being permanently deleted.'
+                      : activeNav === 'starred'
+                      ? 'Star files or folders to easily find them here anytime.'
+                      : activeNav === 'recent'
+                      ? 'Files you have recently opened or edited will appear here.'
+                      : activeNav === 'shared'
+                      ? 'Files and folders shared with you by other collaborators will show here.'
+                      : 'Use the "+" button at the bottom right to upload files or simulate file storage under your Free Plan (1 GB).'}
+                  </p>
+                  <div className="mt-5 flex flex-col items-center gap-3 w-full max-w-sm">
+                    {activeNav === 'my-drive' ? (
+                      <>
+                        <div 
+                          onClick={() => fileInputRef.current?.click()}
+                          className="w-full p-5 border-2 border-dashed border-slate-200 hover:border-blue-400 bg-slate-50/70 hover:bg-blue-50/40 rounded-2xl cursor-pointer transition-all flex flex-col items-center justify-center group"
+                        >
+                          <div className="w-10 h-10 rounded-xl bg-blue-100/80 text-blue-600 flex items-center justify-center mb-2 group-hover:scale-105 transition-transform">
+                            <UploadCloud className="w-5 h-5" />
+                          </div>
+                          <span className="text-xs font-semibold text-slate-800 group-hover:text-blue-700">
+                            Drag &amp; drop files or entire folders here
+                          </span>
+                          <span className="text-[11px] text-slate-400 mt-0.5">
+                            Preserves folder hierarchy automatically
+                          </span>
+                        </div>
+
+                        <div className="flex items-center gap-2 flex-wrap justify-center">
+                          <button 
+                            type="button"
+                            onClick={() => fileInputRef.current?.click()}
+                            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-medium transition-colors shadow-sm cursor-pointer"
+                          >
+                            Browse Files
+                          </button>
+                          <button 
+                            type="button"
+                            onClick={() => folderInputRef.current?.click()}
+                            className="px-4 py-2 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-xl text-xs font-medium transition-colors cursor-pointer"
+                          >
+                            Upload Folder
+                          </button>
+                          <button 
+                            type="button"
+                            onClick={() => handleAddSimulatedFile('Project_Assets.zip', 400 * 1024 * 1024, 'archive')}
+                            className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-xs font-medium transition-colors cursor-pointer"
+                          >
+                            + 400 MB Test File
+                          </button>
+                        </div>
+                      </>
+                    ) : (
+                      <button 
+                        type="button"
+                        onClick={() => handleNavSelect('my-drive')}
+                        className="px-4 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-xl text-sm font-medium transition-colors cursor-pointer"
+                      >
+                        ← Back to My Drive
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )
             ) : viewMode === 'grid' ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
                 <AnimatePresence mode="popLayout">
@@ -1033,12 +1925,19 @@ export default function AsterDriveApp() {
                             : "bg-white border-slate-200 hover:border-slate-300 hover:shadow-sm"
                         )}
                       >
-                        <div className="flex items-start justify-between mb-4">
+                        <div className="flex items-start justify-between mb-3">
                           <div className={cn(
-                            "w-10 h-10 rounded-lg flex items-center justify-center transition-colors",
-                            item.type === 'folder' ? 'bg-blue-50 group-hover:bg-blue-100' : 'bg-slate-50 group-hover:bg-slate-100'
+                            "w-10 h-10 rounded-lg flex items-center justify-center transition-colors relative",
+                            item.type === 'folder' ? 'bg-blue-50 group-hover:bg-blue-100' : 
+                            item.type === 'video' ? 'bg-purple-50 group-hover:bg-purple-100' :
+                            'bg-slate-50 group-hover:bg-slate-100'
                           )}>
                             {getIconForType(item.type, "w-6 h-6")}
+                            {item.type === 'video' && (
+                              <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-purple-600 rounded-full flex items-center justify-center text-white shadow-2xs">
+                                <Play className="w-2.5 h-2.5 fill-white ml-0.5" />
+                              </div>
+                            )}
                           </div>
                           <div className="flex items-center gap-1">
                             {item.starred && (
@@ -1046,7 +1945,6 @@ export default function AsterDriveApp() {
                             )}
                             <button 
                               onClick={(e) => handleOpenItemMenu(item, e)}
-                              onTouchEnd={(e) => e.stopPropagation()}
                               className="text-slate-400 hover:text-slate-700 sm:opacity-0 group-hover:opacity-100 opacity-90 transition-all p-1.5 rounded-lg hover:bg-slate-100 active:bg-slate-200 cursor-pointer"
                               aria-label={`More options for ${item.name}`}
                               title="More actions"
@@ -1055,10 +1953,32 @@ export default function AsterDriveApp() {
                             </button>
                           </div>
                         </div>
-                        <h4 className="font-medium text-slate-900 text-sm truncate mb-1" title={item.name}>
+
+                        <h4 className="font-medium text-slate-900 text-sm truncate mb-0.5" title={item.name}>
                           {item.name}
                         </h4>
-                        <p className="text-xs text-slate-500 flex items-center justify-between mt-auto pt-2">
+
+                        {item.source === 'computer' && (
+                          <div className="flex items-center gap-1 text-[11px] text-blue-600 font-medium mb-1">
+                            <Computer className="w-3 h-3 shrink-0" />
+                            <span className="truncate">{item.computerDevice || 'Computer Sync'}</span>
+                          </div>
+                        )}
+
+                        {item.type === 'video' && !item.trashed && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openVideoPreview(item);
+                            }}
+                            className="my-2 w-full flex items-center justify-center gap-1.5 py-1.5 px-2 bg-purple-50 hover:bg-purple-100 text-purple-700 rounded-lg text-xs font-semibold transition-colors cursor-pointer"
+                          >
+                            <Play className="w-3 h-3 fill-purple-600" /> Watch Video
+                          </button>
+                        )}
+
+                        <p className="text-xs text-slate-500 flex items-center justify-between mt-auto pt-2 border-t border-slate-100/80">
                           <span className="truncate mr-2">{format(new Date(item.updatedAt), 'MMM d, yyyy')}</span>
                           {item.type !== 'folder' && item.size !== undefined && <span className="font-mono shrink-0">{formatBytes(item.size)}</span>}
                         </p>
@@ -1101,7 +2021,27 @@ export default function AsterDriveApp() {
                           <td className="px-6 py-3.5 whitespace-nowrap">
                             <div className="flex items-center gap-3">
                               {getIconForType(item.type)}
-                              <span className="font-medium text-slate-900 truncate max-w-xs">{item.name}</span>
+                              <div className="flex items-center gap-2 min-w-0">
+                                <span className="font-medium text-slate-900 truncate max-w-xs">{item.name}</span>
+                                {item.type === 'video' && !item.trashed && (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      openVideoPreview(item);
+                                    }}
+                                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-purple-50 text-purple-700 hover:bg-purple-100 transition-colors shrink-0 cursor-pointer"
+                                    title="Watch Video"
+                                  >
+                                    <Play className="w-3 h-3 fill-purple-600" /> Watch
+                                  </button>
+                                )}
+                                {item.source === 'computer' && (
+                                  <span className="inline-flex items-center gap-1 text-[10px] text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded font-medium shrink-0">
+                                    <Computer className="w-2.5 h-2.5" /> {item.computerDevice || 'PC'}
+                                  </span>
+                                )}
+                              </div>
                               {item.starred && <Star className="w-3.5 h-3.5 text-amber-400 fill-current shrink-0" />}
                             </div>
                           </td>
@@ -1117,7 +2057,6 @@ export default function AsterDriveApp() {
                           <td className="px-6 py-3.5 whitespace-nowrap text-right text-slate-400">
                             <button 
                               onClick={(e) => handleOpenItemMenu(item, e)}
-                              onTouchEnd={(e) => e.stopPropagation()}
                               className="hover:text-slate-700 text-slate-400 p-1.5 rounded-lg hover:bg-slate-100 active:bg-slate-200 transition-colors cursor-pointer"
                               aria-label={`More options for ${item.name}`}
                               title="More actions"
@@ -1158,6 +2097,16 @@ export default function AsterDriveApp() {
                       {getIconForType(selectedItemDetails.type, "w-16 h-16")}
                     </div>
 
+                    {selectedItemDetails.type === 'video' && !selectedItemDetails.trashed && (
+                      <button 
+                        type="button"
+                        onClick={() => setPreviewVideoItem(selectedItemDetails)}
+                        className="w-full mb-3 flex items-center justify-center gap-2 bg-purple-600 hover:bg-purple-700 text-white py-2.5 rounded-xl text-sm font-semibold transition-all shadow-sm shadow-purple-600/20 cursor-pointer"
+                      >
+                        <Play className="w-4 h-4 fill-white" /> Watch Video
+                      </button>
+                    )}
+
                     <div className="flex gap-2 mb-8">
                       <button 
                         onClick={() => showToast({ type: 'info', title: 'Share Link', message: 'Sharable link copied to clipboard.' })}
@@ -1166,7 +2115,7 @@ export default function AsterDriveApp() {
                         <Share2 className="w-4 h-4" /> Share
                       </button>
                       <button 
-                        onClick={() => showToast({ type: 'success', title: 'Download Started', message: `Downloading ${selectedItemDetails.name}` })}
+                        onClick={() => handleDownloadItem(selectedItemDetails)}
                         className="flex-1 flex items-center justify-center gap-2 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 py-2 rounded-lg text-sm font-medium transition-colors"
                       >
                         <Download className="w-4 h-4" /> Download
@@ -1182,6 +2131,24 @@ export default function AsterDriveApp() {
                         
                         <div className="text-slate-500">Owner</div>
                         <div className="col-span-2 text-slate-900 font-medium capitalize">{selectedItemDetails.owner}</div>
+
+                        {selectedItemDetails.source === 'computer' && (
+                          <>
+                            <div className="text-slate-500">Computer</div>
+                            <div className="col-span-2 text-blue-700 font-medium flex items-center gap-1.5 truncate">
+                              <Computer className="w-3.5 h-3.5 shrink-0" />
+                              <span>{selectedItemDetails.computerDevice || 'This PC'}</span>
+                            </div>
+                            {selectedItemDetails.folderPath && (
+                              <>
+                                <div className="text-slate-500">Sync Folder</div>
+                                <div className="col-span-2 text-slate-800 font-mono text-xs truncate">
+                                  {selectedItemDetails.folderPath}
+                                </div>
+                              </>
+                            )}
+                          </>
+                        )}
                         
                         <div className="text-slate-500">Modified</div>
                         <div className="col-span-2 text-slate-900 font-medium">
@@ -1190,7 +2157,9 @@ export default function AsterDriveApp() {
                         
                         <div className="text-slate-500">Location</div>
                         <div className="col-span-2 text-slate-900 font-medium truncate">
-                          {breadcrumbs.find(c => c.id === selectedItemDetails.parentId)?.name || 'My Drive'}
+                          {selectedItemDetails.source === 'computer' 
+                            ? `Computers > ${selectedItemDetails.computerDevice || 'My PC'}`
+                            : (breadcrumbs.find(c => c.id === selectedItemDetails.parentId)?.name || 'My Drive')}
                         </div>
                       </div>
                     </div>
@@ -1217,23 +2186,64 @@ export default function AsterDriveApp() {
               exit={{ opacity: 0, y: 10, scale: 0.95 }}
               className="mb-4 bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col min-w-[210px] divide-y divide-slate-100"
             >
-              <button 
-                onClick={() => fileInputRef.current?.click()}
-                className="flex items-center gap-3 px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors text-left"
-              >
-                <File className="w-4 h-4 text-blue-600" />
-                File upload
-              </button>
-              <button 
-                onClick={() => folderInputRef.current?.click()}
-                className="flex items-center gap-3 px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors text-left"
-              >
-                <Folder className="w-4 h-4 text-amber-500" />
-                Folder upload
-              </button>
+              {activeNav === 'computers' ? (
+                <>
+                  <button 
+                    onClick={() => {
+                      setShowUploadMenu(false);
+                      computerFolderInputRef.current?.click();
+                    }}
+                    className="flex items-center gap-3 px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors text-left"
+                  >
+                    <Folder className="w-4 h-4 text-amber-500" />
+                    Sync computer folder
+                  </button>
+                  <button 
+                    onClick={() => {
+                      setShowUploadMenu(false);
+                      computerFileInputRef.current?.click();
+                    }}
+                    className="flex items-center gap-3 px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors text-left"
+                  >
+                    <UploadCloud className="w-4 h-4 text-blue-600" />
+                    Sync computer file
+                  </button>
+                  <button 
+                    onClick={() => {
+                      setShowUploadMenu(false);
+                      setIsSyncModalOpen(true);
+                    }}
+                    className="flex items-center gap-3 px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors text-left"
+                  >
+                    <Monitor className="w-4 h-4 text-purple-600" />
+                    Device presets (PC / Mac)
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button 
+                    onClick={() => fileInputRef.current?.click()}
+                    className="flex items-center gap-3 px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors text-left"
+                  >
+                    <File className="w-4 h-4 text-blue-600" />
+                    File upload
+                  </button>
+                  <button 
+                    onClick={() => folderInputRef.current?.click()}
+                    className="flex items-center gap-3 px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors text-left"
+                  >
+                    <Folder className="w-4 h-4 text-amber-500" />
+                    Folder upload
+                  </button>
+                  <div className="px-4 py-2.5 bg-blue-50/70 border-t border-b border-blue-100/60 text-[11px] text-blue-700 flex items-center gap-2">
+                    <UploadCloud className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                    <span>Or drag &amp; drop files/folders anywhere</span>
+                  </div>
+                </>
+              )}
               <div className="p-2 bg-slate-50/80">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 px-2 block mb-1">
-                  Simulate Quota Testing
+                  Simulate Testing
                 </span>
                 <button 
                   onClick={() => handleAddSimulatedFile('Design_Assets_Bundle.zip', 400 * 1024 * 1024, 'archive')}
@@ -1275,12 +2285,29 @@ export default function AsterDriveApp() {
         onChange={handleFileUpload} 
         className="hidden" 
         multiple 
+        suppressHydrationWarning
       />
       <input 
         type="file" 
         ref={folderInputRef} 
         onChange={handleFileUpload} 
         className="hidden" 
+        suppressHydrationWarning
+      />
+      <input 
+        type="file" 
+        ref={computerFileInputRef} 
+        onChange={(e) => handleComputerUpload(e, 'My PC')} 
+        className="hidden" 
+        multiple 
+        suppressHydrationWarning
+      />
+      <input 
+        type="file" 
+        ref={computerFolderInputRef} 
+        onChange={(e) => handleComputerUpload(e, 'My PC')} 
+        className="hidden" 
+        suppressHydrationWarning
       />
 
       {/* DELETE CONFIRMATION MODAL */}
@@ -1553,6 +2580,15 @@ export default function AsterDriveApp() {
                     Manage Account
                   </button>
                 </div>
+              </div>
+
+              {/* VISUAL BREAKDOWN OF STORAGE USAGE BY FILE TYPE (RECHARTS) */}
+              <div className="mb-8">
+                <StorageAnalyticsChart
+                  items={driveItems}
+                  plan={currentPlan}
+                  onUpgradeClick={() => setIsUpgradeModalOpen(true)}
+                />
               </div>
 
               {/* Settings Groups */}
@@ -1996,15 +3032,15 @@ export default function AsterDriveApp() {
                     <p className="text-xs text-slate-500">Have a question or need technical support with your storage? Send us a message directly.</p>
                     <div>
                       <label className="block text-xs font-medium text-slate-700 mb-1">Your Email</label>
-                      <input type="email" defaultValue="verno7897123@gmail.com" readOnly className="w-full px-3 py-2 bg-slate-100 border border-slate-200 rounded-lg text-sm text-slate-600 outline-none" />
+                      <input type="email" defaultValue="verno7897123@gmail.com" readOnly className="w-full px-3 py-2 bg-slate-100 border border-slate-200 rounded-lg text-sm text-slate-600 outline-none" suppressHydrationWarning />
                     </div>
                     <div>
                       <label className="block text-xs font-medium text-slate-700 mb-1">Subject</label>
-                      <input type="text" placeholder="e.g. Question about 1 GB Free Plan quota" className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm outline-none focus:border-blue-500" />
+                      <input type="text" placeholder="e.g. Question about 1 GB Free Plan quota" className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm outline-none focus:border-blue-500" suppressHydrationWarning />
                     </div>
                     <div>
                       <label className="block text-xs font-medium text-slate-700 mb-1">Message</label>
-                      <textarea rows={3} placeholder="Describe your question or issue..." className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm outline-none focus:border-blue-500" />
+                      <textarea rows={3} placeholder="Describe your question or issue..." className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm outline-none focus:border-blue-500" suppressHydrationWarning />
                     </div>
                     <button 
                       onClick={() => {
@@ -2140,6 +3176,7 @@ export default function AsterDriveApp() {
               }}
               className="w-56 bg-white rounded-2xl shadow-2xl border border-slate-200 py-1.5 overflow-hidden text-sm divide-y divide-slate-100"
               onClick={(e) => e.stopPropagation()}
+              onTouchStart={(e) => e.stopPropagation()}
             >
               <div className="px-3.5 py-2 bg-slate-50/80 border-b border-slate-100 flex items-center gap-2.5">
                 {getIconForType(activeItemMenu.item.type, "w-4 h-4 shrink-0")}
@@ -2149,6 +3186,19 @@ export default function AsterDriveApp() {
               </div>
 
               <div className="py-1">
+                {activeItemMenu.item.type === 'video' && !activeItemMenu.item.trashed && (
+                  <button
+                    onClick={() => {
+                      openVideoPreview(activeItemMenu.item);
+                      setActiveItemMenu(null);
+                    }}
+                    className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-purple-700 bg-purple-50/70 hover:bg-purple-100 font-semibold transition-colors text-left text-xs sm:text-sm cursor-pointer"
+                  >
+                    <Play className="w-4 h-4 text-purple-600 fill-purple-600" />
+                    Watch Video
+                  </button>
+                )}
+
                 {activeItemMenu.item.type === 'folder' ? (
                   <button
                     onClick={() => {
@@ -2308,6 +3358,7 @@ export default function AsterDriveApp() {
                   autoFocus
                   className="w-full px-3.5 py-2.5 bg-slate-50 focus:bg-white border border-slate-300 focus:border-blue-600 rounded-xl text-sm font-medium outline-none transition-all shadow-inner"
                   placeholder="Item name"
+                  suppressHydrationWarning
                 />
               </div>
 
@@ -2323,6 +3374,326 @@ export default function AsterDriveApp() {
                   className="px-5 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-xl transition-colors shadow-sm cursor-pointer"
                 >
                   Save
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* VIDEO PREVIEW PLAYER MODAL */}
+      <AnimatePresence>
+        {previewVideoItem && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[130] bg-black/95 flex flex-col justify-between backdrop-blur-md p-3 sm:p-6"
+            onClick={() => setPreviewVideoItem(null)}
+          >
+            {/* Top Header Bar */}
+            <div 
+              onClick={(e) => e.stopPropagation()} 
+              className="flex items-center justify-between text-white pb-3 sm:pb-4 border-b border-white/10 shrink-0 gap-3"
+            >
+              <div className="flex items-center gap-3 min-w-0 pr-2">
+                <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-purple-600/30 border border-purple-500/40 text-purple-300 flex items-center justify-center shrink-0">
+                  <Video className="w-5 h-5" />
+                </div>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className="font-semibold text-sm sm:text-base text-white truncate max-w-xs sm:max-w-md md:max-w-xl" title={previewVideoItem.name}>
+                      {previewVideoItem.name}
+                    </h3>
+                    <span className="text-[10px] font-mono uppercase bg-purple-900/60 text-purple-300 border border-purple-700/50 px-2 py-0.5 rounded-full font-semibold">
+                      Video Player
+                    </span>
+                    {previewVideoItem.source === 'computer' && (
+                      <span className="inline-flex items-center gap-1 text-[10px] bg-blue-900/60 text-blue-300 border border-blue-700/50 px-2 py-0.5 rounded-full font-medium">
+                        <Computer className="w-3 h-3" /> {previewVideoItem.computerDevice || 'Computer Sync'}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-white/60 mt-0.5 flex items-center gap-2 font-mono tabular-nums">
+                    <span>{formatBytes(previewVideoItem.size)}</span>
+                    <span>•</span>
+                    <span>{format(new Date(previewVideoItem.updatedAt), 'MMM d, yyyy')}</span>
+                    {previewVideoItem.folderPath && (
+                      <>
+                        <span>•</span>
+                        <span className="truncate max-w-xs text-white/40 font-sans">{previewVideoItem.folderPath}</span>
+                      </>
+                    )}
+                  </p>
+                </div>
+              </div>
+
+              {/* Action Controls */}
+              <div className="flex items-center gap-2 shrink-0">
+                {/* Speed Controls (Desktop) */}
+                <div className="hidden lg:flex items-center gap-1 bg-white/10 p-1 rounded-xl">
+                  <span className="text-[11px] text-white/60 px-1.5 font-medium">Speed</span>
+                  {[0.75, 1, 1.25, 1.5, 2].map((spd) => (
+                    <button
+                      key={spd}
+                      type="button"
+                      onClick={() => {
+                        setVideoPlaybackSpeed(spd);
+                        if (videoPlayerRef.current) {
+                          videoPlayerRef.current.playbackRate = spd;
+                        }
+                      }}
+                      className={cn(
+                        "px-1.5 py-0.5 rounded-md text-[11px] font-mono transition-all cursor-pointer",
+                        videoPlaybackSpeed === spd
+                          ? "bg-purple-600 text-white font-bold shadow-xs"
+                          : "text-white/70 hover:text-white hover:bg-white/10"
+                      )}
+                    >
+                      {spd}x
+                    </button>
+                  ))}
+                </div>
+
+                {/* Fullscreen Button */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (videoPlayerRef.current) {
+                      if (document.fullscreenElement) {
+                        document.exitFullscreen().catch(() => {});
+                      } else {
+                        videoPlayerRef.current.requestFullscreen?.().catch(() => {});
+                      }
+                    }
+                  }}
+                  className="p-2 sm:px-3 sm:py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white text-xs font-medium transition-colors flex items-center gap-1.5 cursor-pointer"
+                  title="Full screen"
+                >
+                  <Maximize2 className="w-4 h-4 text-purple-300" />
+                  <span className="hidden sm:inline">Fullscreen</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleDownloadItem(previewVideoItem)}
+                  className="p-2 sm:px-3 sm:py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white text-xs font-medium transition-colors flex items-center gap-1.5 cursor-pointer"
+                  title="Download video"
+                >
+                  <Download className="w-4 h-4 text-emerald-400" />
+                  <span className="hidden sm:inline">Download</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleShareItem(previewVideoItem)}
+                  className="p-2 sm:px-3 sm:py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white text-xs font-medium transition-colors flex items-center gap-1.5 cursor-pointer"
+                  title="Share video link"
+                >
+                  <Share2 className="w-4 h-4 text-blue-400" />
+                  <span className="hidden sm:inline">Share</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleToggleStarSingle(previewVideoItem);
+                    setPreviewVideoItem(prev => prev ? { ...prev, starred: !prev.starred } : null);
+                  }}
+                  className="p-2 rounded-lg bg-white/10 hover:bg-white/20 text-white transition-colors cursor-pointer"
+                  title={previewVideoItem.starred ? "Remove star" : "Star video"}
+                >
+                  <Star className={cn("w-4 h-4", previewVideoItem.starred ? "text-amber-400 fill-amber-400" : "text-white/70")} />
+                </button>
+                <div className="w-px h-6 bg-white/15 mx-1" />
+                <button
+                  type="button"
+                  onClick={() => setPreviewVideoItem(null)}
+                  className="p-2 rounded-lg bg-white/10 hover:bg-rose-600/80 text-white transition-colors cursor-pointer"
+                  title="Close (Esc)"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Video Display Center */}
+            <div 
+              onClick={(e) => e.stopPropagation()} 
+              className="flex-1 flex flex-col items-center justify-center p-2 sm:p-4 min-h-0 relative my-auto"
+            >
+              <video
+                ref={videoPlayerRef}
+                key={previewVideoItem.id + (videoLoadError ? '-fallback' : (previewVideoItem.videoUrl || 'primary'))}
+                src={videoLoadError ? SAMPLE_VIDEO_URL : (previewVideoItem.videoUrl || SAMPLE_VIDEO_URL)}
+                controls
+                autoPlay
+                playsInline
+                onError={() => {
+                  if (!videoLoadError) {
+                    setVideoLoadError(true);
+                    showToast({
+                      type: 'info',
+                      title: 'HD Preview Active',
+                      message: 'Loaded high-definition demo stream for smooth playback.'
+                    });
+                  }
+                }}
+                className="max-h-[64vh] sm:max-h-[70vh] w-auto max-w-full rounded-2xl shadow-2xl bg-black border border-white/10 object-contain mx-auto"
+              >
+                Your browser does not support the video tag.
+              </video>
+
+              {/* Mobile/Tablet Speed Selector */}
+              <div className="lg:hidden flex items-center gap-1.5 mt-3 bg-white/10 px-3 py-1.5 rounded-full">
+                <span className="text-[11px] text-white/70">Speed:</span>
+                {[0.75, 1, 1.25, 1.5, 2].map((spd) => (
+                  <button
+                    key={spd}
+                    type="button"
+                    onClick={() => {
+                      setVideoPlaybackSpeed(spd);
+                      if (videoPlayerRef.current) {
+                        videoPlayerRef.current.playbackRate = spd;
+                      }
+                    }}
+                    className={cn(
+                      "px-2 py-0.5 rounded text-xs font-mono font-medium",
+                      videoPlaybackSpeed === spd ? "bg-purple-600 text-white font-bold" : "text-white/60 hover:text-white"
+                    )}
+                  >
+                    {spd}x
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Bottom Info Bar & Shortcuts */}
+            <div 
+              onClick={(e) => e.stopPropagation()} 
+              className="flex items-center justify-between text-xs text-white/60 pt-3 border-t border-white/10 shrink-0 flex-wrap gap-2"
+            >
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="inline-flex items-center gap-1.5 text-purple-300 font-medium">
+                  <Sparkles className="w-3.5 h-3.5" /> High Definition Video Player
+                </span>
+                {videoLoadError ? (
+                  <span className="text-[11px] text-amber-300 font-medium bg-amber-950/60 px-2 py-0.5 rounded border border-amber-700/50">
+                    ● Streaming cloud preview fallback
+                  </span>
+                ) : previewVideoItem.videoUrl?.startsWith('blob:') ? (
+                  <span className="text-[11px] text-emerald-400 font-medium bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-800/40">
+                    ● Streaming local uploaded file
+                  </span>
+                ) : (
+                  <span className="text-[11px] text-blue-300 font-medium bg-blue-950/60 px-2 py-0.5 rounded border border-blue-800/40">
+                    ● 1080p Cloud Stream
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="hidden md:inline">
+                  Press <kbd className="px-1.5 py-0.5 bg-white/15 rounded text-[11px] font-mono text-white">Space</kbd> to Play/Pause, <kbd className="px-1.5 py-0.5 bg-white/15 rounded text-[11px] font-mono text-white">Esc</kbd> to exit
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setPreviewVideoItem(null)}
+                  className="text-white hover:text-purple-300 font-medium transition-colors cursor-pointer"
+                >
+                  Close Viewer
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* COMPUTER SYNC PRESET MODAL */}
+      <AnimatePresence>
+        {isSyncModalOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] bg-slate-900/60 flex items-center justify-center p-4 backdrop-blur-xs"
+            onClick={() => setIsSyncModalOpen(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0, y: 10 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.95, opacity: 0, y: 10 }}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-white rounded-2xl sm:rounded-3xl shadow-2xl max-w-lg w-full p-6 border border-slate-100 overflow-hidden"
+            >
+              <div className="flex items-start justify-between mb-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+                    <Computer className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold text-slate-900">Sync &amp; Backup Computers</h3>
+                    <p className="text-xs text-slate-500">Connect PC or Mac folders for continuous backup</p>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => setIsSyncModalOpen(false)}
+                  className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="space-y-3 mb-6">
+                <div 
+                  onClick={() => handleSyncPreset('windows')}
+                  className="p-4 rounded-xl border border-slate-200 hover:border-blue-500 bg-slate-50/50 hover:bg-blue-50/30 transition-all cursor-pointer flex items-center justify-between group"
+                >
+                  <div className="flex items-center gap-3">
+                    <Monitor className="w-6 h-6 text-blue-600 shrink-0" />
+                    <div>
+                      <h4 className="font-semibold text-slate-900 text-sm group-hover:text-blue-700 transition-colors">Windows 11 Workstation Preset</h4>
+                      <p className="text-xs text-slate-500">Syncs 4K video tutorials, documents &amp; system backups (~565 MB)</p>
+                    </div>
+                  </div>
+                  <span className="text-xs font-semibold text-blue-600 shrink-0 ml-2">Sync Preset →</span>
+                </div>
+
+                <div 
+                  onClick={() => handleSyncPreset('mac')}
+                  className="p-4 rounded-xl border border-slate-200 hover:border-purple-500 bg-slate-50/50 hover:bg-purple-50/30 transition-all cursor-pointer flex items-center justify-between group"
+                >
+                  <div className="flex items-center gap-3">
+                    <Laptop className="w-6 h-6 text-purple-600 shrink-0" />
+                    <div>
+                      <h4 className="font-semibold text-slate-900 text-sm group-hover:text-purple-700 transition-colors">MacBook Pro Preset</h4>
+                      <p className="text-xs text-slate-500">Syncs screen recordings, demo videos &amp; slides (~425 MB)</p>
+                    </div>
+                  </div>
+                  <span className="text-xs font-semibold text-purple-600 shrink-0 ml-2">Sync Preset →</span>
+                </div>
+
+                <div 
+                  onClick={() => {
+                    setIsSyncModalOpen(false);
+                    computerFolderInputRef.current?.click();
+                  }}
+                  className="p-4 rounded-xl border border-slate-200 hover:border-emerald-500 bg-slate-50/50 hover:bg-emerald-50/30 transition-all cursor-pointer flex items-center justify-between group"
+                >
+                  <div className="flex items-center gap-3">
+                    <Folder className="w-6 h-6 text-emerald-600 shrink-0" />
+                    <div>
+                      <h4 className="font-semibold text-slate-900 text-sm group-hover:text-emerald-700 transition-colors">Sync Local Folder from this PC</h4>
+                      <p className="text-xs text-slate-500">Select any folder from your machine to sync</p>
+                    </div>
+                  </div>
+                  <span className="text-xs font-semibold text-emerald-600 shrink-0 ml-2">Choose Folder →</span>
+                </div>
+              </div>
+
+              <div className="flex justify-end">
+                <button
+                  onClick={() => setIsSyncModalOpen(false)}
+                  className="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
+                >
+                  Close
                 </button>
               </div>
             </motion.div>
