@@ -59,13 +59,18 @@ import {
   RefreshCw,
   Maximize2
 } from 'lucide-react';
-import { format } from 'date-fns';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { StorageAnalyticsChart } from '@/components/StorageAnalyticsChart';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
+}
+
+function formatDriveDate(value: string) {
+  const date = new Date(value);
+  const month = date.toLocaleString('en-US', { month: 'short', timeZone: 'UTC' });
+  return `${month} ${date.getUTCDate()}, ${date.getUTCFullYear()}`;
 }
 
 // --- STORAGE PLANS & DATA TYPES ---
@@ -1979,7 +1984,7 @@ export default function AsterDriveApp() {
                         )}
 
                         <p className="text-xs text-slate-500 flex items-center justify-between mt-auto pt-2 border-t border-slate-100/80">
-                          <span className="truncate mr-2">{format(new Date(item.updatedAt), 'MMM d, yyyy')}</span>
+                          <span className="truncate mr-2">{formatDriveDate(item.updatedAt)}</span>
                           {item.type !== 'folder' && item.size !== undefined && <span className="font-mono shrink-0">{formatBytes(item.size)}</span>}
                         </p>
                       </motion.div>
@@ -2049,7 +2054,7 @@ export default function AsterDriveApp() {
                             {item.owner}
                           </td>
                           <td className="px-6 py-3.5 whitespace-nowrap text-slate-500 hidden md:table-cell">
-                            {format(new Date(item.updatedAt), 'MMM d, yyyy')}
+                            {formatDriveDate(item.updatedAt)}
                           </td>
                           <td className="px-6 py-3.5 whitespace-nowrap text-slate-500 font-mono text-right">
                             {formatBytes(item.size)}
@@ -2152,7 +2157,7 @@ export default function AsterDriveApp() {
                         
                         <div className="text-slate-500">Modified</div>
                         <div className="col-span-2 text-slate-900 font-medium">
-                          {format(new Date(selectedItemDetails.updatedAt), 'MMM d, yyyy')}
+                          {formatDriveDate(selectedItemDetails.updatedAt)}
                         </div>
                         
                         <div className="text-slate-500">Location</div>
@@ -3417,7 +3422,7 @@ export default function AsterDriveApp() {
                   <p className="text-xs text-white/60 mt-0.5 flex items-center gap-2 font-mono tabular-nums">
                     <span>{formatBytes(previewVideoItem.size)}</span>
                     <span>•</span>
-                    <span>{format(new Date(previewVideoItem.updatedAt), 'MMM d, yyyy')}</span>
+                    <span>{formatDriveDate(previewVideoItem.updatedAt)}</span>
                     {previewVideoItem.folderPath && (
                       <>
                         <span>•</span>
