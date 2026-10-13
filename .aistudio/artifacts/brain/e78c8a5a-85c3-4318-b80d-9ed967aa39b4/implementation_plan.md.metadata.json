@@ -1,0 +1,6 @@
+{
+  "summary": "Rencana implementasi untuk transisi kuota akun gratis ke 1 GB, penambahan badge Free Plan pada bilah penyimpanan dan profil, validasi pembatasan upload dengan trigger modal upgrade, serta simulasi upgrade kuota secara dinamis.",
+  "updatedAt": "2026-10-13T15:40:28.068587369Z",
+  "requestFeedback": true,
+  "userFacing": true
+}
