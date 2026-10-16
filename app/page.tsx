@@ -1333,6 +1333,70 @@ export default function AsterDriveApp() {
             );
           })}
         </nav>
+
+        {/* CLOUD STORAGE WIDGET IN SIDEBAR / SLIDER */}
+        <div className="p-3.5 m-3 rounded-2xl bg-white border border-slate-200/80 shadow-xs shrink-0 select-none">
+          <div 
+            onClick={() => {
+              setIsUpgradeModalOpen(true);
+              setIsMobileMenuOpen(false);
+            }}
+            className="cursor-pointer group"
+          >
+            <div className="flex items-center justify-between gap-2 mb-2">
+              <div className="flex items-center gap-2 min-w-0">
+                <div className="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 group-hover:bg-blue-100 transition-colors">
+                  <Cloud className="w-4 h-4" />
+                </div>
+                <div className="min-w-0">
+                  <span className="text-xs font-semibold text-slate-800 block truncate group-hover:text-blue-600 transition-colors">
+                    Cloud Storage
+                  </span>
+                </div>
+              </div>
+              <span className={cn(
+                "text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 border",
+                currentPlan.isFree 
+                  ? "bg-emerald-50 text-emerald-700 border-emerald-200/80" 
+                  : "bg-blue-50 text-blue-700 border-blue-200/80"
+              )}>
+                {currentPlan.isFree ? "FREE" : "PRO"}
+              </span>
+            </div>
+
+            {/* Storage Progress Bar */}
+            <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden mb-2">
+              <div 
+                className={cn(
+                  "h-full rounded-full transition-all duration-300",
+                  storagePercentage > 90 ? "bg-rose-500" : storagePercentage > 75 ? "bg-amber-500" : "bg-blue-600"
+                )}
+                style={{ width: `${Math.min(100, Math.max(storagePercentage, 2))}%` }} 
+              />
+            </div>
+
+            <div className="flex items-center justify-between text-[11px] text-slate-500">
+              <span className="font-mono tabular-nums">
+                {formatBytes(totalUsedBytes)} of {currentPlan.storage}
+              </span>
+              <span className="font-medium font-mono">
+                {Math.round(storagePercentage)}%
+              </span>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => {
+              setIsUpgradeModalOpen(true);
+              setIsMobileMenuOpen(false);
+            }}
+            className="mt-3 w-full py-1.5 px-3 rounded-xl border border-slate-200 hover:border-blue-300 bg-slate-50 hover:bg-blue-50 text-slate-700 hover:text-blue-700 text-xs font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs active:scale-[0.98]"
+          >
+            <Sparkles className="w-3.5 h-3.5 text-blue-600" />
+            {currentPlan.isFree ? 'Get More Storage' : 'Manage Subscription'}
+          </button>
+        </div>
       </aside>
 
       {/* MAIN CONTENT */}
@@ -1370,23 +1434,6 @@ export default function AsterDriveApp() {
           </div>
           
           <div className="flex items-center gap-1 sm:gap-2 shrink-0">
-            {/* Quick Storage Status Indicator */}
-            <div 
-              onClick={() => setIsUpgradeModalOpen(true)}
-              className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-full border border-slate-200 hover:border-slate-300 hover:bg-slate-50 cursor-pointer transition-colors"
-            >
-              <Cloud className="w-4 h-4 text-blue-600" />
-              <span className="text-xs font-medium text-slate-600">
-                {formatBytes(totalUsedBytes)} / {currentPlan.storage}
-              </span>
-              <span className={cn(
-                "text-[10px] font-bold px-1.5 py-0.5 rounded-full",
-                currentPlan.isFree ? "bg-emerald-100 text-emerald-800" : "bg-blue-100 text-blue-800"
-              )}>
-                {currentPlan.isFree ? "FREE" : "PRO"}
-              </span>
-            </div>
-
             <button 
               onClick={() => {
                 showToast({
