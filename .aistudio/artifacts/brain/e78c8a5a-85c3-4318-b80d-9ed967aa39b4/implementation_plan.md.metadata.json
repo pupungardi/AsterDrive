@@ -1,6 +1,6 @@
 {
-  "summary": "Implementation plan for adding full-window drag-and-drop file and folder uploads with hierarchy recreation, along with a Recharts-powered storage analytics donut chart in the Account & Profile Center.",
-  "updatedAt": "2026-10-13T18:00:47.709571510Z",
+  "summary": "Rencana penghapusan seluruh data mock dummy, tombol simulasi testing, dan tombol test file, digantikan dengan sistem penyimpanan file riil persisten berbasis IndexedDB dan LocalStorage di browser. Pengguna dapat mengunggah, melihat, memutar video, dan mengunduh file asli mereka sendiri.",
+  "updatedAt": "2026-10-16T19:14:39.125794415Z",
   "requestFeedback": true,
   "userFacing": true
 }

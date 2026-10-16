@@ -1,111 +1,57 @@
-# Drag-and-Drop Folder Upload & Storage Analytics Dashboard
+# Rencana Implementasi: Penggunaan Data Riil & Pembersihan Simulasi
 
-Enable seamless drag-and-drop uploading of files and entire folder hierarchies into AsterDrive, complemented by an interactive Recharts storage breakdown visualization in the Account & Profile Center.
-
-## User Review & Critical Decisions
-
-> [!IMPORTANT]
-> The following key user preferences were confirmed during Phase 1 clarification:
-> - **Drop Zone Presentation**: Full-window backdrop overlay with active drop animation (`motion/react`) featuring blur scrim and glowing dashed target zone.
-> - **Visual Analytics**: Interactive Recharts Donut Chart in the Account & Profile Center displaying categorical storage allocation (Videos, Documents, Archives, Images, Spreadsheets, Free Space).
-> - **Folder Structure Handling**: Automatically recreate nested directory trees in AsterDrive using HTML5 `FileSystemDirectoryEntry` recursion, placing files in their corresponding parent folders.
+Menghapus seluruh file contoh dummy, tombol simulasi, dan file uji coba (*test file*). Mengimplementasikan sistem penyimpanan data riil berbasis **IndexedDB** untuk file biner asli (dokumen, video, audio, gambar, arsip) dan **LocalStorage** untuk metadata struktur drive, sehingga AsterDrive beroperasi dengan data pengguna yang sebenarnya dan persisten.
 
 ---
 
-## 1. Overview & Core Concept
-
-- **What It Does**: Users can drag files and full nested directories from their desktop into AsterDrive's window to upload them directly into the current folder, with nested folder structures recreated automatically. In the Account & Profile Center, users gain an interactive storage analytics panel with a color-coded donut chart powered by Recharts, showing real-time usage by file category and remaining quota.
-- **Target Audience / Persona**: Power users, videographers, and professionals managing mixed media libraries who need fast batch ingestion and clear visibility into cloud storage allocation.
-- **Key Value**: Eliminates repetitive single-file picking, streamlines folder migrations from desktop computers, and gives immediate visual clarity on quota consumption.
-
----
-
-## 2. User Experience & Visual Design
-
-### Key User Flows
-1. **Drag-and-Drop Ingestion**:
-   - User drags one or more files or nested folders from their operating system anywhere over the AsterDrive window.
-   - A smooth backdrop overlay fades in with an illuminated drop target: *"Drop files or folders here to upload"*.
-   - Releasing the drop parses all entries (files and directories recursively), calculates aggregate size, and checks against remaining plan quota (e.g. 1 GB Free Plan).
-   - If quota is exceeded, an actionable warning toast is displayed and the upgrade modal opens.
-   - If quota is sufficient, new folders and files are instantly committed to state with object URLs generated for video playback, and a success notification highlights the total item count and bytes ingested.
-
-2. **Storage Analytics in Account Center**:
-   - User clicks their profile avatar in the top header or navigates to the Account & Profile Center.
-   - A dedicated "Storage Breakdown & Analytics" card sits prominently below the profile summary, featuring an interactive Recharts Donut Chart (`PieChart` with `innerRadius={60}` and `outerRadius={90}`).
-   - Hovering over segments reveals rich tooltips with exact bytes formatted (e.g., `320 MB · 32%`) and item counts.
-   - A structured legend below displays color-coded dots, category names, file counts, and total sizes with tabular numerals.
-
-### Visual Identity & Theme
-- **Aesthetic Direction**: Clean SaaS cloud workspace, adhering strictly to enterprise dashboard standards with single-elevation depth and high visual legibility.
-- **Color Palette**:
-  - Video: Indigo/Blue (`#3b82f6`)
-  - Documents: Amber (`#f59e0b`)
-  - Archives: Emerald (`#10b981`)
-  - Images: Rose (`#ec4899`)
-  - Spreadsheets: Teal (`#14b8a6`)
-  - Free Quota Space: Neutral slate tint (`#e2e8f0`)
-- **Typography & Hierarchy**: `Plus Jakarta Sans` for titles and labels, paired with `font-mono tabular-nums` for bytes and file counts to eliminate layout jitter.
-- **Interactive Motion**: Motion spring transitions (`cubic-bezier(0.16, 1, 0.3, 1)`) on drag-and-drop backdrop entrance/exit and chart segment hover highlights.
+## 1. Analisis Kebutuhan
+- **Pembersihan Dummy & Simulasi:**
+  - Kosongkan `initialData` menjadi array kosong (`[]`) sehingga penyimpanan awal berstatus murni 0 B / 1 GB.
+  - Hapus tombol "Simulate Testing" (`+ 400 MB Assets`, `+ 800 MB Video`) pada floating menu upload.
+  - Hapus tombol `+ 400 MB Test File` pada tampilan drive kosong (*empty state*).
+  - Hapus fungsi pembantu `handleAddSimulatedFile`.
+- **Penyimpanan File Riil Persisten (IndexedDB & LocalStorage):**
+  - **IndexedDB (`asterdrive_db`):** Menyimpan konten biner file (`File` / `Blob`) yang diunggah pengguna tanpa batasan kuota sempit LocalStorage.
+  - **LocalStorage (`asterdrive_items`):** Menyimpan metadata file & folder (`id`, `name`, `type`, `size`, `parentId`, `updatedAt`, `starred`, `trashed`).
+  - **Pratinjau & Unduh File Asli:**
+    - Saat file video diputar, buat ObjectURL langsung dari blob asli di IndexedDB.
+    - Saat file diunduh, buat file download langsung dari konten asli yang diunggah pengguna.
+    - Saat file dihapus permanen, hapus pula blob dari IndexedDB untuk membebaskan ruang penyimpanan.
 
 ---
 
-## 3. Key Product Decisions & Trade-Offs
+## 2. Rincian Teknis Implementasi
 
-- **Recursive Directory Traversal vs Flat Extraction**:
-  - *Chosen Approach*: Recursive `webkitGetAsEntry()` / `FileSystemDirectoryEntry.createReader()` traversal creating matching `DriveItem` folders and parenting child files accordingly.
-  - *Why*: Delivers standard cloud drive parity (Google Drive / Dropbox behavior) where desktop folder organization is preserved.
-  - *Alternatives Considered*: Flattening all files into current directory would discard the user's desktop folder taxonomy.
+### A. Modul Utilitas IndexedDB (`lib/db.ts`)
+- Membuat helper promise-based untuk IndexedDB:
+  - `saveFileBlob(id: string, file: File | Blob): Promise<void>`
+  - `getFileBlob(id: string): Promise<Blob | null>`
+  - `deleteFileBlob(id: string): Promise<void>`
+  - `clearAllFileBlobs(): Promise<void>`
 
-- **Recharts Client Component Encapsulation**:
-  - *Chosen Approach*: Implement a dedicated `StorageBreakdownChart` client component using `recharts` (`ResponsiveContainer`, `PieChart`, `Pie`, `Cell`, `Tooltip`), keeping rendering self-contained and SSR-safe.
-  - *Why*: Recharts requires client-side DOM measurement; encapsulating it isolates chart lifecycle and prevents hydration warnings.
-  - *Alternatives Considered*: Hand-rolled SVG pie charts lack accessible tooltips and smooth sector hover animations.
+### B. Pembersihan & Integrasi di `app/page.tsx`
+1. **Inisialisasi Data Riil:**
+   - Ubah `initialData` menjadi `[]`.
+   - Gunakan `useEffect` untuk memuat metadata dari `localStorage` saat klien aktif.
+   - Sinkronkan setiap perubahan item (tambah file, buat folder, rename, trash, hapus permanen) ke `localStorage`.
+2. **Penyimpanan Upload Riil:**
+   - Pada `handleFileUpload` dan `handleWindowDrop`, simpan setiap file biner yang diunggah ke IndexedDB melalui `saveFileBlob`.
+3. **Pemutar Video & Unduhan Riil:**
+   - Pada `openVideoPreview`: Muat blob asli dari IndexedDB, generate ObjectURL, dan setel ke elemen `<video>`.
+   - Pada `handleDownloadItem`: Muat blob asli dari IndexedDB dan picu proses unduhan browser langsung dengan nama file asli.
+4. **Pembersihan UI Simulasi:**
+   - Hapus sub-menu simulasi di floating action menu (`+`).
+   - Ubah teks *empty state* agar mengajak pengguna mengunggah file riil atau menyeret (*drag-and-drop*) folder asli dari komputer mereka.
 
 ---
 
-## 4. Technical Architecture & Data Strategy
-
-### System & Component Diagram
-
-```
-┌────────────────────────────────────────────────────────────────────────┐
-│                        AsterDrive Client App                           │
-│                                                                        │
-│   ┌────────────────────────┐         ┌───────────────────────────────┐ │
-│   │ Full-Window Drag Zone  │         │   Account & Profile Center    │ │
-│   │   (dragenter/dragover) │         │     (isProfileMenuOpen)       │ │
-│   └───────────┬────────────┘         └───────────────┬───────────────┘ │
-│               │ (drop)                               │                 │
-│               ▼                                      ▼                 │
-│   ┌────────────────────────┐         ┌───────────────────────────────┐ │
-│   │ Recursive Drop Parser  │         │    Storage Breakdown Card     │ │
-│   │ - FileSystemEntry read │         │  - Storage calculation hook  │ │
-│   │ - Quota verification   │         │  - Recharts PieChart (Donut)  │ │
-│   │ - Video ObjectURLs     │         │  - Interactive Custom Tooltip │ │
-│   └───────────┬────────────┘         │  - Tabular Category Legend    │ │
-│               │                      └───────────────────────────────┘ │
-│               ▼                                                        │
-│   ┌──────────────────────────────────────────────────────────────────┐ │
-│   │                     Drive Items State Store                      │ │
-│   │                 (driveItems: DriveItem[], React state)           │ │
-│   └──────────────────────────────────────────────────────────────────┘ │
-└────────────────────────────────────────────────────────────────────────┘
-```
-
-### Data Categorization Schema
-```typescript
-interface StorageCategoryBreakdown {
-  name: string;        // 'Videos' | 'Documents' | 'Archives' | 'Images' | 'Spreadsheets' | 'Available'
-  typeKey: string;     // 'video' | 'document' | 'archive' | 'image' | 'spreadsheet' | 'free'
-  bytes: number;       // Size in bytes
-  count: number;       // Number of files
-  color: string;       // Hex color for Recharts segment
-  percentage: number;  // Relative proportion of total plan quota
-}
-```
-
-### Interactive State & Handlers
-1. `dragDepth` counter state on window/main wrapper to track entered/left transitions without child-element flickering.
-2. `handleDrop` async function that inspects `event.dataTransfer.items`, recursively collects entries and files, computes total size, enforces plan limits, and dispatches batch state updates.
-3. Memoized `storageBreakdown` computed from `driveItems` and `currentPlan.maxBytes`, feeding directly into the Recharts donut chart and category legend.
+## 3. Langkah Verifikasi
+1. **Pemeriksaan Kode & Linter:**
+   - Jalankan `lint_applet` untuk memastikan tidak ada kesalahan TypeScript atau aturan React Hooks.
+2. **Uji Kompilasi:**
+   - Jalankan `compile_applet` guna memverifikasi build aplikasi sukses.
+3. **Uji Fungsionalitas:**
+   - Verifikasi drive mulai dari kondisi kosong (0 B terpakai).
+   - Unggah file nyata (misalnya gambar, dokumen, atau video MP4) melalui tombol upload atau drag-and-drop.
+   - Verifikasi bahwa file tersimpan secara persisten setelah halaman di-refresh.
+   - Putar video asli dan unduh kembali file asli untuk memastikan integritas data.

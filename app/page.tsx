@@ -1196,6 +1196,26 @@ export default function AsterDriveApp() {
   };
 
   const handleNavSelect = (itemId: string) => {
+    if (itemId === 'cloud-storage') {
+      setIsUpgradeModalOpen(true);
+      setIsMobileMenuOpen(false);
+      showToast({
+        type: 'info',
+        title: 'Cloud Storage & Quota',
+        message: `Currently using ${formatBytes(totalUsedBytes)} of ${currentPlan.storage} (${Math.round(storagePercentage)}%)`
+      });
+      return;
+    }
+    if (itemId === 'backup') {
+      setIsSyncModalOpen(true);
+      setIsMobileMenuOpen(false);
+      showToast({
+        type: 'info',
+        title: 'Computer Backup & Sync',
+        message: 'Connect your Windows PC or Mac to automatically back up folders.'
+      });
+      return;
+    }
     setActiveNav(itemId);
     setSearchQuery('');
     setSelectedItems(new Set());
@@ -1332,6 +1352,53 @@ export default function AsterDriveApp() {
               </button>
             );
           })}
+
+          {/* CLOUD SERVICES & BACKUP MENU ITEMS */}
+          <div className="pt-3 mt-3 border-t border-slate-200/60">
+            <p className="px-3.5 pb-2 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+              Cloud & Sync
+            </p>
+            <div className="space-y-1">
+              <button
+                type="button"
+                onClick={() => handleNavSelect('cloud-storage')}
+                className="w-full flex items-center justify-between gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium text-slate-700 hover:bg-blue-50/80 hover:text-blue-700 transition-all text-left select-none cursor-pointer group active:scale-[0.98] outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                title="Manage Cloud Storage Quota & Plans"
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-6 h-6 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 group-hover:bg-blue-100 transition-colors">
+                    <Cloud className="w-4 h-4" />
+                  </div>
+                  <span className="truncate font-medium">Cloud Storage</span>
+                </div>
+                <span className={cn(
+                  "text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 border",
+                  currentPlan.isFree 
+                    ? "bg-emerald-50 text-emerald-700 border-emerald-200/70" 
+                    : "bg-blue-50 text-blue-700 border-blue-200/70"
+                )}>
+                  {Math.round(storagePercentage)}%
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleNavSelect('backup')}
+                className="w-full flex items-center justify-between gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium text-slate-700 hover:bg-indigo-50/80 hover:text-indigo-700 transition-all text-left select-none cursor-pointer group active:scale-[0.98] outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
+                title="Backup and sync local PC / Mac folders"
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-6 h-6 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0 group-hover:bg-indigo-100 transition-colors">
+                    <UploadCloud className="w-4 h-4" />
+                  </div>
+                  <span className="truncate font-medium">Backup & Sync</span>
+                </div>
+                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200/70 shrink-0">
+                  Sync PC
+                </span>
+              </button>
+            </div>
+          </div>
         </nav>
 
         {/* CLOUD STORAGE WIDGET IN SIDEBAR / SLIDER */}
