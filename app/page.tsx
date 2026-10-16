@@ -2087,12 +2087,11 @@ className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm
                             if (e.metaKey || e.ctrlKey) {
                               toggleSelection(item.id);
                             } else {
-                              setSelectedItems(new Set([item.id]));
+                              handleItemClick(item);
                             }
                           }}
-                          onDoubleClick={() => handleItemClick(item)}
                           className={cn(
-                            "cursor-pointer transition-colors select-none",
+                            "cursor-pointer touch-manipulation transition-colors select-none",
                             isSelected ? "bg-blue-50/80" : "hover:bg-slate-50/80"
                           )}
                         >
