@@ -62,6 +62,7 @@ import {
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { StorageAnalyticsChart } from '@/components/StorageAnalyticsChart';
+import { saveFileBlob, getFileBlob, deleteFileBlob } from '@/lib/db';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -111,105 +112,8 @@ interface DriveItem {
 const SAMPLE_VIDEO_URL = "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4";
 const SECONDARY_VIDEO_URL = "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4";
 
-const initialData: DriveItem[] = [
-  {
-    id: 'video-demo-1',
-    parentId: 'root',
-    name: 'Product_Launch_Demo.mp4',
-    type: 'video',
-    size: 84 * 1024 * 1024,
-    updatedAt: '2026-10-13T09:30:00.000Z',
-    owner: 'me',
-    starred: true,
-    source: 'drive',
-    videoUrl: SAMPLE_VIDEO_URL
-  },
-  {
-    id: 'folder-proj-1',
-    parentId: 'root',
-    name: 'Project_Workspace_2026',
-    type: 'folder',
-    updatedAt: '2026-10-13T08:15:00.000Z',
-    owner: 'me',
-    starred: false,
-    source: 'drive'
-  },
-  {
-    id: 'doc-summary-1',
-    parentId: 'root',
-    name: 'Quarterly_Strategy_Brief.pdf',
-    type: 'document',
-    size: 4.8 * 1024 * 1024,
-    updatedAt: '2026-10-13T06:00:00.000Z',
-    owner: 'me',
-    starred: false,
-    source: 'drive'
-  },
-  {
-    id: 'sheet-budget-1',
-    parentId: 'root',
-    name: 'Marketing_Budget_Q4.xlsx',
-    type: 'spreadsheet',
-    size: 2.3 * 1024 * 1024,
-    updatedAt: '2026-10-13T04:20:00.000Z',
-    owner: 'me',
-    starred: false,
-    source: 'drive'
-  },
-  {
-    id: 'video-tutorial-2',
-    parentId: 'root',
-    name: 'Tutorial_Feature_Walkthrough.mp4',
-    type: 'video',
-    size: 142 * 1024 * 1024,
-    updatedAt: '2026-10-12T18:00:00.000Z',
-    owner: 'me',
-    starred: false,
-    source: 'drive',
-    videoUrl: SECONDARY_VIDEO_URL
-  },
-  {
-    id: 'pc-video-1',
-    parentId: 'root',
-    name: 'Windows_Tutorial_Walkthrough_4K.mp4',
-    type: 'video',
-    size: 320 * 1024 * 1024,
-    updatedAt: '2026-10-12T15:45:00.000Z',
-    owner: 'me',
-    starred: false,
-    source: 'computer',
-    videoUrl: SAMPLE_VIDEO_URL,
-    computerDevice: 'Windows 11 Workstation',
-    folderPath: 'C:\\Users\\Workspace\\Videos'
-  },
-  {
-    id: 'mac-video-1',
-    parentId: 'root',
-    name: 'Mac_Screen_Recording_AppDemo.mp4',
-    type: 'video',
-    size: 240 * 1024 * 1024,
-    updatedAt: '2026-10-12T12:30:00.000Z',
-    owner: 'me',
-    starred: true,
-    source: 'computer',
-    videoUrl: SECONDARY_VIDEO_URL,
-    computerDevice: 'MacBook Pro (M3)',
-    folderPath: '~/Movies/Screen_Recordings'
-  },
-  {
-    id: 'mac-deck-1',
-    parentId: 'root',
-    name: 'Keynote_Deck_Product_Pitch.pdf',
-    type: 'document',
-    size: 18 * 1024 * 1024,
-    updatedAt: '2026-10-12T11:00:00.000Z',
-    owner: 'me',
-    starred: false,
-    source: 'computer',
-    computerDevice: 'MacBook Pro (M3)',
-    folderPath: '~/Documents/Pitch'
-  }
-];
+// Real data: AsterDrive starts completely clean with 0 dummy files
+const initialData: DriveItem[] = [];
 
 function formatBytes(bytes?: number, decimals = 1) {
   if (bytes === undefined || bytes === null || isNaN(bytes) || bytes === 0) return '0 B';
@@ -257,6 +161,8 @@ type ProfileDetailView = 'personal' | 'security' | 'settings' | 'offline' | 'not
 
 // --- MAIN APPLICATION COMPONENT ---
 
+const STORAGE_KEY = 'asterdrive_real_items_v2';
+
 export default function AsterDriveApp() {
   const [driveItems, setDriveItems] = useState<DriveItem[]>(initialData);
   const [currentFolderId, setCurrentFolderId] = useState<string>('root');
@@ -294,14 +200,70 @@ export default function AsterDriveApp() {
 
   // Video player modal state
   const [previewVideoItem, setPreviewVideoItem] = useState<DriveItem | null>(null);
+  const [activeVideoUrl, setActiveVideoUrl] = useState<string | null>(null);
   const [videoPlaybackSpeed, setVideoPlaybackSpeed] = useState<number>(1);
   const [videoLoadError, setVideoLoadError] = useState(false);
   const videoPlayerRef = React.useRef<HTMLVideoElement>(null);
 
-  const openVideoPreview = (item: DriveItem) => {
+  // Load persistent real items from localStorage on mount
+  React.useEffect(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          requestAnimationFrame(() => {
+            setDriveItems(parsed);
+          });
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to load items from localStorage', e);
+    }
+  }, []);
+
+  // Save persistent real items to localStorage
+  React.useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(driveItems));
+    } catch (e) {
+      console.warn('Failed to save items to localStorage', e);
+    }
+  }, [driveItems]);
+
+  const openVideoPreview = async (item: DriveItem) => {
     setVideoLoadError(false);
     setVideoPlaybackSpeed(1);
     setPreviewVideoItem(item);
+
+    if (activeVideoUrl && activeVideoUrl.startsWith('blob:')) {
+      URL.revokeObjectURL(activeVideoUrl);
+    }
+
+    try {
+      const blob = await getFileBlob(item.id);
+      if (blob) {
+        const url = URL.createObjectURL(blob);
+        setActiveVideoUrl(url);
+        return;
+      }
+    } catch (err) {
+      console.warn('Could not load video blob from IndexedDB', err);
+    }
+
+    if (item.videoUrl) {
+      setActiveVideoUrl(item.videoUrl);
+    } else {
+      setActiveVideoUrl(null);
+    }
+  };
+
+  const closeVideoPreview = () => {
+    if (activeVideoUrl && activeVideoUrl.startsWith('blob:')) {
+      URL.revokeObjectURL(activeVideoUrl);
+    }
+    setActiveVideoUrl(null);
+    setPreviewVideoItem(null);
   };
 
   // Computer sync modal state
@@ -363,7 +325,7 @@ export default function AsterDriveApp() {
     });
   };
 
-  const handleDownloadItem = (item: DriveItem) => {
+  const handleDownloadItem = async (item: DriveItem) => {
     setActiveItemMenu(null);
     showToast({
       type: 'success',
@@ -371,10 +333,14 @@ export default function AsterDriveApp() {
       message: `Downloading "${item.name}" (${formatBytes(item.size)})`
     });
     try {
-      const blob = new Blob([
-        `AsterDrive Cloud Storage\nFile: ${item.name}\nSize: ${formatBytes(item.size)}\nOwner: ${item.owner}\nUploaded: ${item.updatedAt}\nPlan: ${currentPlan.name}`
-      ], { type: 'text/plain' });
-      const url = URL.createObjectURL(blob);
+      const realBlob = await getFileBlob(item.id);
+      let downloadBlob = realBlob;
+      if (!downloadBlob) {
+        downloadBlob = new Blob([
+          `AsterDrive Cloud Storage\nFile: ${item.name}\nSize: ${formatBytes(item.size)}\nOwner: ${item.owner}\nUploaded: ${item.updatedAt}\nPlan: ${currentPlan.name}`
+        ], { type: 'text/plain' });
+      }
+      const url = URL.createObjectURL(downloadBlob);
       const a = document.createElement('a');
       a.href = url;
       a.download = item.name.includes('.') ? item.name : `${item.name}.txt`;
@@ -599,6 +565,11 @@ export default function AsterDriveApp() {
           };
         });
 
+        // Save binary file blobs to IndexedDB for real persistent retrieval
+        newFileItems.forEach((item, idx) => {
+          saveFileBlob(item.id, filesWithFolder[idx].file);
+        });
+
         setDriveItems(prev => [...prev, ...newFolderItems, ...newFileItems]);
         setShowUploadMenu(false);
         showToast({
@@ -637,6 +608,11 @@ export default function AsterDriveApp() {
           computerDevice: activeNav === 'computers' ? 'This PC' : undefined,
           folderPath: activeNav === 'computers' ? 'Uploaded from PC' : undefined
         };
+      });
+
+      // Save binary file blobs to IndexedDB
+      newItems.forEach((item, idx) => {
+        saveFileBlob(item.id, filesArray[idx]);
       });
 
       setDriveItems(prev => [...prev, ...newItems]);
@@ -843,6 +819,11 @@ export default function AsterDriveApp() {
       };
     });
 
+    // Save binary file blobs to IndexedDB
+    newFileItems.forEach((item, idx) => {
+      saveFileBlob(item.id, discoveredFiles[idx].file);
+    });
+
     setDriveItems(prev => [...prev, ...newFolderItems, ...newFileItems]);
     showToast({
       type: 'success',
@@ -907,6 +888,11 @@ export default function AsterDriveApp() {
         };
       });
 
+      // Save binary file blobs to IndexedDB
+      newItems.forEach((item, idx) => {
+        saveFileBlob(item.id, filesArray[idx]);
+      });
+
       setDriveItems(prev => [...prev, ...newItems]);
       setIsSyncModalOpen(false);
       showToast({
@@ -918,159 +904,7 @@ export default function AsterDriveApp() {
     }
   };
 
-  // Instant 1-click Preset Sync simulation for Windows PC & MacBook
-  const handleSyncPreset = (deviceType: 'windows' | 'mac') => {
-    const isWindows = deviceType === 'windows';
-    const deviceName = isWindows ? 'Windows 11 Workstation' : 'MacBook Pro (M3)';
-    const folderPath = isWindows ? 'C:\\Users\\Workspace\\Videos & Backups' : '~/Movies/Screen_Recordings';
-
-    const presetItems: DriveItem[] = isWindows ? [
-      {
-        id: Math.random().toString(36).substring(7),
-        parentId: 'root',
-        name: 'Project_Tutorial_4K.mp4',
-        type: 'video',
-        size: 320 * 1024 * 1024,
-        updatedAt: new Date(Date.now() - 3600000).toISOString(),
-        owner: 'me',
-        source: 'computer',
-        videoUrl: SAMPLE_VIDEO_URL,
-        computerDevice: deviceName,
-        folderPath
-      },
-      {
-        id: Math.random().toString(36).substring(7),
-        parentId: 'root',
-        name: 'Weekly_Client_Demo.mp4',
-        type: 'video',
-        size: 150 * 1024 * 1024,
-        updatedAt: new Date(Date.now() - 7200000).toISOString(),
-        owner: 'me',
-        source: 'computer',
-        videoUrl: SECONDARY_VIDEO_URL,
-        computerDevice: deviceName,
-        folderPath
-      },
-      {
-        id: Math.random().toString(36).substring(7),
-        parentId: 'root',
-        name: 'Windows_System_Backup.zip',
-        type: 'archive',
-        size: 80 * 1024 * 1024,
-        updatedAt: new Date(Date.now() - 14400000).toISOString(),
-        owner: 'me',
-        source: 'computer',
-        computerDevice: deviceName,
-        folderPath
-      },
-      {
-        id: Math.random().toString(36).substring(7),
-        parentId: 'root',
-        name: 'Sync_Backup_Summary.pdf',
-        type: 'document',
-        size: 15 * 1024 * 1024,
-        updatedAt: new Date(Date.now() - 18000000).toISOString(),
-        owner: 'me',
-        source: 'computer',
-        computerDevice: deviceName,
-        folderPath
-      }
-    ] : [
-      {
-        id: Math.random().toString(36).substring(7),
-        parentId: 'root',
-        name: 'Mac_Screen_Recording_AppDemo.mp4',
-        type: 'video',
-        size: 240 * 1024 * 1024,
-        updatedAt: new Date(Date.now() - 1800000).toISOString(),
-        owner: 'me',
-        source: 'computer',
-        videoUrl: SAMPLE_VIDEO_URL,
-        computerDevice: deviceName,
-        folderPath
-      },
-      {
-        id: Math.random().toString(36).substring(7),
-        parentId: 'root',
-        name: 'FinalCut_Render_Preview.mp4',
-        type: 'video',
-        size: 160 * 1024 * 1024,
-        updatedAt: new Date(Date.now() - 5400000).toISOString(),
-        owner: 'me',
-        source: 'computer',
-        videoUrl: SECONDARY_VIDEO_URL,
-        computerDevice: deviceName,
-        folderPath
-      },
-      {
-        id: Math.random().toString(36).substring(7),
-        parentId: 'root',
-        name: 'Keynote_Deck_Q4.pdf',
-        type: 'document',
-        size: 25 * 1024 * 1024,
-        updatedAt: new Date(Date.now() - 10800000).toISOString(),
-        owner: 'me',
-        source: 'computer',
-        computerDevice: deviceName,
-        folderPath
-      }
-    ];
-
-    const presetBytes = presetItems.reduce((acc, item) => acc + (item.size || 0), 0);
-    if (totalUsedBytes + presetBytes > currentPlan.maxBytes) {
-      showToast({
-        type: 'warning',
-        title: 'Storage Limit Reached',
-        message: `Syncing preset (${formatBytes(presetBytes)}) exceeds your ${currentPlan.name} quota (${currentPlan.storage}). Upgrade storage to add more synced computers.`
-      });
-      setIsUpgradeModalOpen(true);
-      return;
-    }
-
-    setDriveItems(prev => [...prev, ...presetItems]);
-    setIsSyncModalOpen(false);
-    showToast({
-      type: 'success',
-      title: `${deviceName} Synced`,
-      message: `${presetItems.length} items (${formatBytes(presetBytes)}) synced and backed up to AsterDrive.`
-    });
-  };
-
-  // Helper to add simulated files for easy quota and upgrade testing
-  const handleAddSimulatedFile = (name: string, size: number, type: ItemType) => {
-    if (totalUsedBytes + size > currentPlan.maxBytes) {
-      showToast({
-        type: 'warning',
-        title: 'Storage Quota Exceeded',
-        message: `Adding "${name}" (${formatBytes(size)}) exceeds your ${currentPlan.name} quota (${currentPlan.storage}). Currently using ${formatBytes(totalUsedBytes)} of ${currentPlan.storage}.`
-      });
-      setIsUpgradeModalOpen(true);
-      setShowUploadMenu(false);
-      return;
-    }
-
-    const newItem: DriveItem = {
-      id: Math.random().toString(36).substring(7),
-      parentId: currentFolderId,
-      name,
-      type,
-      size,
-      updatedAt: new Date().toISOString(),
-      owner: 'me',
-      source: 'drive',
-      videoUrl: type === 'video' ? SAMPLE_VIDEO_URL : undefined
-    };
-
-    setDriveItems(prev => [...prev, newItem]);
-    setShowUploadMenu(false);
-    showToast({
-      type: 'success',
-      title: 'Sample File Added',
-      message: `"${name}" (${formatBytes(size)}) added to your storage.`
-    });
-  };
-
-  // Upgrade simulation handler
+  // Upgrade handler
   const handleConfirmUpgrade = () => {
     const chosenPlan = UPGRADE_PLANS.find(p => p.id === selectedPlanId);
     if (!chosenPlan) return;
@@ -1118,6 +952,9 @@ export default function AsterDriveApp() {
   };
 
   const handleDeletePermanent = () => {
+    selectedItems.forEach(id => {
+      deleteFileBlob(id);
+    });
     setDriveItems(prev => prev.filter(item => !selectedItems.has(item.id)));
     setSelectedItems(new Set());
     setIsDeleteDialogOpen(false);
@@ -1864,49 +1701,49 @@ export default function AsterDriveApp() {
                     Safely backup videos, photos, and project folders directly from your PC or Mac. Any synced files are accessible anytime, anywhere on AsterDrive.
                   </p>
 
-                  {/* Preset Cards & Actions */}
+                  {/* Real Backup Action Cards */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full mb-6 text-left">
                     <div 
-                      onClick={() => handleSyncPreset('windows')}
-                      className="p-4 rounded-xl border border-slate-200 hover:border-blue-400 bg-white hover:bg-blue-50/40 shadow-xs transition-all cursor-pointer group"
+                      onClick={() => computerFolderInputRef.current?.click()}
+                      className="p-4 rounded-xl border border-slate-200 hover:border-blue-500 bg-white hover:bg-blue-50/40 shadow-xs transition-all cursor-pointer group"
                     >
                       <div className="flex items-center gap-3 mb-2">
                         <div className="w-9 h-9 rounded-lg bg-blue-100/70 text-blue-700 flex items-center justify-center font-bold">
-                          <Monitor className="w-5 h-5" />
+                          <Folder className="w-5 h-5 text-blue-600" />
                         </div>
                         <div>
-                          <h4 className="font-semibold text-slate-900 text-sm group-hover:text-blue-700 transition-colors">Windows PC Sync</h4>
-                          <span className="text-[11px] text-slate-500">Preset • 4K Videos &amp; Docs</span>
+                          <h4 className="font-semibold text-slate-900 text-sm group-hover:text-blue-700 transition-colors">Backup Computer Folder</h4>
+                          <span className="text-[11px] text-slate-500">Select any local directory</span>
                         </div>
                       </div>
-                      <p className="text-xs text-slate-500 mb-3">Syncs sample 4K videos and workstation backups (~565 MB).</p>
+                      <p className="text-xs text-slate-500 mb-3">Recreates entire directory structures and backs up all nested files.</p>
                       <button 
                         type="button" 
                         className="text-xs font-semibold text-blue-600 group-hover:text-blue-700 flex items-center gap-1"
                       >
-                        ⚡ Sync Windows PC now →
+                        Select Folder from this PC →
                       </button>
                     </div>
 
                     <div 
-                      onClick={() => handleSyncPreset('mac')}
-                      className="p-4 rounded-xl border border-slate-200 hover:border-purple-400 bg-white hover:bg-purple-50/40 shadow-xs transition-all cursor-pointer group"
+                      onClick={() => computerFileInputRef.current?.click()}
+                      className="p-4 rounded-xl border border-slate-200 hover:border-indigo-500 bg-white hover:bg-indigo-50/40 shadow-xs transition-all cursor-pointer group"
                     >
                       <div className="flex items-center gap-3 mb-2">
-                        <div className="w-9 h-9 rounded-lg bg-purple-100/70 text-purple-700 flex items-center justify-center font-bold">
-                          <Laptop className="w-5 h-5" />
+                        <div className="w-9 h-9 rounded-lg bg-indigo-100/70 text-indigo-700 flex items-center justify-center font-bold">
+                          <UploadCloud className="w-5 h-5 text-indigo-600" />
                         </div>
                         <div>
-                          <h4 className="font-semibold text-slate-900 text-sm group-hover:text-purple-700 transition-colors">MacBook Sync</h4>
-                          <span className="text-[11px] text-slate-500">Preset • Screen Recordings</span>
+                          <h4 className="font-semibold text-slate-900 text-sm group-hover:text-indigo-700 transition-colors">Backup Computer Files</h4>
+                          <span className="text-[11px] text-slate-500">Select individual files</span>
                         </div>
                       </div>
-                      <p className="text-xs text-slate-500 mb-3">Syncs sample app demo videos and keynote decks (~425 MB).</p>
+                      <p className="text-xs text-slate-500 mb-3">Upload videos, images, archives, or documents directly from your computer.</p>
                       <button 
                         type="button" 
-                        className="text-xs font-semibold text-purple-600 group-hover:text-purple-700 flex items-center gap-1"
+                        className="text-xs font-semibold text-indigo-600 group-hover:text-indigo-700 flex items-center gap-1"
                       >
-                        ⚡ Sync MacBook now →
+                        Browse Files from this PC →
                       </button>
                     </div>
                   </div>
@@ -1963,7 +1800,7 @@ export default function AsterDriveApp() {
                       ? 'Files you have recently opened or edited will appear here.'
                       : activeNav === 'shared'
                       ? 'Files and folders shared with you by other collaborators will show here.'
-                      : 'Use the "+" button at the bottom right to upload files or simulate file storage under your Free Plan (1 GB).'}
+                      : 'Use the "+" button at the bottom right to upload files or drag and drop real documents, photos, and videos into your drive.'}
                   </p>
                   <div className="mt-5 flex flex-col items-center gap-3 w-full max-w-sm">
                     {activeNav === 'my-drive' ? (
@@ -1997,13 +1834,6 @@ export default function AsterDriveApp() {
                             className="px-4 py-2 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-xl text-xs font-medium transition-colors cursor-pointer"
                           >
                             Upload Folder
-                          </button>
-                          <button 
-                            type="button"
-                            onClick={() => handleAddSimulatedFile('Project_Assets.zip', 400 * 1024 * 1024, 'archive')}
-                            className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-xs font-medium transition-colors cursor-pointer"
-                          >
-                            + 400 MB Test File
                           </button>
                         </div>
                       </>
@@ -2361,37 +2191,12 @@ export default function AsterDriveApp() {
                     <Folder className="w-4 h-4 text-amber-500" />
                     Folder upload
                   </button>
-                  <div className="px-4 py-2.5 bg-blue-50/70 border-t border-b border-blue-100/60 text-[11px] text-blue-700 flex items-center gap-2">
+                  <div className="px-4 py-2.5 bg-blue-50/70 border-t border-blue-100/60 text-[11px] text-blue-700 flex items-center gap-2">
                     <UploadCloud className="w-3.5 h-3.5 text-blue-600 shrink-0" />
                     <span>Or drag &amp; drop files/folders anywhere</span>
                   </div>
                 </>
               )}
-              <div className="p-2 bg-slate-50/80">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 px-2 block mb-1">
-                  Simulate Testing
-                </span>
-                <button 
-                  onClick={() => handleAddSimulatedFile('Design_Assets_Bundle.zip', 400 * 1024 * 1024, 'archive')}
-                  className="w-full flex items-center justify-between px-2 py-1.5 rounded-lg text-xs font-medium text-slate-700 hover:bg-white hover:shadow-xs transition-all text-left"
-                >
-                  <span className="flex items-center gap-2">
-                    <FileArchive className="w-3.5 h-3.5 text-amber-500" />
-                    + 400 MB Assets
-                  </span>
-                  <span className="text-[10px] font-mono text-slate-400">400 MB</span>
-                </button>
-                <button 
-                  onClick={() => handleAddSimulatedFile('Raw_4K_Footage.mp4', 800 * 1024 * 1024, 'video')}
-                  className="w-full flex items-center justify-between px-2 py-1.5 rounded-lg text-xs font-medium text-slate-700 hover:bg-white hover:shadow-xs transition-all text-left"
-                >
-                  <span className="flex items-center gap-2">
-                    <Video className="w-3.5 h-3.5 text-purple-500" />
-                    + 800 MB Video
-                  </span>
-                  <span className="text-[10px] font-mono text-slate-400">800 MB</span>
-                </button>
-              </div>
             </motion.div>
           )}
         </AnimatePresence>
@@ -3515,7 +3320,7 @@ export default function AsterDriveApp() {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="fixed inset-0 z-[130] bg-black/95 flex flex-col justify-between backdrop-blur-md p-3 sm:p-6"
-            onClick={() => setPreviewVideoItem(null)}
+            onClick={closeVideoPreview}
           >
             {/* Top Header Bar */}
             <div 
@@ -3609,15 +3414,17 @@ export default function AsterDriveApp() {
                   <Download className="w-4 h-4 text-emerald-400" />
                   <span className="hidden sm:inline">Download</span>
                 </button>
+
                 <button
                   type="button"
                   onClick={() => handleShareItem(previewVideoItem)}
                   className="p-2 sm:px-3 sm:py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white text-xs font-medium transition-colors flex items-center gap-1.5 cursor-pointer"
                   title="Share video link"
                 >
-                  <Share2 className="w-4 h-4 text-blue-400" />
+                  <Share2 className="w-4 h-4 text-blue-300" />
                   <span className="hidden sm:inline">Share</span>
                 </button>
+
                 <button
                   type="button"
                   onClick={() => {
@@ -3632,7 +3439,7 @@ export default function AsterDriveApp() {
                 <div className="w-px h-6 bg-white/15 mx-1" />
                 <button
                   type="button"
-                  onClick={() => setPreviewVideoItem(null)}
+                  onClick={closeVideoPreview}
                   className="p-2 rounded-lg bg-white/10 hover:bg-rose-600/80 text-white transition-colors cursor-pointer"
                   title="Close (Esc)"
                 >
@@ -3648,19 +3455,14 @@ export default function AsterDriveApp() {
             >
               <video
                 ref={videoPlayerRef}
-                key={previewVideoItem.id + (videoLoadError ? '-fallback' : (previewVideoItem.videoUrl || 'primary'))}
-                src={videoLoadError ? SAMPLE_VIDEO_URL : (previewVideoItem.videoUrl || SAMPLE_VIDEO_URL)}
+                key={previewVideoItem.id + (activeVideoUrl || previewVideoItem.videoUrl || 'video')}
+                src={activeVideoUrl || previewVideoItem.videoUrl || ''}
                 controls
                 autoPlay
                 playsInline
                 onError={() => {
                   if (!videoLoadError) {
                     setVideoLoadError(true);
-                    showToast({
-                      type: 'info',
-                      title: 'HD Preview Active',
-                      message: 'Loaded high-definition demo stream for smooth playback.'
-                    });
                   }
                 }}
                 className="max-h-[64vh] sm:max-h-[70vh] w-auto max-w-full rounded-2xl shadow-2xl bg-black border border-white/10 object-contain mx-auto"
@@ -3769,48 +3571,45 @@ export default function AsterDriveApp() {
 
               <div className="space-y-3 mb-6">
                 <div 
-                  onClick={() => handleSyncPreset('windows')}
+                  onClick={() => {
+                    setIsSyncModalOpen(false);
+                    computerFolderInputRef.current?.click();
+                  }}
                   className="p-4 rounded-xl border border-slate-200 hover:border-blue-500 bg-slate-50/50 hover:bg-blue-50/30 transition-all cursor-pointer flex items-center justify-between group"
                 >
                   <div className="flex items-center gap-3">
-                    <Monitor className="w-6 h-6 text-blue-600 shrink-0" />
+                    <Folder className="w-6 h-6 text-blue-600 shrink-0" />
                     <div>
-                      <h4 className="font-semibold text-slate-900 text-sm group-hover:text-blue-700 transition-colors">Windows 11 Workstation Preset</h4>
-                      <p className="text-xs text-slate-500">Syncs 4K video tutorials, documents &amp; system backups (~565 MB)</p>
+                      <h4 className="font-semibold text-slate-900 text-sm group-hover:text-blue-700 transition-colors">Sync Folder from this Computer</h4>
+                      <p className="text-xs text-slate-500">Select any local folder from your PC/Mac to sync its contents to AsterDrive</p>
                     </div>
                   </div>
-                  <span className="text-xs font-semibold text-blue-600 shrink-0 ml-2">Sync Preset →</span>
-                </div>
-
-                <div 
-                  onClick={() => handleSyncPreset('mac')}
-                  className="p-4 rounded-xl border border-slate-200 hover:border-purple-500 bg-slate-50/50 hover:bg-purple-50/30 transition-all cursor-pointer flex items-center justify-between group"
-                >
-                  <div className="flex items-center gap-3">
-                    <Laptop className="w-6 h-6 text-purple-600 shrink-0" />
-                    <div>
-                      <h4 className="font-semibold text-slate-900 text-sm group-hover:text-purple-700 transition-colors">MacBook Pro Preset</h4>
-                      <p className="text-xs text-slate-500">Syncs screen recordings, demo videos &amp; slides (~425 MB)</p>
-                    </div>
-                  </div>
-                  <span className="text-xs font-semibold text-purple-600 shrink-0 ml-2">Sync Preset →</span>
+                  <span className="text-xs font-semibold text-blue-600 shrink-0 ml-2">Choose Folder →</span>
                 </div>
 
                 <div 
                   onClick={() => {
                     setIsSyncModalOpen(false);
-                    computerFolderInputRef.current?.click();
+                    computerFileInputRef.current?.click();
                   }}
-                  className="p-4 rounded-xl border border-slate-200 hover:border-emerald-500 bg-slate-50/50 hover:bg-emerald-50/30 transition-all cursor-pointer flex items-center justify-between group"
+                  className="p-4 rounded-xl border border-slate-200 hover:border-indigo-500 bg-slate-50/50 hover:bg-indigo-50/30 transition-all cursor-pointer flex items-center justify-between group"
                 >
                   <div className="flex items-center gap-3">
-                    <Folder className="w-6 h-6 text-emerald-600 shrink-0" />
+                    <FileText className="w-6 h-6 text-indigo-600 shrink-0" />
                     <div>
-                      <h4 className="font-semibold text-slate-900 text-sm group-hover:text-emerald-700 transition-colors">Sync Local Folder from this PC</h4>
-                      <p className="text-xs text-slate-500">Select any folder from your machine to sync</p>
+                      <h4 className="font-semibold text-slate-900 text-sm group-hover:text-indigo-700 transition-colors">Sync Files from this Computer</h4>
+                      <p className="text-xs text-slate-500">Pick individual documents, media, or archives to backup directly</p>
                     </div>
                   </div>
-                  <span className="text-xs font-semibold text-emerald-600 shrink-0 ml-2">Choose Folder →</span>
+                  <span className="text-xs font-semibold text-indigo-600 shrink-0 ml-2">Choose Files →</span>
+                </div>
+
+                <div className="p-3.5 rounded-xl border border-slate-200/80 bg-slate-50/80 text-xs text-slate-600 flex items-start gap-2.5">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                  <div>
+                    <span className="font-semibold text-slate-800">100% Real Browser Storage: </span>
+                    All synced files are stored persistently in IndexedDB on this device without server upload limits or simulated data.
+                  </div>
                 </div>
               </div>
 
