@@ -42,18 +42,24 @@ interface CategoryData {
   percentage: number;
 }
 
-const subscribe = () => () => {};
+const emptySubscribe = () => () => {};
+const getClientTrue = () => true;
+const getServerFalse = () => false;
 
-function CustomTooltip({ active, payload, planMaxBytes }: { active?: boolean; payload?: any[]; planMaxBytes: number }) {
+function StorageCustomTooltip({ active, payload }: any) {
   if (active && payload && payload.length) {
     const data = payload[0].payload;
     const isFree = data.key === 'free';
-    const pctOfTotal = ((data.value / planMaxBytes) * 100).toFixed(1);
+    const totalMax = data.totalMaxBytes || 1;
+    const pctOfTotal = ((data.value / totalMax) * 100).toFixed(1);
 
     return (
       <div className="bg-slate-900/95 text-white px-3.5 py-2.5 rounded-xl shadow-xl border border-slate-700/60 text-xs backdrop-blur-md">
         <div className="flex items-center gap-2 mb-1">
-          <span className="w-2.5 h-2.5 rounded-full inline-block shrink-0" style={{ backgroundColor: data.color }} />
+          <span
+            className="w-2.5 h-2.5 rounded-full inline-block shrink-0"
+            style={{ backgroundColor: data.color }}
+          />
           <span className="font-semibold text-slate-100">{data.name}</span>
         </div>
         <div className="space-y-0.5 text-slate-300 font-mono tabular-nums">
@@ -69,7 +75,7 @@ function CustomTooltip({ active, payload, planMaxBytes }: { active?: boolean; pa
 }
 
 export function StorageAnalyticsChart({ items, plan, onUpgradeClick }: StorageAnalyticsChartProps) {
-  const isMounted = useSyncExternalStore(subscribe, () => true, () => false);
+  const isMounted = useSyncExternalStore(emptySubscribe, getClientTrue, getServerFalse);
   const [hoveredKey, setHoveredKey] = useState<string | null>(null);
 
   const { categories, totalUsedBytes, freeBytes, usedPercentage } = useMemo(() => {
@@ -185,14 +191,15 @@ export function StorageAnalyticsChart({ items, plan, onUpgradeClick }: StorageAn
   // Chart data: active categories with usage, plus available space
   const chartData = useMemo(() => {
     if (categories.length === 0) {
-      return [{ name: 'Free Storage', value: plan.maxBytes, color: '#e2e8f0', key: 'free', count: 0 }];
+      return [{ name: 'Free Storage', value: plan.maxBytes, color: '#e2e8f0', key: 'free', count: 0, totalMaxBytes: plan.maxBytes }];
     }
     const data = categories.map(cat => ({
       name: cat.name,
       value: cat.bytes,
       color: cat.color,
       key: cat.key,
-      count: cat.count
+      count: cat.count,
+      totalMaxBytes: plan.maxBytes
     }));
 
     if (freeBytes > 0) {
@@ -201,7 +208,8 @@ export function StorageAnalyticsChart({ items, plan, onUpgradeClick }: StorageAn
         value: freeBytes,
         color: '#e2e8f0',
         key: 'free',
-        count: 0
+        count: 0,
+        totalMaxBytes: plan.maxBytes
       });
     }
 
@@ -243,7 +251,7 @@ export function StorageAnalyticsChart({ items, plan, onUpgradeClick }: StorageAn
             <div className="w-full h-52 relative flex items-center justify-center">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
-                  <Tooltip content={<CustomTooltip planMaxBytes={plan.maxBytes} />} />
+                  <Tooltip content={<StorageCustomTooltip />} />
                   <Pie
                     data={chartData}
                     cx="50%"
@@ -254,7 +262,7 @@ export function StorageAnalyticsChart({ items, plan, onUpgradeClick }: StorageAn
                     dataKey="value"
                     stroke="#ffffff"
                     strokeWidth={2}
-                    onMouseEnter={(data) => setHoveredKey(typeof data.key === 'string' ? data.key : null)}
+                    onMouseEnter={(data: any) => setHoveredKey(data?.key ? String(data.key) : null)}
                     onMouseLeave={() => setHoveredKey(null)}
                   >
                     {chartData.map((entry) => (
