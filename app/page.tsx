@@ -69,8 +69,8 @@ function cn(...inputs: ClassValue[]) {
 
 function formatDriveDate(value: string) {
   const date = new Date(value);
-  const month = date.toLocaleString('en-US', { month: 'short', timeZone: 'UTC' });
-  return `${month} ${date.getUTCDate()}, ${date.getUTCFullYear()}`;
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  return `${months[date.getUTCMonth()]} ${date.getUTCDate()}, ${date.getUTCFullYear()}`;
 }
 
 // --- STORAGE PLANS & DATA TYPES ---
