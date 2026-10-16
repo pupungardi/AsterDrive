@@ -1212,7 +1212,7 @@ export default function AsterDriveApp() {
   };
 
   const navigation = [
-    { id: 'my-drive', label: 'My Drive', icon: HardDrive },
+    { id: 'my-drive', label: 'My Drive', icon: Cloud },
     { id: 'computers', label: 'Computers', icon: Computer },
     { id: 'shared', label: 'Shared with me', icon: Users },
     { id: 'recent', label: 'Recent', icon: Clock },
@@ -1376,37 +1376,6 @@ export default function AsterDriveApp() {
           </div>
           
           <div className="flex items-center gap-1 sm:gap-2 shrink-0">
-            {/* Quick Storage Status Indicator */}
-            <div 
-              onClick={() => setIsUpgradeModalOpen(true)}
-              className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-full border border-slate-200 hover:border-slate-300 hover:bg-slate-50 cursor-pointer transition-colors"
-            >
-              <Cloud className="w-4 h-4 text-blue-600" />
-              <span className="text-xs font-medium text-slate-600">
-                {formatBytes(totalUsedBytes)} / {currentPlan.storage}
-              </span>
-              <span className={cn(
-                "text-[10px] font-bold px-1.5 py-0.5 rounded-full",
-                currentPlan.isFree ? "bg-emerald-100 text-emerald-800" : "bg-blue-100 text-blue-800"
-              )}>
-                {currentPlan.isFree ? "FREE" : "PRO"}
-              </span>
-            </div>
-
-            <button 
-              onClick={() => {
-                showToast({
-                  type: 'info',
-                  title: 'Preferences',
-                  message: 'Opening preferences and configuration menu.'
-                });
-                setIsProfileMenuOpen(true);
-              }}
-              className="p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600 rounded-full transition-colors hidden sm:block"
-              title="Settings"
-            >
-              <Settings className="w-5 h-5" />
-            </button>
             <button 
               onClick={() => {
                 showToast({
@@ -1420,24 +1389,8 @@ export default function AsterDriveApp() {
             >
               <Bell className="w-5 h-5" />
             </button>
-
-            {/* Header Three Dots (More Options) Button */}
+            {/* Header utility menu */}
             <div className="relative">
-              <button 
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setIsHeaderMenuOpen(!isHeaderMenuOpen);
-                }}
-                className={cn(
-                  "p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-700 rounded-full transition-colors",
-                  isHeaderMenuOpen && "bg-slate-100 text-slate-900"
-                )}
-                title="More options"
-                aria-label="More options"
-              >
-                <MoreVertical className="w-5 h-5" />
-              </button>
-
               <AnimatePresence>
                 {isHeaderMenuOpen && (
                   <>
@@ -1461,7 +1414,7 @@ export default function AsterDriveApp() {
                         className="px-4 py-2.5 hover:bg-slate-50 cursor-pointer transition-colors"
                       >
                         <div className="flex items-center justify-between text-xs mb-1">
-                          <span className="font-semibold text-slate-800">Cloud Storage</span>
+                          <span className="flex items-center gap-2 font-semibold text-slate-800"><Cloud className="w-3.5 h-3.5 text-blue-600" />Cloud Storage</span>
                           <span className={cn(
                             "font-bold text-[10px] px-1.5 py-0.5 rounded-full",
                             currentPlan.isFree ? "bg-emerald-100 text-emerald-800" : "bg-blue-100 text-blue-800"
@@ -1907,11 +1860,7 @@ export default function AsterDriveApp() {
                           if (e.metaKey || e.ctrlKey) {
                             toggleSelection(item.id);
                           } else {
-                            if (item.type === 'folder') {
-                              handleItemClick(item);
-                            } else {
-                              setSelectedItems(new Set([item.id]));
-                            }
+                            handleItemClick(item);
                           }
                         }}
                         onDoubleClick={() => handleItemClick(item)}
