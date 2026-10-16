@@ -1660,27 +1660,6 @@ export default function AsterDriveApp() {
         {/* FILE LIST AREA */}
         <div className="flex-1 flex overflow-hidden">
           <div className="flex-1 overflow-y-auto px-4 lg:px-6 pb-6">
-            {/* QUICK DRAG-AND-DROP UPLOAD CALLOUT BAR */}
-            {(activeNav === 'my-drive' || activeNav === 'computers') && (
-              <div 
-                onClick={() => fileInputRef.current?.click()}
-                className="mb-4 py-2.5 px-4 bg-slate-50/90 hover:bg-blue-50/60 border border-dashed border-slate-200 hover:border-blue-400 rounded-2xl flex items-center justify-between text-xs text-slate-600 hover:text-blue-700 transition-all cursor-pointer group shadow-2xs"
-              >
-                <div className="flex items-center gap-2.5">
-                  <div className="w-6 h-6 rounded-lg bg-blue-100/80 text-blue-600 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
-                    <UploadCloud className="w-3.5 h-3.5" />
-                  </div>
-                  <span className="font-medium">
-                    Drag &amp; drop files or entire folders here to upload directly
-                  </span>
-                </div>
-                <div className="flex items-center gap-2 text-[11px] text-slate-400 group-hover:text-blue-600 shrink-0">
-                  <span className="hidden sm:inline">Nested trees preserved</span>
-                  <span className="font-semibold underline">Browse computer</span>
-                </div>
-              </div>
-            )}
-
             {/* COMPUTERS TOP STATUS BANNER (When synced items exist) */}
             {activeNav === 'computers' && displayedItems.length > 0 && (
               <div className="mb-5 p-4 bg-gradient-to-r from-blue-50/90 via-indigo-50/40 to-slate-50 border border-blue-100 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-3 shadow-2xs">
@@ -1892,7 +1871,7 @@ export default function AsterDriveApp() {
                         onClick={() => handleNavSelect('my-drive')}
                         className="px-4 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-xl text-sm font-medium transition-colors cursor-pointer"
                       >
-                        ← Back to My Drive
+                        ��� Back to My Drive
                       </button>
                     )}
                   </div>

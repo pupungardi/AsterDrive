@@ -254,7 +254,7 @@ export function StorageAnalyticsChart({ items, plan, onUpgradeClick }: StorageAn
                     dataKey="value"
                     stroke="#ffffff"
                     strokeWidth={2}
-                    onMouseEnter={(data) => setHoveredKey(data.key)}
+                    onMouseEnter={(data) => setHoveredKey(typeof data.key === 'string' ? data.key : null)}
                     onMouseLeave={() => setHoveredKey(null)}
                   >
                     {chartData.map((entry) => (
