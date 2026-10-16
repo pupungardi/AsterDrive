@@ -2,6 +2,7 @@ import type {NextConfig} from 'next';
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+  allowedDevOrigins: ['aster-drive-e8ivqf7w.v0.build'],
   eslint: {
     ignoreDuringBuilds: true,
   },
