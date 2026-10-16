@@ -1225,7 +1225,8 @@ export default function AsterDriveApp() {
     : null;
 
   return (
-    <div 
+              <div
+
       className="flex h-screen bg-slate-50 font-sans text-slate-800 overflow-hidden select-none relative" 
       suppressHydrationWarning
       onDragEnter={handleWindowDragEnter}
@@ -1250,7 +1251,8 @@ export default function AsterDriveApp() {
               transition={{ type: "spring", stiffness: 350, damping: 25 }}
               className="max-w-lg w-full bg-white/95 backdrop-blur-xl border-2 border-dashed border-blue-500 rounded-3xl p-8 sm:p-10 text-center shadow-2xl flex flex-col items-center"
             >
-              <div className="w-20 h-20 rounded-2xl bg-blue-100 text-blue-600 flex items-center justify-center mb-5 shadow-inner animate-bounce">
+                        <div
+className="w-20 h-20 rounded-2xl bg-blue-100 text-blue-600 flex items-center justify-center mb-5 shadow-inner animate-bounce">
                 <UploadCloud className="w-10 h-10" />
               </div>
               <h2 className="text-xl sm:text-2xl font-bold text-slate-900 mb-2">
@@ -1262,7 +1264,8 @@ export default function AsterDriveApp() {
                   {currentFolderId === 'root' ? (activeNav === 'computers' ? 'Synced Computers' : 'My Drive') : (driveItems.find(i => i.id === currentFolderId)?.name || 'Current Folder')}
                 </span>
               </p>
-              <div className="flex items-center gap-2 text-xs font-medium text-slate-600 bg-slate-100/90 px-3.5 py-2 rounded-full border border-slate-200/60">
+                        <div
+className="flex items-center gap-2 text-xs font-medium text-slate-600 bg-slate-100/90 px-3.5 py-2 rounded-full border border-slate-200/60">
                 <Folder className="w-4 h-4 text-blue-500" />
                 <span>Entire nested folder structures are preserved automatically</span>
               </div>
@@ -1292,7 +1295,8 @@ export default function AsterDriveApp() {
           isMobileMenuOpen ? "translate-x-0 shadow-2xl" : "-translate-x-full lg:translate-x-0"
         )}
       >
-        <div className="h-16 flex items-center justify-between px-6 border-b border-transparent shrink-0">
+                  <div
+className="h-16 flex items-center justify-between px-6 border-b border-transparent shrink-0">
           <button
             type="button"
             onClick={() => handleNavSelect('my-drive')}
@@ -1339,14 +1343,87 @@ export default function AsterDriveApp() {
             );
           })}
         </nav>
+
+        {/* CLOUD STORAGE WIDGET IN SIDEBAR / SLIDER */}
+                  <div
+className="p-3.5 m-3 rounded-2xl bg-white border border-slate-200/80 shadow-xs shrink-0 select-none">
+          <div
+            onClick={() => {
+              setIsUpgradeModalOpen(true);
+              setIsMobileMenuOpen(false);
+            }}
+            className="cursor-pointer group"
+          >
+                      <div
+className="flex items-center justify-between gap-2 mb-2">
+                        <div
+className="flex items-center gap-2 min-w-0">
+                          <div
+className="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 group-hover:bg-blue-100 transition-colors">
+                  <Cloud className="w-4 h-4" />
+                </div>
+                          <div
+className="min-w-0">
+                  <span className="text-xs font-semibold text-slate-800 block truncate group-hover:text-blue-600 transition-colors">
+                    Cloud Storage
+                  </span>
+                </div>
+              </div>
+              <span className={cn(
+                "text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 border",
+                currentPlan.isFree
+                  ? "bg-emerald-50 text-emerald-700 border-emerald-200/80"
+                  : "bg-blue-50 text-blue-700 border-blue-200/80"
+              )}>
+                {currentPlan.isFree ? "FREE" : "PRO"}
+              </span>
+            </div>
+
+            {/* Storage Progress Bar */}
+                      <div
+className="w-full bg-slate-100 h-2 rounded-full overflow-hidden mb-2">
+              <div
+                className={cn(
+                  "h-full rounded-full transition-all duration-300",
+                  storagePercentage > 90 ? "bg-rose-500" : storagePercentage > 75 ? "bg-amber-500" : "bg-blue-600"
+                )}
+                style={{ width: `${Math.min(100, Math.max(storagePercentage, 2))}%` }}
+              />
+            </div>
+
+                      <div
+className="flex items-center justify-between text-[11px] text-slate-500">
+              <span className="font-mono tabular-nums">
+                {formatBytes(totalUsedBytes)} of {currentPlan.storage}
+              </span>
+              <span className="font-medium font-mono">
+                {Math.round(storagePercentage)}%
+              </span>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => {
+              setIsUpgradeModalOpen(true);
+              setIsMobileMenuOpen(false);
+            }}
+            className="mt-3 w-full py-1.5 px-3 rounded-xl border border-slate-200 hover:border-blue-300 bg-slate-50 hover:bg-blue-50 text-slate-700 hover:text-blue-700 text-xs font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs active:scale-[0.98]"
+          >
+            <Sparkles className="w-3.5 h-3.5 text-blue-600" />
+            {currentPlan.isFree ? 'Get More Storage' : 'Manage Subscription'}
+          </button>
+        </div>
       </aside>
 
       {/* MAIN CONTENT */}
-      <div className="flex-1 flex flex-col min-w-0 bg-white rounded-tl-2xl border-t border-l border-slate-200 shadow-sm overflow-hidden lg:my-2 lg:mr-2">
+                <div
+className="flex-1 flex flex-col min-w-0 bg-white rounded-tl-2xl border-t border-l border-slate-200 shadow-sm overflow-hidden lg:my-2 lg:mr-2">
         {/* HEADER */}
         <header className="h-16 flex items-center justify-between px-4 lg:px-6 border-b border-slate-100 gap-4 shrink-0" suppressHydrationWarning>
-          <div className="flex items-center gap-3 flex-1 max-w-2xl" suppressHydrationWarning>
-            <button 
+                    <div
+className="flex items-center gap-3 flex-1 max-w-2xl" suppressHydrationWarning>
+            <button
               type="button"
               className="lg:hidden text-slate-500 hover:bg-slate-100 p-2 rounded-xl transition-colors -ml-2 shrink-0 cursor-pointer"
               onClick={() => setIsMobileMenuOpen(true)}
@@ -1354,7 +1431,8 @@ export default function AsterDriveApp() {
             >
               <Menu className="w-5 h-5" />
             </button>
-            <div className="relative w-full" suppressHydrationWarning>
+                      <div
+className="relative w-full" suppressHydrationWarning>
               <Search className="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
               <input
                 type="text"
@@ -1365,7 +1443,7 @@ export default function AsterDriveApp() {
                 suppressHydrationWarning
               />
               {searchQuery && (
-                <button 
+                <button
                   onClick={() => setSearchQuery('')}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
                 >
@@ -1375,8 +1453,23 @@ export default function AsterDriveApp() {
             </div>
           </div>
           
-          <div className="flex items-center gap-1 sm:gap-2 shrink-0">
-            <button 
+                    <div
+className="flex items-center gap-1 sm:gap-2 shrink-0">
+            <button
+              onClick={() => {
+                showToast({
+                  type: 'info',
+                  title: 'Preferences',
+                  message: 'Opening preferences and configuration menu.'
+                });
+                setIsProfileMenuOpen(true);
+              }}
+              className="p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600 rounded-full transition-colors hidden sm:block"
+              title="Settings"
+            >
+              <Settings className="w-5 h-5" />
+            </button>
+            <button
               onClick={() => {
                 showToast({
                   type: 'info',
@@ -1390,11 +1483,12 @@ export default function AsterDriveApp() {
               <Bell className="w-5 h-5" />
             </button>
             {/* Header utility menu */}
-            <div className="relative">
+                      <div
+className="relative">
               <AnimatePresence>
                 {isHeaderMenuOpen && (
                   <>
-                    <div 
+                    <div
                       className="fixed inset-0 z-30" 
                       onClick={() => setIsHeaderMenuOpen(false)} 
                     />
@@ -1406,14 +1500,15 @@ export default function AsterDriveApp() {
                       onClick={(e) => e.stopPropagation()}
                     >
                       {/* Storage Overview */}
-                      <div 
+                      <div
                         onClick={() => {
                           setIsUpgradeModalOpen(true);
                           setIsHeaderMenuOpen(false);
                         }}
                         className="px-4 py-2.5 hover:bg-slate-50 cursor-pointer transition-colors"
                       >
-                        <div className="flex items-center justify-between text-xs mb-1">
+                                  <div
+className="flex items-center justify-between text-xs mb-1">
                           <span className="flex items-center gap-2 font-semibold text-slate-800"><Cloud className="w-3.5 h-3.5 text-blue-600" />Cloud Storage</span>
                           <span className={cn(
                             "font-bold text-[10px] px-1.5 py-0.5 rounded-full",
@@ -1422,8 +1517,9 @@ export default function AsterDriveApp() {
                             {currentPlan.name}
                           </span>
                         </div>
-                        <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden mb-1">
-                          <div 
+                                  <div
+className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden mb-1">
+                          <div
                             className="h-full bg-blue-600 rounded-full transition-all" 
                             style={{ width: `${storagePercentage}%` }} 
                           />
@@ -1433,7 +1529,8 @@ export default function AsterDriveApp() {
                         </p>
                       </div>
 
-                      <div className="py-1">
+                                <div
+className="py-1">
                         <button
                           onClick={() => {
                             fileInputRef.current?.click();
@@ -1476,7 +1573,8 @@ export default function AsterDriveApp() {
                         </button>
                       </div>
 
-                      <div className="py-1">
+                                <div
+className="py-1">
                         <button
                           onClick={() => {
                             setIsProfileMenuOpen(true);
@@ -1516,7 +1614,7 @@ export default function AsterDriveApp() {
               </AnimatePresence>
             </div>
 
-            <button 
+            <button
               onClick={() => setIsProfileMenuOpen(true)}
               className="w-9 h-9 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-sm ml-1 cursor-pointer hover:bg-blue-200 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 shadow-sm"
               title="Account & Profile"
@@ -1527,12 +1625,15 @@ export default function AsterDriveApp() {
         </header>
 
         {/* BREADCRUMBS & TOOLBAR */}
-        <div className="flex items-center justify-between px-4 lg:px-6 py-4 shrink-0">
-          <div className="flex items-center text-sm">
+                  <div
+className="flex items-center justify-between px-4 lg:px-6 py-4 shrink-0">
+                    <div
+className="flex items-center text-sm">
             {searchQuery ? (
               <span className="font-medium text-slate-800 text-lg">Search results for &ldquo;{searchQuery}&rdquo;</span>
             ) : activeNav !== 'my-drive' ? (
-              <div className="flex items-center gap-2">
+                        <div
+className="flex items-center gap-2">
                 <span className="font-semibold text-slate-800 text-xl">
                   {navigation.find(n => n.id === activeNav)?.label || activeNav}
                 </span>
@@ -1541,10 +1642,11 @@ export default function AsterDriveApp() {
                 </span>
               </div>
             ) : (
-              <div className="flex items-center flex-wrap gap-1">
+                        <div
+className="flex items-center flex-wrap gap-1">
                 {breadcrumbs.map((crumb, idx) => (
                   <React.Fragment key={crumb.id}>
-                    <button 
+                    <button
                       onClick={() => {
                         setCurrentFolderId(crumb.id);
                         setSelectedItems(new Set());
@@ -1565,7 +1667,8 @@ export default function AsterDriveApp() {
             )}
           </div>
           
-          <div className="flex items-center gap-1">
+                    <div
+className="flex items-center gap-1">
             <AnimatePresence>
               {selectedItems.size > 0 && (
                 <motion.div 
@@ -1596,23 +1699,25 @@ export default function AsterDriveApp() {
                 </motion.div>
               )}
             </AnimatePresence>
-            <button 
+            <button
               onClick={() => setShowDetails(!showDetails)}
               className={cn("p-2 rounded-lg transition-colors hidden lg:block", showDetails ? "bg-blue-50 text-blue-600" : "text-slate-400 hover:bg-slate-100 hover:text-slate-700")}
               title="View details"
             >
               <Info className="w-5 h-5" />
             </button>
-            <div className="w-px h-6 bg-slate-200 mx-2 hidden sm:block" />
-            <div className="flex items-center bg-slate-100 border border-slate-200 rounded-lg p-0.5">
-              <button 
+                      <div
+className="w-px h-6 bg-slate-200 mx-2 hidden sm:block" />
+                      <div
+className="flex items-center bg-slate-100 border border-slate-200 rounded-lg p-0.5">
+              <button
                 onClick={() => setViewMode('list')}
                 className={cn("p-1.5 rounded-md transition-colors", viewMode === 'list' ? "bg-white text-slate-900 shadow-sm" : "text-slate-400 hover:text-slate-700")}
                 title="List view"
               >
                 <ListIcon className="w-4 h-4" />
               </button>
-              <button 
+              <button
                 onClick={() => setViewMode('grid')}
                 className={cn("p-1.5 rounded-md transition-colors", viewMode === 'grid' ? "bg-white text-slate-900 shadow-sm" : "text-slate-400 hover:text-slate-700")}
                 title="Grid view"
@@ -1624,17 +1729,23 @@ export default function AsterDriveApp() {
         </div>
 
         {/* FILE LIST AREA */}
-        <div className="flex-1 flex overflow-hidden">
-          <div className="flex-1 overflow-y-auto px-4 lg:px-6 pb-6">
+                  <div
+className="flex-1 flex overflow-hidden">
+                    <div
+className="flex-1 overflow-y-auto px-4 lg:px-6 pb-6">
             {/* COMPUTERS TOP STATUS BANNER (When synced items exist) */}
             {activeNav === 'computers' && displayedItems.length > 0 && (
-              <div className="mb-5 p-4 bg-gradient-to-r from-blue-50/90 via-indigo-50/40 to-slate-50 border border-blue-100 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-3 shadow-2xs">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-sm shadow-blue-500/20">
+                        <div
+className="mb-5 p-4 bg-gradient-to-r from-blue-50/90 via-indigo-50/40 to-slate-50 border border-blue-100 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-3 shadow-2xs">
+                          <div
+className="flex items-center gap-3">
+                            <div
+className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-sm shadow-blue-500/20">
                     <Computer className="w-5 h-5" />
                   </div>
                   <div>
-                    <div className="flex items-center gap-2 flex-wrap">
+                              <div
+className="flex items-center gap-2 flex-wrap">
                       <span className="font-semibold text-slate-900 text-sm">Computer Sync &amp; Backup</span>
                       <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-emerald-700 bg-emerald-100/70 px-2 py-0.5 rounded-full">
                         <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
@@ -1646,8 +1757,9 @@ export default function AsterDriveApp() {
                     </p>
                   </div>
                 </div>
-                <div className="flex items-center gap-2 flex-wrap shrink-0">
-                  <button 
+                          <div
+className="flex items-center gap-2 flex-wrap shrink-0">
+                  <button
                     type="button"
                     onClick={() => computerFolderInputRef.current?.click()}
                     className="px-3 py-1.5 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-lg text-xs font-semibold transition-colors shadow-2xs flex items-center gap-1.5 cursor-pointer"
@@ -1655,7 +1767,7 @@ export default function AsterDriveApp() {
                     <Folder className="w-3.5 h-3.5 text-amber-500" />
                     Sync Folder
                   </button>
-                  <button 
+                  <button
                     type="button"
                     onClick={() => computerFileInputRef.current?.click()}
                     className="px-3 py-1.5 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-lg text-xs font-semibold transition-colors shadow-2xs flex items-center gap-1.5 cursor-pointer"
@@ -1663,7 +1775,7 @@ export default function AsterDriveApp() {
                     <UploadCloud className="w-3.5 h-3.5 text-blue-600" />
                     Sync File
                   </button>
-                  <button 
+                  <button
                     type="button"
                     onClick={() => setIsSyncModalOpen(true)}
                     className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold transition-colors shadow-2xs flex items-center gap-1.5 cursor-pointer"
@@ -1677,8 +1789,10 @@ export default function AsterDriveApp() {
 
             {displayedItems.length === 0 ? (
               activeNav === 'computers' ? (
-                <div className="flex flex-col items-center justify-center py-10 px-4 max-w-xl mx-auto text-center">
-                  <div className="w-20 h-20 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center mb-5 shadow-sm">
+                          <div
+className="flex flex-col items-center justify-center py-10 px-4 max-w-xl mx-auto text-center">
+                            <div
+className="w-20 h-20 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center mb-5 shadow-sm">
                     <Computer className="w-10 h-10" />
                   </div>
                   <h3 className="text-xl font-bold text-slate-900 mb-2">
@@ -1689,13 +1803,16 @@ export default function AsterDriveApp() {
                   </p>
 
                   {/* Preset Cards & Actions */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full mb-6 text-left">
-                    <div 
+                            <div
+className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full mb-6 text-left">
+                    <div
                       onClick={() => handleSyncPreset('windows')}
                       className="p-4 rounded-xl border border-slate-200 hover:border-blue-400 bg-white hover:bg-blue-50/40 shadow-xs transition-all cursor-pointer group"
                     >
-                      <div className="flex items-center gap-3 mb-2">
-                        <div className="w-9 h-9 rounded-lg bg-blue-100/70 text-blue-700 flex items-center justify-center font-bold">
+                                <div
+className="flex items-center gap-3 mb-2">
+                                  <div
+className="w-9 h-9 rounded-lg bg-blue-100/70 text-blue-700 flex items-center justify-center font-bold">
                           <Monitor className="w-5 h-5" />
                         </div>
                         <div>
@@ -1704,7 +1821,7 @@ export default function AsterDriveApp() {
                         </div>
                       </div>
                       <p className="text-xs text-slate-500 mb-3">Syncs sample 4K videos and workstation backups (~565 MB).</p>
-                      <button 
+                      <button
                         type="button" 
                         className="text-xs font-semibold text-blue-600 group-hover:text-blue-700 flex items-center gap-1"
                       >
@@ -1712,12 +1829,14 @@ export default function AsterDriveApp() {
                       </button>
                     </div>
 
-                    <div 
+                    <div
                       onClick={() => handleSyncPreset('mac')}
                       className="p-4 rounded-xl border border-slate-200 hover:border-purple-400 bg-white hover:bg-purple-50/40 shadow-xs transition-all cursor-pointer group"
                     >
-                      <div className="flex items-center gap-3 mb-2">
-                        <div className="w-9 h-9 rounded-lg bg-purple-100/70 text-purple-700 flex items-center justify-center font-bold">
+                                <div
+className="flex items-center gap-3 mb-2">
+                                  <div
+className="w-9 h-9 rounded-lg bg-purple-100/70 text-purple-700 flex items-center justify-center font-bold">
                           <Laptop className="w-5 h-5" />
                         </div>
                         <div>
@@ -1726,7 +1845,7 @@ export default function AsterDriveApp() {
                         </div>
                       </div>
                       <p className="text-xs text-slate-500 mb-3">Syncs sample app demo videos and keynote decks (~425 MB).</p>
-                      <button 
+                      <button
                         type="button" 
                         className="text-xs font-semibold text-purple-600 group-hover:text-purple-700 flex items-center gap-1"
                       >
@@ -1736,8 +1855,9 @@ export default function AsterDriveApp() {
                   </div>
 
                   {/* Real Folder / File Sync Buttons */}
-                  <div className="flex items-center gap-2.5 flex-wrap justify-center">
-                    <button 
+                            <div
+className="flex items-center gap-2.5 flex-wrap justify-center">
+                    <button
                       type="button"
                       onClick={() => computerFolderInputRef.current?.click()}
                       className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-semibold transition-colors shadow-sm cursor-pointer flex items-center gap-2"
@@ -1745,7 +1865,7 @@ export default function AsterDriveApp() {
                       <Folder className="w-4 h-4 text-blue-200" />
                       Sync Folder from this Computer
                     </button>
-                    <button 
+                    <button
                       type="button"
                       onClick={() => computerFileInputRef.current?.click()}
                       className="px-4 py-2.5 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-xl text-sm font-medium transition-colors cursor-pointer flex items-center gap-2"
@@ -1753,7 +1873,7 @@ export default function AsterDriveApp() {
                       <UploadCloud className="w-4 h-4 text-slate-500" />
                       Sync File
                     </button>
-                    <button 
+                    <button
                       type="button"
                       onClick={() => handleNavSelect('my-drive')}
                       className="px-3.5 py-2.5 text-slate-500 hover:text-slate-800 text-sm font-medium transition-colors cursor-pointer"
@@ -1763,8 +1883,10 @@ export default function AsterDriveApp() {
                   </div>
                 </div>
               ) : (
-                <div className="flex flex-col items-center justify-center h-full text-center px-4">
-                  <div className="w-24 h-24 bg-slate-50 rounded-full flex items-center justify-center mb-4">
+                          <div
+className="flex flex-col items-center justify-center h-full text-center px-4">
+                            <div
+className="w-24 h-24 bg-slate-50 rounded-full flex items-center justify-center mb-4">
                     {activeNav === 'shared' ? <Users className="w-10 h-10 text-slate-300" /> :
                      activeNav === 'recent' ? <Clock className="w-10 h-10 text-slate-300" /> :
                      activeNav === 'starred' ? <Star className="w-10 h-10 text-slate-300" /> :
@@ -1789,14 +1911,16 @@ export default function AsterDriveApp() {
                       ? 'Files and folders shared with you by other collaborators will show here.'
                       : 'Use the "+" button at the bottom right to upload files or simulate file storage under your Free Plan (1 GB).'}
                   </p>
-                  <div className="mt-5 flex flex-col items-center gap-3 w-full max-w-sm">
+                            <div
+className="mt-5 flex flex-col items-center gap-3 w-full max-w-sm">
                     {activeNav === 'my-drive' ? (
                       <>
-                        <div 
+                        <div
                           onClick={() => fileInputRef.current?.click()}
                           className="w-full p-5 border-2 border-dashed border-slate-200 hover:border-blue-400 bg-slate-50/70 hover:bg-blue-50/40 rounded-2xl cursor-pointer transition-all flex flex-col items-center justify-center group"
                         >
-                          <div className="w-10 h-10 rounded-xl bg-blue-100/80 text-blue-600 flex items-center justify-center mb-2 group-hover:scale-105 transition-transform">
+                                    <div
+className="w-10 h-10 rounded-xl bg-blue-100/80 text-blue-600 flex items-center justify-center mb-2 group-hover:scale-105 transition-transform">
                             <UploadCloud className="w-5 h-5" />
                           </div>
                           <span className="text-xs font-semibold text-slate-800 group-hover:text-blue-700">
@@ -1807,22 +1931,23 @@ export default function AsterDriveApp() {
                           </span>
                         </div>
 
-                        <div className="flex items-center gap-2 flex-wrap justify-center">
-                          <button 
+                                  <div
+className="flex items-center gap-2 flex-wrap justify-center">
+                          <button
                             type="button"
                             onClick={() => fileInputRef.current?.click()}
                             className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-medium transition-colors shadow-sm cursor-pointer"
                           >
                             Browse Files
                           </button>
-                          <button 
+                          <button
                             type="button"
                             onClick={() => folderInputRef.current?.click()}
                             className="px-4 py-2 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-xl text-xs font-medium transition-colors cursor-pointer"
                           >
                             Upload Folder
                           </button>
-                          <button 
+                          <button
                             type="button"
                             onClick={() => handleAddSimulatedFile('Project_Assets.zip', 400 * 1024 * 1024, 'archive')}
                             className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-xs font-medium transition-colors cursor-pointer"
@@ -1832,7 +1957,7 @@ export default function AsterDriveApp() {
                         </div>
                       </>
                     ) : (
-                      <button 
+                      <button
                         type="button"
                         onClick={() => handleNavSelect('my-drive')}
                         className="px-4 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-xl text-sm font-medium transition-colors cursor-pointer"
@@ -1844,7 +1969,8 @@ export default function AsterDriveApp() {
                 </div>
               )
             ) : viewMode === 'grid' ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
+                        <div
+className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
                 <AnimatePresence mode="popLayout">
                   {displayedItems.map((item) => {
                     const isSelected = selectedItems.has(item.id);
@@ -1871,8 +1997,10 @@ export default function AsterDriveApp() {
                             : "bg-white border-slate-200 hover:border-slate-300 hover:shadow-sm"
                         )}
                       >
-                        <div className="flex items-start justify-between mb-3">
-                          <div className={cn(
+                                  <div
+className="flex items-start justify-between mb-3">
+                                    <div
+className={cn(
                             "w-10 h-10 rounded-lg flex items-center justify-center transition-colors relative",
                             item.type === 'folder' ? 'bg-blue-50 group-hover:bg-blue-100' : 
                             item.type === 'video' ? 'bg-purple-50 group-hover:bg-purple-100' :
@@ -1880,16 +2008,18 @@ export default function AsterDriveApp() {
                           )}>
                             {getIconForType(item.type, "w-6 h-6")}
                             {item.type === 'video' && (
-                              <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-purple-600 rounded-full flex items-center justify-center text-white shadow-2xs">
+                                        <div
+className="absolute -bottom-1 -right-1 w-4 h-4 bg-purple-600 rounded-full flex items-center justify-center text-white shadow-2xs">
                                 <Play className="w-2.5 h-2.5 fill-white ml-0.5" />
                               </div>
                             )}
                           </div>
-                          <div className="flex items-center gap-1">
+                                    <div
+className="flex items-center gap-1">
                             {item.starred && (
                               <Star className="w-4 h-4 text-amber-400 fill-current" />
                             )}
-                            <button 
+                            <button
                               onClick={(e) => handleOpenItemMenu(item, e)}
                               className="text-slate-400 hover:text-slate-700 sm:opacity-0 group-hover:opacity-100 opacity-90 transition-all p-1.5 rounded-lg hover:bg-slate-100 active:bg-slate-200 cursor-pointer"
                               aria-label={`More options for ${item.name}`}
@@ -1905,7 +2035,8 @@ export default function AsterDriveApp() {
                         </h4>
 
                         {item.source === 'computer' && (
-                          <div className="flex items-center gap-1 text-[11px] text-blue-600 font-medium mb-1">
+                                    <div
+className="flex items-center gap-1 text-[11px] text-blue-600 font-medium mb-1">
                             <Computer className="w-3 h-3 shrink-0" />
                             <span className="truncate">{item.computerDevice || 'Computer Sync'}</span>
                           </div>
@@ -1934,7 +2065,8 @@ export default function AsterDriveApp() {
                 </AnimatePresence>
               </div>
             ) : (
-              <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
+                        <div
+className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
                 <table className="min-w-full divide-y divide-slate-200 text-sm text-left">
                   <thead className="bg-slate-50/80 text-slate-500">
                     <tr>
@@ -1965,9 +2097,11 @@ export default function AsterDriveApp() {
                           )}
                         >
                           <td className="px-6 py-3.5 whitespace-nowrap">
-                            <div className="flex items-center gap-3">
+                                      <div
+className="flex items-center gap-3">
                               {getIconForType(item.type)}
-                              <div className="flex items-center gap-2 min-w-0">
+                                        <div
+className="flex items-center gap-2 min-w-0">
                                 <span className="font-medium text-slate-900 truncate max-w-xs">{item.name}</span>
                                 {item.type === 'video' && !item.trashed && (
                                   <button
@@ -2001,7 +2135,7 @@ export default function AsterDriveApp() {
                             {formatBytes(item.size)}
                           </td>
                           <td className="px-6 py-3.5 whitespace-nowrap text-right text-slate-400">
-                            <button 
+                            <button
                               onClick={(e) => handleOpenItemMenu(item, e)}
                               className="hover:text-slate-700 text-slate-400 p-1.5 rounded-lg hover:bg-slate-100 active:bg-slate-200 transition-colors cursor-pointer"
                               aria-label={`More options for ${item.name}`}
@@ -2029,8 +2163,10 @@ export default function AsterDriveApp() {
                 className="border-l border-slate-200 bg-white overflow-hidden flex flex-col shrink-0"
               >
                 {selectedItemDetails ? (
-                  <div className="p-6 flex-1 overflow-y-auto">
-                    <div className="flex items-center justify-between mb-6">
+                            <div
+className="p-6 flex-1 overflow-y-auto">
+                              <div
+className="flex items-center justify-between mb-6">
                       <h3 className="font-semibold text-slate-900 truncate" title={selectedItemDetails.name}>
                         {selectedItemDetails.name}
                       </h3>
@@ -2039,12 +2175,13 @@ export default function AsterDriveApp() {
                       </button>
                     </div>
 
-                    <div className="h-40 bg-slate-50 rounded-xl flex items-center justify-center mb-6 border border-slate-100">
+                              <div
+className="h-40 bg-slate-50 rounded-xl flex items-center justify-center mb-6 border border-slate-100">
                       {getIconForType(selectedItemDetails.type, "w-16 h-16")}
                     </div>
 
                     {selectedItemDetails.type === 'video' && !selectedItemDetails.trashed && (
-                      <button 
+                      <button
                         type="button"
                         onClick={() => setPreviewVideoItem(selectedItemDetails)}
                         className="w-full mb-3 flex items-center justify-center gap-2 bg-purple-600 hover:bg-purple-700 text-white py-2.5 rounded-xl text-sm font-semibold transition-all shadow-sm shadow-purple-600/20 cursor-pointer"
@@ -2053,14 +2190,15 @@ export default function AsterDriveApp() {
                       </button>
                     )}
 
-                    <div className="flex gap-2 mb-8">
-                      <button 
+                              <div
+className="flex gap-2 mb-8">
+                      <button
                         onClick={() => showToast({ type: 'info', title: 'Share Link', message: 'Sharable link copied to clipboard.' })}
                         className="flex-1 flex items-center justify-center gap-2 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 py-2 rounded-lg text-sm font-medium transition-colors"
                       >
                         <Share2 className="w-4 h-4" /> Share
                       </button>
-                      <button 
+                      <button
                         onClick={() => handleDownloadItem(selectedItemDetails)}
                         className="flex-1 flex items-center justify-center gap-2 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 py-2 rounded-lg text-sm font-medium transition-colors"
                       >
@@ -2068,27 +2206,37 @@ export default function AsterDriveApp() {
                       </button>
                     </div>
 
-                    <div className="space-y-4">
+                              <div
+className="space-y-4">
                       <h4 className="text-xs font-semibold text-slate-900 uppercase tracking-wider mb-3">Properties</h4>
                       
-                      <div className="grid grid-cols-3 gap-y-4 text-sm">
-                        <div className="text-slate-500">Size</div>
-                        <div className="col-span-2 text-slate-900 font-medium font-mono">{formatBytes(selectedItemDetails.size)}</div>
+                                <div
+className="grid grid-cols-3 gap-y-4 text-sm">
+                                  <div
+className="text-slate-500">Size</div>
+                                  <div
+className="col-span-2 text-slate-900 font-medium font-mono">{formatBytes(selectedItemDetails.size)}</div>
                         
-                        <div className="text-slate-500">Owner</div>
-                        <div className="col-span-2 text-slate-900 font-medium capitalize">{selectedItemDetails.owner}</div>
+                                  <div
+className="text-slate-500">Owner</div>
+                                  <div
+className="col-span-2 text-slate-900 font-medium capitalize">{selectedItemDetails.owner}</div>
 
                         {selectedItemDetails.source === 'computer' && (
                           <>
-                            <div className="text-slate-500">Computer</div>
-                            <div className="col-span-2 text-blue-700 font-medium flex items-center gap-1.5 truncate">
+                                      <div
+className="text-slate-500">Computer</div>
+                                      <div
+className="col-span-2 text-blue-700 font-medium flex items-center gap-1.5 truncate">
                               <Computer className="w-3.5 h-3.5 shrink-0" />
                               <span>{selectedItemDetails.computerDevice || 'This PC'}</span>
                             </div>
                             {selectedItemDetails.folderPath && (
                               <>
-                                <div className="text-slate-500">Sync Folder</div>
-                                <div className="col-span-2 text-slate-800 font-mono text-xs truncate">
+                                          <div
+className="text-slate-500">Sync Folder</div>
+                                          <div
+className="col-span-2 text-slate-800 font-mono text-xs truncate">
                                   {selectedItemDetails.folderPath}
                                 </div>
                               </>
@@ -2096,13 +2244,16 @@ export default function AsterDriveApp() {
                           </>
                         )}
                         
-                        <div className="text-slate-500">Modified</div>
+                                  <div
+className="text-slate-500">Modified</div>
   <div suppressHydrationWarning className="col-span-2 text-slate-900 font-medium">
   {formatDateSafe(selectedItemDetails.updatedAt)}
                         </div>
                         
-                        <div className="text-slate-500">Location</div>
-                        <div className="col-span-2 text-slate-900 font-medium truncate">
+                                  <div
+className="text-slate-500">Location</div>
+                                  <div
+className="col-span-2 text-slate-900 font-medium truncate">
                           {selectedItemDetails.source === 'computer' 
                             ? `Computers > ${selectedItemDetails.computerDevice || 'My PC'}`
                             : (breadcrumbs.find(c => c.id === selectedItemDetails.parentId)?.name || 'My Drive')}
@@ -2111,7 +2262,8 @@ export default function AsterDriveApp() {
                     </div>
                   </div>
                 ) : (
-                  <div className="p-6 h-full flex flex-col items-center justify-center text-center text-slate-500">
+                            <div
+className="p-6 h-full flex flex-col items-center justify-center text-center text-slate-500">
                     <Info className="w-12 h-12 text-slate-300 mb-4" />
                     <p className="text-sm">Select a file or folder to view its properties.</p>
                   </div>
@@ -2123,7 +2275,8 @@ export default function AsterDriveApp() {
       </div>
 
       {/* FLOATING ACTION BUTTON */}
-      <div className="fixed bottom-6 right-6 lg:bottom-8 lg:right-8 z-40 flex flex-col items-end">
+                <div
+className="fixed bottom-6 right-6 lg:bottom-8 lg:right-8 z-40 flex flex-col items-end">
         <AnimatePresence>
           {showUploadMenu && (
             <motion.div
@@ -2134,7 +2287,7 @@ export default function AsterDriveApp() {
             >
               {activeNav === 'computers' ? (
                 <>
-                  <button 
+                  <button
                     onClick={() => {
                       setShowUploadMenu(false);
                       computerFolderInputRef.current?.click();
@@ -2144,7 +2297,7 @@ export default function AsterDriveApp() {
                     <Folder className="w-4 h-4 text-amber-500" />
                     Sync computer folder
                   </button>
-                  <button 
+                  <button
                     onClick={() => {
                       setShowUploadMenu(false);
                       computerFileInputRef.current?.click();
@@ -2154,7 +2307,7 @@ export default function AsterDriveApp() {
                     <UploadCloud className="w-4 h-4 text-blue-600" />
                     Sync computer file
                   </button>
-                  <button 
+                  <button
                     onClick={() => {
                       setShowUploadMenu(false);
                       setIsSyncModalOpen(true);
@@ -2167,31 +2320,33 @@ export default function AsterDriveApp() {
                 </>
               ) : (
                 <>
-                  <button 
+                  <button
                     onClick={() => fileInputRef.current?.click()}
                     className="flex items-center gap-3 px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors text-left"
                   >
                     <File className="w-4 h-4 text-blue-600" />
                     File upload
                   </button>
-                  <button 
+                  <button
                     onClick={() => folderInputRef.current?.click()}
                     className="flex items-center gap-3 px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors text-left"
                   >
                     <Folder className="w-4 h-4 text-amber-500" />
                     Folder upload
                   </button>
-                  <div className="px-4 py-2.5 bg-blue-50/70 border-t border-b border-blue-100/60 text-[11px] text-blue-700 flex items-center gap-2">
+                            <div
+className="px-4 py-2.5 bg-blue-50/70 border-t border-b border-blue-100/60 text-[11px] text-blue-700 flex items-center gap-2">
                     <UploadCloud className="w-3.5 h-3.5 text-blue-600 shrink-0" />
                     <span>Or drag &amp; drop files/folders anywhere</span>
                   </div>
                 </>
               )}
-              <div className="p-2 bg-slate-50/80">
+                        <div
+className="p-2 bg-slate-50/80">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 px-2 block mb-1">
                   Simulate Testing
                 </span>
-                <button 
+                <button
                   onClick={() => handleAddSimulatedFile('Design_Assets_Bundle.zip', 400 * 1024 * 1024, 'archive')}
                   className="w-full flex items-center justify-between px-2 py-1.5 rounded-lg text-xs font-medium text-slate-700 hover:bg-white hover:shadow-xs transition-all text-left"
                 >
@@ -2201,7 +2356,7 @@ export default function AsterDriveApp() {
                   </span>
                   <span className="text-[10px] font-mono text-slate-400">400 MB</span>
                 </button>
-                <button 
+                <button
                   onClick={() => handleAddSimulatedFile('Raw_4K_Footage.mp4', 800 * 1024 * 1024, 'video')}
                   className="w-full flex items-center justify-between px-2 py-1.5 rounded-lg text-xs font-medium text-slate-700 hover:bg-white hover:shadow-xs transition-all text-left"
                 >
@@ -2271,8 +2426,10 @@ export default function AsterDriveApp() {
               exit={{ scale: 0.95, opacity: 0 }}
               className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6 overflow-hidden"
             >
-              <div className="flex items-start gap-4">
-                <div className="w-10 h-10 rounded-full bg-rose-100 flex items-center justify-center shrink-0">
+                        <div
+className="flex items-start gap-4">
+                          <div
+className="w-10 h-10 rounded-full bg-rose-100 flex items-center justify-center shrink-0">
                   <AlertTriangle className="w-5 h-5 text-rose-600" />
                 </div>
                 <div>
@@ -2282,14 +2439,15 @@ export default function AsterDriveApp() {
                       ? "This item will be deleted forever and you won't be able to restore it." 
                       : `These ${selectedItems.size} items will be deleted forever and you won't be able to restore them.`}
                   </p>
-                  <div className="flex items-center justify-end gap-3">
-                    <button 
+                            <div
+className="flex items-center justify-end gap-3">
+                    <button
                       onClick={() => setIsDeleteDialogOpen(false)}
                       className="px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
                     >
                       Cancel
                     </button>
-                    <button 
+                    <button
                       onClick={handleDeletePermanent}
                       className="px-4 py-2 text-sm font-medium text-white bg-rose-600 hover:bg-rose-700 rounded-lg transition-colors shadow-sm"
                     >
@@ -2321,14 +2479,17 @@ export default function AsterDriveApp() {
               className="bg-white rounded-2xl sm:rounded-3xl shadow-2xl max-w-xl w-full flex flex-col max-h-[calc(100vh-2rem)] my-auto overflow-hidden border border-slate-100"
             >
               {/* Header - completely uncropped across all screen sizes */}
-              <div className="p-5 sm:px-8 sm:pt-7 sm:pb-4 border-b border-slate-100 shrink-0 bg-white">
-                <div className="flex justify-between items-start gap-4">
+                        <div
+className="p-5 sm:px-8 sm:pt-7 sm:pb-4 border-b border-slate-100 shrink-0 bg-white">
+                          <div
+className="flex justify-between items-start gap-4">
                   <div>
-                    <div className="flex items-center gap-2 flex-wrap">
+                              <div
+className="flex items-center gap-2 flex-wrap">
                       <h2 className="text-xl sm:text-2xl font-bold text-slate-900">Upgrade your storage</h2>
                       <span className={cn(
                         "text-[11px] font-semibold px-2 py-0.5 rounded-full border",
-                        currentPlan.isFree 
+                        currentPlan.isFree
                           ? "bg-emerald-50 text-emerald-700 border-emerald-200" 
                           : "bg-blue-50 text-blue-700 border-blue-200"
                       )}>
@@ -2339,7 +2500,7 @@ export default function AsterDriveApp() {
                       Choose a plan to instantly expand your cloud storage capacity.
                     </p>
                   </div>
-                  <button 
+                  <button
                     onClick={() => setIsUpgradeModalOpen(false)} 
                     className="text-slate-400 hover:text-slate-600 p-2 rounded-full hover:bg-slate-100 transition-colors -mr-2 shrink-0"
                     aria-label="Close upgrade dialog"
@@ -2350,12 +2511,13 @@ export default function AsterDriveApp() {
               </div>
                 
               {/* Scrollable Plan List */}
-              <div className="p-4 sm:p-6 sm:px-8 overflow-y-auto flex-1 space-y-3">
+                        <div
+className="p-4 sm:p-6 sm:px-8 overflow-y-auto flex-1 space-y-3">
                 {UPGRADE_PLANS.map((plan) => {
                   const isSelected = selectedPlanId === plan.id;
                   const isCurrent = currentPlan.id === plan.id;
                   return (
-                    <div 
+                    <div
                       key={plan.id}
                       onClick={() => setSelectedPlanId(plan.id)}
                       role="radio"
@@ -2374,15 +2536,19 @@ export default function AsterDriveApp() {
                           : "border-slate-200 hover:border-slate-300 hover:bg-slate-50/70"
                       )}
                     >
-                      <div className="flex items-center gap-4 min-w-0">
-                        <div className={cn(
+                                <div
+className="flex items-center gap-4 min-w-0">
+                                  <div
+className={cn(
                           "w-20 sm:w-24 py-2 rounded-xl font-bold text-center text-sm shrink-0 transition-colors",
                           isSelected ? "bg-blue-600 text-white shadow-sm" : "bg-slate-100 text-slate-800"
                         )}>
                           {plan.storage}
                         </div>
-                        <div className="flex flex-col min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap">
+                                  <div
+className="flex flex-col min-w-0">
+                                    <div
+className="flex items-center gap-2 flex-wrap">
                             <span className={cn(
                               "font-semibold text-sm sm:text-base transition-colors",
                               isSelected ? "text-blue-900" : "text-slate-800"
@@ -2407,8 +2573,10 @@ export default function AsterDriveApp() {
                       </div>
                       
                       {/* Accessible Radio Button */}
-                      <div className="pl-3 shrink-0">
-                        <div className={cn(
+                                <div
+className="pl-3 shrink-0">
+                                  <div
+className={cn(
                           "w-6 h-6 rounded-full flex items-center justify-center transition-all border-2",
                           isSelected 
                             ? "border-blue-600 bg-blue-600 shadow-sm" 
@@ -2423,7 +2591,8 @@ export default function AsterDriveApp() {
               </div>
 
               {/* Fixed Footer */}
-              <div className="p-4 sm:px-8 sm:py-5 border-t border-slate-100 shrink-0 bg-slate-50/80 flex flex-col sm:flex-row items-center justify-between gap-3 rounded-b-2xl sm:rounded-b-3xl">
+                        <div
+className="p-4 sm:px-8 sm:py-5 border-t border-slate-100 shrink-0 bg-slate-50/80 flex flex-col sm:flex-row items-center justify-between gap-3 rounded-b-2xl sm:rounded-b-3xl">
                 <div>
                   {!currentPlan.isFree ? (
                     <button
@@ -2438,14 +2607,15 @@ export default function AsterDriveApp() {
                     </span>
                   )}
                 </div>
-                <div className="flex items-center justify-end gap-3 w-full sm:w-auto">
-                  <button 
+                          <div
+className="flex items-center justify-end gap-3 w-full sm:w-auto">
+                  <button
                     onClick={() => setIsUpgradeModalOpen(false)} 
                     className="flex-1 sm:flex-none px-5 py-2.5 rounded-xl font-medium text-slate-600 hover:bg-slate-200 transition-colors text-sm"
                   >
                     Cancel
                   </button>
-                  <button 
+                  <button
                     onClick={handleConfirmUpgrade} 
                     className="flex-1 sm:flex-none px-6 py-2.5 rounded-xl font-semibold text-white bg-blue-600 hover:bg-blue-700 transition-colors shadow-sm text-sm active:scale-95"
                   >
@@ -2469,14 +2639,17 @@ export default function AsterDriveApp() {
             className="fixed inset-0 z-[70] bg-slate-50 flex flex-col overflow-y-auto"
           >
             {/* Header */}
-            <div className="flex items-center justify-between px-6 py-4 bg-white border-b border-slate-200 shrink-0 sticky top-0 z-10 shadow-xs">
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
+                      <div
+className="flex items-center justify-between px-6 py-4 bg-white border-b border-slate-200 shrink-0 sticky top-0 z-10 shadow-xs">
+                        <div
+className="flex items-center gap-3">
+                          <div
+className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
                   <Cloud className="w-5 h-5" />
                 </div>
                 <h2 className="text-xl font-semibold text-slate-800">Account Center</h2>
               </div>
-              <button 
+              <button
                 onClick={() => setIsProfileMenuOpen(false)}
                 className="p-2 rounded-full hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors"
                 aria-label="Close profile"
@@ -2485,17 +2658,21 @@ export default function AsterDriveApp() {
               </button>
             </div>
             
-            <div className="flex-1 w-full max-w-3xl mx-auto px-4 py-8 sm:px-6 sm:py-10">
+                      <div
+className="flex-1 w-full max-w-3xl mx-auto px-4 py-8 sm:px-6 sm:py-10">
               {/* Profile Card */}
-              <div className="bg-white rounded-3xl shadow-sm border border-slate-200 p-8 flex flex-col items-center mb-8 text-center relative overflow-hidden">
-                <div className="w-24 h-24 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-3xl mb-3 shadow-inner">
+                        <div
+className="bg-white rounded-3xl shadow-sm border border-slate-200 p-8 flex flex-col items-center mb-8 text-center relative overflow-hidden">
+                          <div
+className="w-24 h-24 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-3xl mb-3 shadow-inner">
                   JS
                 </div>
                 <h1 className="text-2xl font-bold text-slate-900 mb-0.5">John Smith</h1>
                 <p className="text-slate-500 text-sm">verno7897123@gmail.com</p>
                 
                 {/* Active Plan Badge */}
-                <div className="flex items-center gap-2 mt-3">
+                          <div
+className="flex items-center gap-2 mt-3">
                   {currentPlan.isFree ? (
                     <span className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
                       <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
@@ -2509,8 +2686,9 @@ export default function AsterDriveApp() {
                   )}
                 </div>
 
-                <div className="flex items-center gap-3 mt-5 flex-wrap justify-center">
-                  <button 
+                          <div
+className="flex items-center gap-3 mt-5 flex-wrap justify-center">
+                  <button
                     onClick={() => {
                       setIsUpgradeModalOpen(true);
                     }}
@@ -2519,7 +2697,7 @@ export default function AsterDriveApp() {
                     <Sparkles className="w-4 h-4" />
                     {currentPlan.isFree ? 'Upgrade Storage' : 'Change Subscription'}
                   </button>
-                  <button 
+                  <button
                     onClick={() => setActiveProfileDetail('personal')}
                     className="px-5 py-2 border border-slate-300 rounded-full font-medium text-slate-700 hover:bg-slate-50 transition-colors text-sm"
                   >
@@ -2529,7 +2707,8 @@ export default function AsterDriveApp() {
               </div>
 
               {/* VISUAL BREAKDOWN OF STORAGE USAGE BY FILE TYPE (RECHARTS) */}
-              <div className="mb-8">
+                        <div
+className="mb-8">
                 <StorageAnalyticsChart
                   items={driveItems}
                   plan={currentPlan}
@@ -2538,20 +2717,24 @@ export default function AsterDriveApp() {
               </div>
 
               {/* Settings Groups */}
-              <div className="w-full flex flex-col gap-6">
+                        <div
+className="w-full flex flex-col gap-6">
                 
                 {/* Group 1: Account */}
                 <div>
                   <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-3 px-4">Account</h3>
-                  <div className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden divide-y divide-slate-100">
-                    <div 
+                            <div
+className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden divide-y divide-slate-100">
+                    <div
                       className="px-6 py-4 flex items-center gap-4 hover:bg-slate-50 cursor-pointer transition-colors" 
                       onClick={() => setActiveProfileDetail('personal')}
                     >
-                      <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center shrink-0">
+                                <div
+className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center shrink-0">
                         <User className="w-5 h-5 text-slate-600" />
                       </div>
-                      <div className="flex-1 min-w-0">
+                                <div
+className="flex-1 min-w-0">
                         <h4 className="font-medium text-slate-900">Personal Info</h4>
                         <p className="text-sm text-slate-500">Name, email, and user credentials</p>
                       </div>
@@ -2559,21 +2742,24 @@ export default function AsterDriveApp() {
                     </div>
                     
                     {/* Storage Row in Profile */}
-                    <div 
+                    <div
                       className="px-6 py-4 flex items-center gap-4 hover:bg-slate-50 cursor-pointer transition-colors" 
                       onClick={() => {
                         setIsUpgradeModalOpen(true);
                       }}
                     >
-                      <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center shrink-0">
+                                <div
+className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center shrink-0">
                         <HardDrive className="w-5 h-5 text-blue-600" />
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
+                                <div
+className="flex-1 min-w-0">
+                                  <div
+className="flex items-center gap-2">
                           <h4 className="font-medium text-slate-900">Storage</h4>
                           <span className={cn(
                             "px-2 py-0.5 rounded text-[11px] font-semibold border",
-                            currentPlan.isFree 
+                            currentPlan.isFree
                               ? "bg-emerald-50 text-emerald-700 border-emerald-200" 
                               : "bg-blue-50 text-blue-700 border-blue-200"
                           )}>
@@ -2587,14 +2773,16 @@ export default function AsterDriveApp() {
                       <ChevronRight className="w-5 h-5 text-slate-400" />
                     </div>
                     
-                    <div 
+                    <div
                       className="px-6 py-4 flex items-center gap-4 hover:bg-slate-50 cursor-pointer transition-colors" 
                       onClick={() => setActiveProfileDetail('security')}
                     >
-                      <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center shrink-0">
+                                <div
+className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center shrink-0">
                         <Shield className="w-5 h-5 text-slate-600" />
                       </div>
-                      <div className="flex-1 min-w-0">
+                                <div
+className="flex-1 min-w-0">
                         <h4 className="font-medium text-slate-900">Security</h4>
                         <p className="text-sm text-slate-500">Password, 2FA, and session devices</p>
                       </div>
@@ -2606,57 +2794,66 @@ export default function AsterDriveApp() {
                 {/* Group 2: Preferences */}
                 <div>
                   <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-3 px-4">Preferences</h3>
-                  <div className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden divide-y divide-slate-100">
-                    <div 
+                            <div
+className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden divide-y divide-slate-100">
+                    <div
                       className="px-6 py-4 flex items-center gap-4 hover:bg-slate-50 cursor-pointer transition-colors" 
                       onClick={() => setActiveProfileDetail('settings')}
                     >
-                      <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center shrink-0">
+                                <div
+className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center shrink-0">
                         <Settings className="w-5 h-5 text-slate-600" />
                       </div>
-                      <div className="flex-1 min-w-0">
+                                <div
+className="flex-1 min-w-0">
                         <h4 className="font-medium text-slate-900">General Settings</h4>
                         <p className="text-sm text-slate-500">File handling, uploads, and default folders</p>
                       </div>
                       <ChevronRight className="w-5 h-5 text-slate-400" />
                     </div>
 
-                    <div 
+                    <div
                       className="px-6 py-4 flex items-center gap-4 hover:bg-slate-50 cursor-pointer transition-colors" 
                       onClick={() => setActiveProfileDetail('offline')}
                     >
-                      <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center shrink-0">
+                                <div
+className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center shrink-0">
                         <CloudOff className="w-5 h-5 text-slate-600" />
                       </div>
-                      <div className="flex-1 min-w-0">
+                                <div
+className="flex-1 min-w-0">
                         <h4 className="font-medium text-slate-900">Offline Access</h4>
                         <p className="text-sm text-slate-500">Manage files available without internet connection</p>
                       </div>
                       <ChevronRight className="w-5 h-5 text-slate-400" />
                     </div>
 
-                    <div 
+                    <div
                       className="px-6 py-4 flex items-center gap-4 hover:bg-slate-50 cursor-pointer transition-colors" 
                       onClick={() => setActiveProfileDetail('notifications')}
                     >
-                      <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center shrink-0">
+                                <div
+className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center shrink-0">
                         <Bell className="w-5 h-5 text-slate-600" />
                       </div>
-                      <div className="flex-1 min-w-0">
+                                <div
+className="flex-1 min-w-0">
                         <h4 className="font-medium text-slate-900">Notifications</h4>
                         <p className="text-sm text-slate-500">Manage email, quota alerts, and desktop notices</p>
                       </div>
                       <ChevronRight className="w-5 h-5 text-slate-400" />
                     </div>
                     
-                    <div 
+                    <div
                       className="px-6 py-4 flex items-center gap-4 hover:bg-slate-50 cursor-pointer transition-colors" 
                       onClick={() => setActiveProfileDetail('appearance')}
                     >
-                      <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center shrink-0">
+                                <div
+className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center shrink-0">
                         <Palette className="w-5 h-5 text-slate-600" />
                       </div>
-                      <div className="flex-1 min-w-0">
+                                <div
+className="flex-1 min-w-0">
                         <h4 className="font-medium text-slate-900">Appearance</h4>
                         <p className="text-sm text-slate-500">Theme, view modes, and display accessibility</p>
                       </div>
@@ -2668,29 +2865,34 @@ export default function AsterDriveApp() {
                 {/* Group 3: Support & About */}
                 <div>
                   <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-3 px-4">Support & About</h3>
-                  <div className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden divide-y divide-slate-100">
-                    <div 
+                            <div
+className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden divide-y divide-slate-100">
+                    <div
                       className="px-6 py-4 flex items-center gap-4 hover:bg-slate-50 cursor-pointer transition-colors" 
                       onClick={() => setActiveProfileDetail('contact')}
                     >
-                      <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center shrink-0">
+                                <div
+className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center shrink-0">
                         <HelpCircle className="w-5 h-5 text-slate-600" />
                       </div>
-                      <div className="flex-1 min-w-0">
+                                <div
+className="flex-1 min-w-0">
                         <h4 className="font-medium text-slate-900">Help & Contact</h4>
                         <p className="text-sm text-slate-500">Get assistance, send feedback, or report problems</p>
                       </div>
                       <ChevronRight className="w-5 h-5 text-slate-400" />
                     </div>
                     
-                    <div 
+                    <div
                       className="px-6 py-4 flex items-center gap-4 hover:bg-slate-50 cursor-pointer transition-colors" 
                       onClick={() => setActiveProfileDetail('about')}
                     >
-                      <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center shrink-0">
+                                <div
+className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center shrink-0">
                         <Info className="w-5 h-5 text-slate-600" />
                       </div>
-                      <div className="flex-1 min-w-0">
+                                <div
+className="flex-1 min-w-0">
                         <h4 className="font-medium text-slate-900">About AsterDrive</h4>
                         <p className="text-sm text-slate-500">Version 1.2.0 · Release information and storage tiers</p>
                       </div>
@@ -2702,57 +2904,66 @@ export default function AsterDriveApp() {
                 {/* Group 4: Legal & Compliance */}
                 <div>
                   <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-3 px-4">Legal & Compliance</h3>
-                  <div className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden divide-y divide-slate-100">
-                    <div 
+                            <div
+className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden divide-y divide-slate-100">
+                    <div
                       className="px-6 py-4 flex items-center gap-4 hover:bg-slate-50 cursor-pointer transition-colors" 
                       onClick={() => setActiveProfileDetail('terms')}
                     >
-                      <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center shrink-0">
+                                <div
+className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center shrink-0">
                         <FileText className="w-5 h-5 text-slate-600" />
                       </div>
-                      <div className="flex-1 min-w-0">
+                                <div
+className="flex-1 min-w-0">
                         <h4 className="font-medium text-slate-900">Terms of Service</h4>
                         <p className="text-sm text-slate-500">Rules and policies governing cloud storage usage</p>
                       </div>
                       <ChevronRight className="w-5 h-5 text-slate-400" />
                     </div>
                     
-                    <div 
+                    <div
                       className="px-6 py-4 flex items-center gap-4 hover:bg-slate-50 cursor-pointer transition-colors" 
                       onClick={() => setActiveProfileDetail('privacy')}
                     >
-                      <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center shrink-0">
+                                <div
+className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center shrink-0">
                         <ShieldCheck className="w-5 h-5 text-slate-600" />
                       </div>
-                      <div className="flex-1 min-w-0">
+                                <div
+className="flex-1 min-w-0">
                         <h4 className="font-medium text-slate-900">Privacy Policy</h4>
                         <p className="text-sm text-slate-500">Data encryption, collection principles, and user privacy</p>
                       </div>
                       <ChevronRight className="w-5 h-5 text-slate-400" />
                     </div>
                     
-                    <div 
+                    <div
                       className="px-6 py-4 flex items-center gap-4 hover:bg-slate-50 cursor-pointer transition-colors" 
                       onClick={() => setActiveProfileDetail('acceptable')}
                     >
-                      <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center shrink-0">
+                                <div
+className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center shrink-0">
                         <Scale className="w-5 h-5 text-slate-600" />
                       </div>
-                      <div className="flex-1 min-w-0">
+                                <div
+className="flex-1 min-w-0">
                         <h4 className="font-medium text-slate-900">Acceptable Use Policy</h4>
                         <p className="text-sm text-slate-500">Content limits, sharing rules, and security guidelines</p>
                       </div>
                       <ChevronRight className="w-5 h-5 text-slate-400" />
                     </div>
 
-                    <div 
+                    <div
                       className="px-6 py-4 flex items-center gap-4 hover:bg-slate-50 cursor-pointer transition-colors" 
                       onClick={() => setActiveProfileDetail('copyright')}
                     >
-                      <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center shrink-0">
+                                <div
+className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center shrink-0">
                         <BookOpen className="w-5 h-5 text-slate-600" />
                       </div>
-                      <div className="flex-1 min-w-0">
+                                <div
+className="flex-1 min-w-0">
                         <h4 className="font-medium text-slate-900">Copyright & DMCA</h4>
                         <p className="text-sm text-slate-500">Intellectual property protection and notices</p>
                       </div>
@@ -2762,8 +2973,9 @@ export default function AsterDriveApp() {
                 </div>
 
                 {/* Sign Out Action */}
-                <div className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden mt-2">
-                  <div 
+                          <div
+className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden mt-2">
+                  <div
                     className="px-6 py-4 flex items-center gap-4 hover:bg-rose-50 cursor-pointer transition-colors" 
                     onClick={() => {
                       setIsProfileMenuOpen(false);
@@ -2774,10 +2986,12 @@ export default function AsterDriveApp() {
                       });
                     }}
                   >
-                    <div className="w-10 h-10 rounded-full bg-rose-100 flex items-center justify-center shrink-0">
+                              <div
+className="w-10 h-10 rounded-full bg-rose-100 flex items-center justify-center shrink-0">
                       <LogOut className="w-5 h-5 text-rose-600" />
                     </div>
-                    <div className="flex-1 min-w-0">
+                              <div
+className="flex-1 min-w-0">
                       <h4 className="font-medium text-rose-600">Sign out</h4>
                       <p className="text-sm text-rose-500/80">Log out of this browser session</p>
                     </div>
@@ -2807,9 +3021,12 @@ export default function AsterDriveApp() {
               className="bg-white rounded-3xl shadow-2xl max-w-xl w-full flex flex-col max-h-[85vh] overflow-hidden border border-slate-100"
             >
               {/* Header */}
-              <div className="p-6 border-b border-slate-100 flex items-center justify-between shrink-0 bg-white">
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 font-bold">
+                        <div
+className="p-6 border-b border-slate-100 flex items-center justify-between shrink-0 bg-white">
+                          <div
+className="flex items-center gap-3">
+                            <div
+className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 font-bold">
                     {activeProfileDetail === 'personal' && <User className="w-5 h-5" />}
                     {activeProfileDetail === 'security' && <Shield className="w-5 h-5" />}
                     {activeProfileDetail === 'settings' && <Settings className="w-5 h-5" />}
@@ -2840,7 +3057,7 @@ export default function AsterDriveApp() {
                     </h3>
                   </div>
                 </div>
-                <button 
+                <button
                   onClick={() => setActiveProfileDetail(null)}
                   className="text-slate-400 hover:text-slate-600 p-2 rounded-full hover:bg-slate-100 transition-colors"
                   aria-label="Close dialog"
@@ -2850,24 +3067,29 @@ export default function AsterDriveApp() {
               </div>
 
               {/* Body */}
-              <div className="p-6 overflow-y-auto flex-1 text-sm text-slate-600 space-y-4">
+                        <div
+className="p-6 overflow-y-auto flex-1 text-sm text-slate-600 space-y-4">
                 {activeProfileDetail === 'personal' && (
-                  <div className="space-y-4">
-                    <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex items-center justify-between">
+                            <div
+className="space-y-4">
+                              <div
+className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex items-center justify-between">
                       <div>
                         <span className="text-xs text-slate-400 block">Full Name</span>
                         <span className="text-sm font-semibold text-slate-800">John Smith</span>
                       </div>
                       <span className="text-xs font-semibold text-blue-600">Verified</span>
                     </div>
-                    <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex items-center justify-between">
+                              <div
+className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex items-center justify-between">
                       <div>
                         <span className="text-xs text-slate-400 block">Email Address</span>
                         <span className="text-sm font-semibold text-slate-800">verno7897123@gmail.com</span>
                       </div>
                       <span className="text-xs font-semibold text-emerald-600">Primary</span>
                     </div>
-                    <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex items-center justify-between">
+                              <div
+className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex items-center justify-between">
                       <div>
                         <span className="text-xs text-slate-400 block">Active Storage Tier</span>
                         <span className="text-sm font-semibold text-slate-800">{currentPlan.name} ({currentPlan.storage})</span>
@@ -2880,17 +3102,21 @@ export default function AsterDriveApp() {
                 )}
 
                 {activeProfileDetail === 'security' && (
-                  <div className="space-y-4">
-                    <div className="p-4 bg-emerald-50/60 rounded-2xl border border-emerald-100 flex items-center gap-3">
+                            <div
+className="space-y-4">
+                              <div
+className="p-4 bg-emerald-50/60 rounded-2xl border border-emerald-100 flex items-center gap-3">
                       <ShieldCheck className="w-6 h-6 text-emerald-600 shrink-0" />
                       <div>
                         <h5 className="font-semibold text-emerald-950 text-sm">Account Protected</h5>
                         <p className="text-xs text-emerald-700 mt-0.5">Two-factor authentication is active via your primary device.</p>
                       </div>
                     </div>
-                    <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 space-y-2">
+                              <div
+className="p-4 bg-slate-50 rounded-2xl border border-slate-100 space-y-2">
                       <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Active Sessions</span>
-                      <div className="flex items-center justify-between text-xs text-slate-700 pt-1">
+                                <div
+className="flex items-center justify-between text-xs text-slate-700 pt-1">
                         <span className="flex items-center gap-2">
                           <Computer className="w-4 h-4 text-slate-400" /> Current Web Browser
                         </span>
@@ -2901,15 +3127,18 @@ export default function AsterDriveApp() {
                 )}
 
                 {activeProfileDetail === 'settings' && (
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between p-3 bg-slate-50 rounded-xl">
+                            <div
+className="space-y-4">
+                              <div
+className="flex items-center justify-between p-3 bg-slate-50 rounded-xl">
                       <div>
                         <p className="font-medium text-slate-800 text-sm">Confirm file deletion</p>
                         <p className="text-xs text-slate-500">Always ask before moving items to trash</p>
                       </div>
                       <input type="checkbox" defaultChecked className="w-4 h-4 text-blue-600 rounded" />
                     </div>
-                    <div className="flex items-center justify-between p-3 bg-slate-50 rounded-xl">
+                              <div
+className="flex items-center justify-between p-3 bg-slate-50 rounded-xl">
                       <div>
                         <p className="font-medium text-slate-800 text-sm">Automatic folder sync</p>
                         <p className="text-xs text-slate-500">Sync changes across browser sessions</p>
@@ -2920,11 +3149,13 @@ export default function AsterDriveApp() {
                 )}
 
                 {activeProfileDetail === 'offline' && (
-                  <div className="space-y-3">
+                            <div
+className="space-y-3">
                     <p className="text-xs text-slate-500 leading-relaxed">
                       Offline access caches your recently opened documents so you can read and browse files even when your device loses internet connectivity.
                     </p>
-                    <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex items-center justify-between">
+                              <div
+className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex items-center justify-between">
                       <span className="text-sm font-medium text-slate-700">Offline caching</span>
                       <span className="text-xs font-semibold px-2 py-1 rounded bg-emerald-100 text-emerald-800">Enabled</span>
                     </div>
@@ -2932,15 +3163,18 @@ export default function AsterDriveApp() {
                 )}
 
                 {activeProfileDetail === 'notifications' && (
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between p-3 bg-slate-50 rounded-xl">
+                            <div
+className="space-y-3">
+                              <div
+className="flex items-center justify-between p-3 bg-slate-50 rounded-xl">
                       <div>
                         <p className="font-medium text-slate-800 text-sm">Storage quota alerts</p>
                         <p className="text-xs text-slate-500">Notify when storage reaches 85% and 100% capacity</p>
                       </div>
                       <input type="checkbox" defaultChecked className="w-4 h-4 text-blue-600 rounded" />
                     </div>
-                    <div className="flex items-center justify-between p-3 bg-slate-50 rounded-xl">
+                              <div
+className="flex items-center justify-between p-3 bg-slate-50 rounded-xl">
                       <div>
                         <p className="font-medium text-slate-800 text-sm">Upload completion sound</p>
                         <p className="text-xs text-slate-500">Chime on upload completion</p>
@@ -2951,20 +3185,25 @@ export default function AsterDriveApp() {
                 )}
 
                 {activeProfileDetail === 'appearance' && (
-                  <div className="space-y-3">
+                            <div
+className="space-y-3">
                     <p className="text-xs text-slate-500">Customize the visual theme and density of your AsterDrive workspace.</p>
-                    <div className="grid grid-cols-2 gap-3 pt-2">
-                      <div className="p-3 rounded-xl border-2 border-blue-600 bg-blue-50/50 flex flex-col items-center gap-2 cursor-pointer">
-                        <div className="w-full h-12 bg-white rounded-lg border border-slate-200 shadow-xs flex items-center justify-center text-xs font-semibold text-slate-700">
+                              <div
+className="grid grid-cols-2 gap-3 pt-2">
+                                <div
+className="p-3 rounded-xl border-2 border-blue-600 bg-blue-50/50 flex flex-col items-center gap-2 cursor-pointer">
+                                  <div
+className="w-full h-12 bg-white rounded-lg border border-slate-200 shadow-xs flex items-center justify-center text-xs font-semibold text-slate-700">
                           Light Mode
                         </div>
                         <span className="text-xs font-semibold text-blue-600">Active</span>
                       </div>
-                      <div 
+                      <div
                         onClick={() => showToast({ type: 'info', title: 'Dark Mode', message: 'Dark mode theme is in beta preview.' })}
                         className="p-3 rounded-xl border border-slate-200 bg-slate-50 flex flex-col items-center gap-2 cursor-pointer hover:border-slate-300"
                       >
-                        <div className="w-full h-12 bg-slate-900 rounded-lg shadow-xs flex items-center justify-center text-xs font-semibold text-slate-100">
+                                  <div
+className="w-full h-12 bg-slate-900 rounded-lg shadow-xs flex items-center justify-center text-xs font-semibold text-slate-100">
                           Dark Mode
                         </div>
                         <span className="text-xs text-slate-500">Preview</span>
@@ -2974,7 +3213,8 @@ export default function AsterDriveApp() {
                 )}
 
                 {activeProfileDetail === 'contact' && (
-                  <div className="space-y-4">
+                            <div
+className="space-y-4">
                     <p className="text-xs text-slate-500">Have a question or need technical support with your storage? Send us a message directly.</p>
                     <div>
                       <label className="block text-xs font-medium text-slate-700 mb-1">Your Email</label>
@@ -2988,7 +3228,7 @@ export default function AsterDriveApp() {
                       <label className="block text-xs font-medium text-slate-700 mb-1">Message</label>
                       <textarea rows={3} placeholder="Describe your question or issue..." className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm outline-none focus:border-blue-500" suppressHydrationWarning />
                     </div>
-                    <button 
+                    <button
                       onClick={() => {
                         setActiveProfileDetail(null);
                         showToast({
@@ -3005,15 +3245,18 @@ export default function AsterDriveApp() {
                 )}
 
                 {activeProfileDetail === 'about' && (
-                  <div className="space-y-4 leading-relaxed">
-                    <div className="p-4 bg-blue-50/50 rounded-2xl border border-blue-100">
+                            <div
+className="space-y-4 leading-relaxed">
+                              <div
+className="p-4 bg-blue-50/50 rounded-2xl border border-blue-100">
                       <h4 className="font-bold text-slate-900 text-base">AsterDrive Cloud Storage</h4>
                       <p className="text-xs text-blue-700 mt-1">Version 1.2.0 · Build 2026.10</p>
                     </div>
                     <p className="text-xs text-slate-600">
                       AsterDrive provides fast, reliable, encrypted cloud storage for individuals and teams. Every new user receives a free 1 GB tier to store essential documents, spreadsheets, photos, and presentations.
                     </p>
-                    <div className="border-t border-slate-100 pt-3 text-xs space-y-1.5">
+                              <div
+className="border-t border-slate-100 pt-3 text-xs space-y-1.5">
                       <p><strong className="text-slate-800">Current Plan:</strong> {currentPlan.name} ({currentPlan.storage})</p>
                       <p><strong className="text-slate-800">Storage Used:</strong> {formatBytes(totalUsedBytes)} of {currentPlan.storage}</p>
                       <p><strong className="text-slate-800">Supported Formats:</strong> Documents, Media, Archives, Folders</p>
@@ -3022,7 +3265,8 @@ export default function AsterDriveApp() {
                 )}
 
                 {activeProfileDetail === 'terms' && (
-                  <div className="space-y-3 leading-relaxed text-xs text-slate-600">
+                            <div
+className="space-y-3 leading-relaxed text-xs text-slate-600">
                     <h5 className="font-bold text-slate-900 text-sm">AsterDrive Terms of Service</h5>
                     <p>Last updated: October 2026</p>
                     <h6 className="font-semibold text-slate-800 pt-2">1. Storage Quota &amp; Free Account</h6>
@@ -3041,7 +3285,8 @@ export default function AsterDriveApp() {
                 )}
 
                 {activeProfileDetail === 'privacy' && (
-                  <div className="space-y-3 leading-relaxed text-xs text-slate-600">
+                            <div
+className="space-y-3 leading-relaxed text-xs text-slate-600">
                     <h5 className="font-bold text-slate-900 text-sm">AsterDrive Privacy Policy</h5>
                     <p>Effective Date: October 2026</p>
                     <h6 className="font-semibold text-slate-800 pt-2">1. Data Encryption & Security</h6>
@@ -3060,7 +3305,8 @@ export default function AsterDriveApp() {
                 )}
 
                 {activeProfileDetail === 'acceptable' && (
-                  <div className="space-y-3 leading-relaxed text-xs text-slate-600">
+                            <div
+className="space-y-3 leading-relaxed text-xs text-slate-600">
                     <h5 className="font-bold text-slate-900 text-sm">Acceptable Use Policy</h5>
                     <p>
                       AsterDrive is dedicated to maintaining a secure, safe environment for all cloud storage users.
@@ -3074,7 +3320,8 @@ export default function AsterDriveApp() {
                 )}
 
                 {activeProfileDetail === 'copyright' && (
-                  <div className="space-y-3 leading-relaxed text-xs text-slate-600">
+                            <div
+className="space-y-3 leading-relaxed text-xs text-slate-600">
                     <h5 className="font-bold text-slate-900 text-sm">Copyright & DMCA Policy</h5>
                     <p>
                       AsterDrive respects the intellectual property rights of creators and complies with the Digital Millennium Copyright Act (DMCA).
@@ -3087,8 +3334,9 @@ export default function AsterDriveApp() {
               </div>
 
               {/* Footer */}
-              <div className="p-4 border-t border-slate-100 bg-slate-50 flex justify-end">
-                <button 
+                        <div
+className="p-4 border-t border-slate-100 bg-slate-50 flex justify-end">
+                <button
                   onClick={() => setActiveProfileDetail(null)}
                   className="px-5 py-2 rounded-xl text-sm font-medium bg-slate-200 text-slate-700 hover:bg-slate-300 transition-colors"
                 >
@@ -3104,7 +3352,7 @@ export default function AsterDriveApp() {
       <AnimatePresence>
         {activeItemMenu && (
           <>
-            <div 
+            <div
               className="fixed inset-0 z-[60] bg-black/5 sm:bg-transparent"
               onClick={() => setActiveItemMenu(null)}
               onTouchStart={() => setActiveItemMenu(null)}
@@ -3124,14 +3372,16 @@ export default function AsterDriveApp() {
               onClick={(e) => e.stopPropagation()}
               onTouchStart={(e) => e.stopPropagation()}
             >
-              <div className="px-3.5 py-2 bg-slate-50/80 border-b border-slate-100 flex items-center gap-2.5">
+                        <div
+className="px-3.5 py-2 bg-slate-50/80 border-b border-slate-100 flex items-center gap-2.5">
                 {getIconForType(activeItemMenu.item.type, "w-4 h-4 shrink-0")}
                 <span className="font-semibold text-slate-800 text-xs truncate max-w-[170px]" title={activeItemMenu.item.name}>
                   {activeItemMenu.item.name}
                 </span>
               </div>
 
-              <div className="py-1">
+                        <div
+className="py-1">
                 {activeItemMenu.item.type === 'video' && !activeItemMenu.item.trashed && (
                   <button
                     onClick={() => {
@@ -3204,7 +3454,8 @@ export default function AsterDriveApp() {
                 </button>
               </div>
 
-              <div className="py-1">
+                        <div
+className="py-1">
                 {activeItemMenu.item.trashed ? (
                   <>
                     <button
@@ -3282,8 +3533,10 @@ export default function AsterDriveApp() {
               onClick={(e) => e.stopPropagation()}
               className="bg-white rounded-2xl shadow-xl max-w-sm w-full p-6 overflow-hidden border border-slate-100"
             >
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center shrink-0">
+                        <div
+className="flex items-center gap-3 mb-4">
+                          <div
+className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center shrink-0">
                   {getIconForType(itemToRename.type, "w-5 h-5")}
                 </div>
                 <div>
@@ -3292,7 +3545,8 @@ export default function AsterDriveApp() {
                 </div>
               </div>
 
-              <div className="mb-5">
+                        <div
+className="mb-5">
                 <input
                   type="text"
                   value={renameInput}
@@ -3308,7 +3562,8 @@ export default function AsterDriveApp() {
                 />
               </div>
 
-              <div className="flex items-center justify-end gap-2.5">
+                        <div
+className="flex items-center justify-end gap-2.5">
                 <button
                   onClick={() => setItemToRename(null)}
                   className="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
@@ -3338,16 +3593,20 @@ export default function AsterDriveApp() {
             onClick={() => setPreviewVideoItem(null)}
           >
             {/* Top Header Bar */}
-            <div 
+            <div
               onClick={(e) => e.stopPropagation()} 
               className="flex items-center justify-between text-white pb-3 sm:pb-4 border-b border-white/10 shrink-0 gap-3"
             >
-              <div className="flex items-center gap-3 min-w-0 pr-2">
-                <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-purple-600/30 border border-purple-500/40 text-purple-300 flex items-center justify-center shrink-0">
+                        <div
+className="flex items-center gap-3 min-w-0 pr-2">
+                          <div
+className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-purple-600/30 border border-purple-500/40 text-purple-300 flex items-center justify-center shrink-0">
                   <Video className="w-5 h-5" />
                 </div>
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
+                          <div
+className="min-w-0">
+                            <div
+className="flex items-center gap-2 flex-wrap">
                     <h3 className="font-semibold text-sm sm:text-base text-white truncate max-w-xs sm:max-w-md md:max-w-xl" title={previewVideoItem.name}>
                       {previewVideoItem.name}
                     </h3>
@@ -3375,9 +3634,11 @@ export default function AsterDriveApp() {
               </div>
 
               {/* Action Controls */}
-              <div className="flex items-center gap-2 shrink-0">
+                        <div
+className="flex items-center gap-2 shrink-0">
                 {/* Speed Controls (Desktop) */}
-                <div className="hidden lg:flex items-center gap-1 bg-white/10 p-1 rounded-xl">
+                          <div
+className="hidden lg:flex items-center gap-1 bg-white/10 p-1 rounded-xl">
                   <span className="text-[11px] text-white/60 px-1.5 font-medium">Speed</span>
                   {[0.75, 1, 1.25, 1.5, 2].map((spd) => (
                     <button
@@ -3449,7 +3710,8 @@ export default function AsterDriveApp() {
                 >
                   <Star className={cn("w-4 h-4", previewVideoItem.starred ? "text-amber-400 fill-amber-400" : "text-white/70")} />
                 </button>
-                <div className="w-px h-6 bg-white/15 mx-1" />
+                          <div
+className="w-px h-6 bg-white/15 mx-1" />
                 <button
                   type="button"
                   onClick={() => setPreviewVideoItem(null)}
@@ -3462,7 +3724,7 @@ export default function AsterDriveApp() {
             </div>
 
             {/* Video Display Center */}
-            <div 
+            <div
               onClick={(e) => e.stopPropagation()} 
               className="flex-1 flex flex-col items-center justify-center p-2 sm:p-4 min-h-0 relative my-auto"
             >
@@ -3489,7 +3751,8 @@ export default function AsterDriveApp() {
               </video>
 
               {/* Mobile/Tablet Speed Selector */}
-              <div className="lg:hidden flex items-center gap-1.5 mt-3 bg-white/10 px-3 py-1.5 rounded-full">
+                        <div
+className="lg:hidden flex items-center gap-1.5 mt-3 bg-white/10 px-3 py-1.5 rounded-full">
                 <span className="text-[11px] text-white/70">Speed:</span>
                 {[0.75, 1, 1.25, 1.5, 2].map((spd) => (
                   <button
@@ -3513,11 +3776,12 @@ export default function AsterDriveApp() {
             </div>
 
             {/* Bottom Info Bar & Shortcuts */}
-            <div 
+            <div
               onClick={(e) => e.stopPropagation()} 
               className="flex items-center justify-between text-xs text-white/60 pt-3 border-t border-white/10 shrink-0 flex-wrap gap-2"
             >
-              <div className="flex items-center gap-2 flex-wrap">
+                        <div
+className="flex items-center gap-2 flex-wrap">
                 <span className="inline-flex items-center gap-1.5 text-purple-300 font-medium">
                   <Sparkles className="w-3.5 h-3.5" /> High Definition Video Player
                 </span>
@@ -3535,7 +3799,8 @@ export default function AsterDriveApp() {
                   </span>
                 )}
               </div>
-              <div className="flex items-center gap-3">
+                        <div
+className="flex items-center gap-3">
                 <span className="hidden md:inline">
                   Press <kbd className="px-1.5 py-0.5 bg-white/15 rounded text-[11px] font-mono text-white">Space</kbd> to Play/Pause, <kbd className="px-1.5 py-0.5 bg-white/15 rounded text-[11px] font-mono text-white">Esc</kbd> to exit
                 </span>
@@ -3569,9 +3834,12 @@ export default function AsterDriveApp() {
               onClick={(e) => e.stopPropagation()}
               className="bg-white rounded-2xl sm:rounded-3xl shadow-2xl max-w-lg w-full p-6 border border-slate-100 overflow-hidden"
             >
-              <div className="flex items-start justify-between mb-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+                        <div
+className="flex items-start justify-between mb-4">
+                          <div
+className="flex items-center gap-3">
+                            <div
+className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
                     <Computer className="w-5 h-5" />
                   </div>
                   <div>
@@ -3579,7 +3847,7 @@ export default function AsterDriveApp() {
                     <p className="text-xs text-slate-500">Connect PC or Mac folders for continuous backup</p>
                   </div>
                 </div>
-                <button 
+                <button
                   onClick={() => setIsSyncModalOpen(false)}
                   className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
                 >
@@ -3587,12 +3855,14 @@ export default function AsterDriveApp() {
                 </button>
               </div>
 
-              <div className="space-y-3 mb-6">
-                <div 
+                        <div
+className="space-y-3 mb-6">
+                <div
                   onClick={() => handleSyncPreset('windows')}
                   className="p-4 rounded-xl border border-slate-200 hover:border-blue-500 bg-slate-50/50 hover:bg-blue-50/30 transition-all cursor-pointer flex items-center justify-between group"
                 >
-                  <div className="flex items-center gap-3">
+                            <div
+className="flex items-center gap-3">
                     <Monitor className="w-6 h-6 text-blue-600 shrink-0" />
                     <div>
                       <h4 className="font-semibold text-slate-900 text-sm group-hover:text-blue-700 transition-colors">Windows 11 Workstation Preset</h4>
@@ -3602,11 +3872,12 @@ export default function AsterDriveApp() {
                   <span className="text-xs font-semibold text-blue-600 shrink-0 ml-2">Sync Preset →</span>
                 </div>
 
-                <div 
+                <div
                   onClick={() => handleSyncPreset('mac')}
                   className="p-4 rounded-xl border border-slate-200 hover:border-purple-500 bg-slate-50/50 hover:bg-purple-50/30 transition-all cursor-pointer flex items-center justify-between group"
                 >
-                  <div className="flex items-center gap-3">
+                            <div
+className="flex items-center gap-3">
                     <Laptop className="w-6 h-6 text-purple-600 shrink-0" />
                     <div>
                       <h4 className="font-semibold text-slate-900 text-sm group-hover:text-purple-700 transition-colors">MacBook Pro Preset</h4>
@@ -3616,14 +3887,15 @@ export default function AsterDriveApp() {
                   <span className="text-xs font-semibold text-purple-600 shrink-0 ml-2">Sync Preset →</span>
                 </div>
 
-                <div 
+                <div
                   onClick={() => {
                     setIsSyncModalOpen(false);
                     computerFolderInputRef.current?.click();
                   }}
                   className="p-4 rounded-xl border border-slate-200 hover:border-emerald-500 bg-slate-50/50 hover:bg-emerald-50/30 transition-all cursor-pointer flex items-center justify-between group"
                 >
-                  <div className="flex items-center gap-3">
+                            <div
+className="flex items-center gap-3">
                     <Folder className="w-6 h-6 text-emerald-600 shrink-0" />
                     <div>
                       <h4 className="font-semibold text-slate-900 text-sm group-hover:text-emerald-700 transition-colors">Sync Local Folder from this PC</h4>
@@ -3634,7 +3906,8 @@ export default function AsterDriveApp() {
                 </div>
               </div>
 
-              <div className="flex justify-end">
+                        <div
+className="flex justify-end">
                 <button
                   onClick={() => setIsSyncModalOpen(false)}
                   className="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
@@ -3648,7 +3921,8 @@ export default function AsterDriveApp() {
       </AnimatePresence>
 
       {/* TOAST NOTIFICATION CONTAINER */}
-      <div className="fixed bottom-5 right-5 z-[100] flex flex-col gap-2 max-w-sm pointer-events-none">
+                <div
+className="fixed bottom-5 right-5 z-[100] flex flex-col gap-2 max-w-sm pointer-events-none">
         <AnimatePresence>
           {toasts.map((toast) => (
             <motion.div
@@ -3664,17 +3938,19 @@ export default function AsterDriveApp() {
                 "border-slate-200 text-slate-800"
               )}
             >
-              <div className="shrink-0 mt-0.5">
+                        <div
+className="shrink-0 mt-0.5">
                 {toast.type === 'warning' && <AlertTriangle className="w-5 h-5 text-amber-500" />}
                 {toast.type === 'success' && <Check className="w-5 h-5 text-emerald-500" />}
                 {toast.type === 'error' && <AlertCircle className="w-5 h-5 text-rose-500" />}
                 {toast.type === 'info' && <Info className="w-5 h-5 text-blue-500" />}
               </div>
-              <div className="flex-1 min-w-0">
+                        <div
+className="flex-1 min-w-0">
                 <p className="text-sm font-semibold">{toast.title}</p>
                 <p className="text-xs text-slate-600 mt-0.5 leading-relaxed">{toast.message}</p>
               </div>
-              <button 
+              <button
                 onClick={() => setToasts(prev => prev.filter(t => t.id !== toast.id))}
                 className="text-slate-400 hover:text-slate-600 p-0.5 rounded transition-colors"
                 aria-label="Dismiss toast"
