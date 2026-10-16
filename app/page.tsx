@@ -59,7 +59,6 @@ import {
   RefreshCw,
   Maximize2
 } from 'lucide-react';
-import { format } from 'date-fns';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { StorageAnalyticsChart } from '@/components/StorageAnalyticsChart';
@@ -219,6 +218,19 @@ function formatBytes(bytes?: number, decimals = 1) {
   const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
   return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${sizes[i]}`;
+}
+
+const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+function formatDateSafe(dateStr?: string | Date): string {
+  if (!dateStr) return '';
+  try {
+    const d = typeof dateStr === 'string' ? new Date(dateStr) : dateStr;
+    if (isNaN(d.getTime())) return typeof dateStr === 'string' ? dateStr : '';
+    return `${MONTH_NAMES[d.getUTCMonth()]} ${d.getUTCDate()}, ${d.getUTCFullYear()}`;
+  } catch {
+    return typeof dateStr === 'string' ? dateStr : '';
+  }
 }
 
 const getIconForType = (type: ItemType, className?: string) => {
@@ -1979,7 +1991,7 @@ export default function AsterDriveApp() {
                         )}
 
                         <p className="text-xs text-slate-500 flex items-center justify-between mt-auto pt-2 border-t border-slate-100/80">
-                          <span className="truncate mr-2">{format(new Date(item.updatedAt), 'MMM d, yyyy')}</span>
+                          <span suppressHydrationWarning className="truncate mr-2">{formatDateSafe(item.updatedAt)}</span>
                           {item.type !== 'folder' && item.size !== undefined && <span className="font-mono shrink-0">{formatBytes(item.size)}</span>}
                         </p>
                       </motion.div>
@@ -2048,8 +2060,8 @@ export default function AsterDriveApp() {
                           <td className="px-6 py-3.5 whitespace-nowrap text-slate-500 hidden sm:table-cell">
                             {item.owner}
                           </td>
-                          <td className="px-6 py-3.5 whitespace-nowrap text-slate-500 hidden md:table-cell">
-                            {format(new Date(item.updatedAt), 'MMM d, yyyy')}
+                          <td suppressHydrationWarning className="px-6 py-3.5 whitespace-nowrap text-slate-500 hidden md:table-cell">
+                            {formatDateSafe(item.updatedAt)}
                           </td>
                           <td className="px-6 py-3.5 whitespace-nowrap text-slate-500 font-mono text-right">
                             {formatBytes(item.size)}
@@ -2151,8 +2163,8 @@ export default function AsterDriveApp() {
                         )}
                         
                         <div className="text-slate-500">Modified</div>
-                        <div className="col-span-2 text-slate-900 font-medium">
-                          {format(new Date(selectedItemDetails.updatedAt), 'MMM d, yyyy')}
+                        <div suppressHydrationWarning className="col-span-2 text-slate-900 font-medium">
+                          {formatDateSafe(selectedItemDetails.updatedAt)}
                         </div>
                         
                         <div className="text-slate-500">Location</div>
@@ -3417,7 +3429,7 @@ export default function AsterDriveApp() {
                   <p className="text-xs text-white/60 mt-0.5 flex items-center gap-2 font-mono tabular-nums">
                     <span>{formatBytes(previewVideoItem.size)}</span>
                     <span>•</span>
-                    <span>{format(new Date(previewVideoItem.updatedAt), 'MMM d, yyyy')}</span>
+                    <span suppressHydrationWarning>{formatDateSafe(previewVideoItem.updatedAt)}</span>
                     {previewVideoItem.folderPath && (
                       <>
                         <span>•</span>
