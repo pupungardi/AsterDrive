@@ -1845,8 +1845,17 @@ export default function AsterDriveApp() {
                           }
                         }}
                         onDoubleClick={() => handleItemClick(item)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            handleItemClick(item);
+                          }
+                        }}
+                        role="button"
+                        tabIndex={0}
+                        aria-pressed={isSelected}
                         className={cn(
-                          "group relative flex flex-col p-4 rounded-xl border transition-all cursor-pointer select-none",
+                          "group relative flex flex-col p-4 rounded-xl border transition-all cursor-pointer select-none touch-manipulation focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2",
                           isSelected 
                             ? "bg-blue-50 border-blue-200 shadow-sm" 
                             : "bg-white border-slate-200 hover:border-slate-300 hover:shadow-sm"
