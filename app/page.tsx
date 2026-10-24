@@ -405,6 +405,92 @@ export default function AsterDriveApp() {
     });
   };
 
+  // Computer sync execution state
+  const [isSyncingNow, setIsSyncingNow] = useState(false);
+
+  const handleSyncNow = () => {
+    if (isSyncingNow) return;
+    setIsSyncingNow(true);
+    showToast({
+      type: 'info',
+      title: 'Verifying Computer Sync...',
+      message: 'Checking local files against AsterDrive backup storage...'
+    });
+    setTimeout(() => {
+      setIsSyncingNow(false);
+      showToast({
+        type: 'success',
+        title: 'Sync Complete & Up to Date',
+        message: 'All files are securely backed up and match your local computer.'
+      });
+    }, 1200);
+  };
+
+  const handleToggleComputerSync = (item: DriveItem) => {
+    setActiveItemMenu(null);
+    const willBeComputer = item.source !== 'computer';
+    setDriveItems(prev => prev.map(i => i.id === item.id ? {
+      ...i,
+      source: willBeComputer ? 'computer' : 'drive',
+      computerDevice: willBeComputer ? (i.computerDevice || 'This PC') : undefined,
+      folderPath: willBeComputer ? (i.folderPath || 'Synced from PC') : undefined,
+      updatedAt: new Date().toISOString()
+    } : i));
+    showToast({
+      type: 'success',
+      title: willBeComputer ? 'Linked to Computer Sync' : 'Removed from Computer Sync',
+      message: `"${item.name}" is now ${willBeComputer ? 'synced with your computer and visible in the Computers tab.' : 'stored in My Drive only.'}`
+    });
+  };
+
+  const handleSyncAllDriveFilesToComputer = () => {
+    const unlinked = driveItems.filter(i => !i.trashed && i.source !== 'computer');
+    if (unlinked.length === 0) return;
+    setDriveItems(prev => prev.map(item => {
+      if (!item.trashed && item.source !== 'computer') {
+        return {
+          ...item,
+          source: 'computer',
+          computerDevice: 'This PC',
+          folderPath: item.folderPath || 'Backup / Uploaded',
+          updatedAt: new Date().toISOString()
+        };
+      }
+      return item;
+    }));
+    showToast({
+      type: 'success',
+      title: 'Files Synced with Computer',
+      message: `${unlinked.length} file(s) have been linked to this Computer and are now backed up.`
+    });
+  };
+
+  const handleToggleSelectedComputerSync = () => {
+    if (selectedItems.size === 0) return;
+    const selectedList = driveItems.filter(i => selectedItems.has(i.id));
+    const allAlreadyComputer = selectedList.every(i => i.source === 'computer');
+    const newSource = allAlreadyComputer ? 'drive' : 'computer';
+
+    setDriveItems(prev => prev.map(item => {
+      if (selectedItems.has(item.id)) {
+        return {
+          ...item,
+          source: newSource,
+          computerDevice: newSource === 'computer' ? (item.computerDevice || 'This PC') : undefined,
+          folderPath: newSource === 'computer' ? (item.folderPath || 'Synced from PC') : undefined,
+          updatedAt: new Date().toISOString()
+        };
+      }
+      return item;
+    }));
+
+    showToast({
+      type: 'success',
+      title: newSource === 'computer' ? 'Linked to Computer Sync' : 'Removed from Computer Sync',
+      message: `${selectedList.length} item(s) ${newSource === 'computer' ? 'are now visible in the Computers tab and marked as synced.' : 'are now stored in My Drive only.'}`
+    });
+  };
+
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const folderInputRef = React.useRef<HTMLInputElement>(null);
   const computerFileInputRef = React.useRef<HTMLInputElement>(null);
@@ -1580,6 +1666,9 @@ export default function AsterDriveApp() {
                       <button onClick={handleToggleStar} className="p-2 text-slate-500 hover:text-amber-500 hover:bg-slate-100 rounded-md transition-colors" title="Toggle Star">
                         <Star className="w-5 h-5" />
                       </button>
+                      <button onClick={handleToggleSelectedComputerSync} className="p-2 text-slate-500 hover:text-indigo-600 hover:bg-slate-100 rounded-md transition-colors" title="Toggle Computer Sync & Backup">
+                        <Computer className="w-5 h-5" />
+                      </button>
                       <button onClick={handleMoveToTrash} className="p-2 text-slate-500 hover:text-rose-600 hover:bg-slate-100 rounded-md transition-colors" title="Move to Trash">
                         <Trash2 className="w-5 h-5" />
                       </button>
@@ -1635,11 +1724,21 @@ export default function AsterDriveApp() {
                       </span>
                     </div>
                     <p className="text-xs text-slate-500 mt-0.5">
-                      {displayedItems.length} synced files • Total backed up {formatBytes(displayedItems.reduce((acc, i) => acc + (i.size || 0), 0))}
+                      {displayedItems.length} synced file(s) • Total backed up {formatBytes(displayedItems.reduce((acc, i) => acc + (i.size || 0), 0))} • Status: Up to date
                     </p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2 flex-wrap shrink-0">
+                  <button 
+                    type="button"
+                    onClick={handleSyncNow}
+                    disabled={isSyncingNow}
+                    className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold transition-colors shadow-2xs flex items-center gap-1.5 cursor-pointer disabled:opacity-70"
+                    title="Verify local and cloud files match"
+                  >
+                    <RefreshCw className={cn("w-3.5 h-3.5", isSyncingNow && "animate-spin")} />
+                    {isSyncingNow ? 'Verifying...' : 'Sync Now'}
+                  </button>
                   <button 
                     type="button"
                     onClick={() => computerFolderInputRef.current?.click()}
@@ -1680,6 +1779,33 @@ export default function AsterDriveApp() {
                   <p className="text-slate-600 text-sm leading-relaxed mb-6 max-w-md">
                     Safely backup videos, photos, and project folders directly from your PC or Mac. Any synced files are accessible anytime, anywhere on AsterDrive.
                   </p>
+
+                  {/* Quick link existing uploaded drive files to Computers */}
+                  {driveItems.filter(i => !i.trashed && i.source !== 'computer').length > 0 && (
+                    <div className="w-full mb-6 p-4 bg-gradient-to-r from-blue-50 via-indigo-50/50 to-blue-50 border border-blue-200 rounded-2xl text-left flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm">
+                      <div className="flex items-start gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center shrink-0 mt-0.5 shadow-sm shadow-blue-500/20">
+                          <Computer className="w-5 h-5" />
+                        </div>
+                        <div>
+                          <h4 className="text-sm font-bold text-slate-900">
+                            Sync {driveItems.filter(i => !i.trashed && i.source !== 'computer').length} uploaded file(s) to this PC
+                          </h4>
+                          <p className="text-xs text-slate-600 mt-0.5 leading-relaxed">
+                            We detected files in your Drive. Link them to Computer Sync &amp; Backup with one click.
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleSyncAllDriveFilesToComputer}
+                        className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold shrink-0 shadow-sm transition-all cursor-pointer flex items-center justify-center gap-2 hover:shadow-md active:scale-95"
+                      >
+                        <CheckCircle2 className="w-4 h-4 text-blue-200" />
+                        Sync All to this PC
+                      </button>
+                    </div>
+                  )}
 
                   {/* Real Backup Action Cards */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full mb-6 text-left">
@@ -1860,12 +1986,22 @@ export default function AsterDriveApp() {
                           {item.name}
                         </h4>
 
-                        {item.source === 'computer' && (
-                          <div className="flex items-center gap-1 text-[11px] text-blue-600 font-medium mb-1">
-                            <Computer className="w-3 h-3 shrink-0" />
-                            <span className="truncate">{item.computerDevice || 'Computer Sync'}</span>
+                        {item.source === 'computer' ? (
+                          <div className="flex items-center justify-between text-[11px] font-medium mb-1.5 bg-emerald-50 text-emerald-800 px-2 py-1 rounded-md border border-emerald-200/80">
+                            <span className="inline-flex items-center gap-1 truncate font-semibold">
+                              <CheckCircle2 className="w-3 h-3 text-emerald-600 shrink-0" />
+                              Synced
+                            </span>
+                            <span className="text-[10px] text-emerald-700 font-mono truncate">
+                              {item.computerDevice || 'This PC'}
+                            </span>
                           </div>
-                        )}
+                        ) : activeNav === 'computers' ? (
+                          <div className="flex items-center gap-1 text-[11px] text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200 font-medium mb-1">
+                            <Clock className="w-3 h-3 shrink-0" />
+                            <span>Queued for Sync</span>
+                          </div>
+                        ) : null}
 
                         {item.type === 'video' && !item.trashed && (
                           <button
@@ -1939,8 +2075,8 @@ export default function AsterDriveApp() {
                                   </button>
                                 )}
                                 {item.source === 'computer' && (
-                                  <span className="inline-flex items-center gap-1 text-[10px] text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded font-medium shrink-0">
-                                    <Computer className="w-2.5 h-2.5" /> {item.computerDevice || 'PC'}
+                                  <span className="inline-flex items-center gap-1 text-[10px] text-emerald-800 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full font-medium shrink-0">
+                                    <CheckCircle2 className="w-2.5 h-2.5 text-emerald-600" /> Synced ({item.computerDevice || 'This PC'})
                                   </span>
                                 )}
                               </div>
@@ -2009,7 +2145,7 @@ export default function AsterDriveApp() {
                       </button>
                     )}
 
-                    <div className="flex gap-2 mb-8">
+                    <div className="flex gap-2 mb-3">
                       <button 
                         onClick={() => showToast({ type: 'info', title: 'Share Link', message: 'Sharable link copied to clipboard.' })}
                         className="flex-1 flex items-center justify-center gap-2 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 py-2 rounded-lg text-sm font-medium transition-colors"
@@ -2024,6 +2160,22 @@ export default function AsterDriveApp() {
                       </button>
                     </div>
 
+                    <button
+                      type="button"
+                      onClick={() => handleToggleComputerSync(selectedItemDetails)}
+                      className={cn(
+                        "w-full mb-6 flex items-center justify-center gap-2 py-2 px-3 rounded-xl text-xs font-semibold border transition-all cursor-pointer shadow-2xs",
+                        selectedItemDetails.source === 'computer'
+                          ? "bg-amber-50 hover:bg-amber-100 text-amber-800 border-amber-200"
+                          : "bg-blue-50 hover:bg-blue-100 text-blue-700 border-blue-200"
+                      )}
+                    >
+                      <Computer className="w-4 h-4" />
+                      {selectedItemDetails.source === 'computer' 
+                        ? 'Remove from Computer Sync' 
+                        : 'Link to Computer Sync & Backup'}
+                    </button>
+
                     <div className="space-y-4">
                       <h4 className="text-xs font-semibold text-slate-900 uppercase tracking-wider mb-3">Properties</h4>
                       
@@ -2036,6 +2188,11 @@ export default function AsterDriveApp() {
 
                         {selectedItemDetails.source === 'computer' && (
                           <>
+                            <div className="text-slate-500">Sync Status</div>
+                            <div className="col-span-2 text-emerald-700 font-medium flex items-center gap-1.5">
+                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                              <span>Synced &amp; Up to date</span>
+                            </div>
                             <div className="text-slate-500">Computer</div>
                             <div className="col-span-2 text-blue-700 font-medium flex items-center gap-1.5 truncate">
                               <Computer className="w-3.5 h-3.5 shrink-0" />
@@ -3132,6 +3289,14 @@ export default function AsterDriveApp() {
                 >
                   <Info className="w-4 h-4 text-slate-500" />
                   Details &amp; Info
+                </button>
+
+                <button
+                  onClick={() => handleToggleComputerSync(activeItemMenu.item)}
+                  className="w-full flex items-center gap-2.5 px-3.5 py-2 text-slate-700 hover:bg-slate-100 transition-colors text-left text-xs sm:text-sm cursor-pointer"
+                >
+                  <Computer className="w-4 h-4 text-indigo-600" />
+                  {activeItemMenu.item.source === 'computer' ? 'Remove from Computer Sync' : 'Link to Computer Sync'}
                 </button>
               </div>
 

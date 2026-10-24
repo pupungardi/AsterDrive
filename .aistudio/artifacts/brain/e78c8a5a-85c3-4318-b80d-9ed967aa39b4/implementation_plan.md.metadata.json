@@ -1,6 +1,6 @@
 {
-  "summary":  "Rencana implementasi untuk menghapus kedua elemen drag-and-drop (callout bar di bagian atas dan kotak drag-and-drop di empty state), sehingga tampilan AsterDrive bersih, rapi, dan tetap mempertahankan kemampuan upload via tombol aksi dan drag-and-drop langsung ke jendela browser.",
-  "updatedAt":  "2026-10-24T04:13:40.383197161Z",
+  "summary":  "Rencana implementasi untuk menampilkan status sinkronisasi mendalam dan pengelolaan file di tab Computers (Sync & Backup), mencakup indikator status sync (hijau/up-to-date), info perangkat asal, tombol aksi cepat (Sync Now, Unduh, Kelola Sumber), serta opsi memindahkan atau menghubungkan file yang sudah diunggah ke tab Computers.",
+  "updatedAt":  "2026-10-24T05:02:03.878366136Z",
   "requestFeedback":  true,
   "userFacing":  true
 }
