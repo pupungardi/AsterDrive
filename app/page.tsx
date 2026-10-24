@@ -1618,26 +1618,6 @@ export default function AsterDriveApp() {
         {/* FILE LIST AREA */}
         <div className="flex-1 flex overflow-hidden">
           <div className="flex-1 overflow-y-auto px-4 lg:px-6 pb-6">
-            {/* QUICK DRAG-AND-DROP UPLOAD CALLOUT BAR */}
-            {(activeNav === 'my-drive' || activeNav === 'computers') && (
-              <div 
-                onClick={() => fileInputRef.current?.click()}
-                className="mb-4 py-2.5 px-4 bg-slate-50/90 hover:bg-blue-50/60 border border-dashed border-slate-200 hover:border-blue-400 rounded-2xl flex items-center justify-between text-xs text-slate-600 hover:text-blue-700 transition-all cursor-pointer group shadow-2xs"
-              >
-                <div className="flex items-center gap-2.5">
-                  <div className="w-6 h-6 rounded-lg bg-blue-100/80 text-blue-600 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
-                    <UploadCloud className="w-3.5 h-3.5" />
-                  </div>
-                  <span className="font-medium">
-                    Drag &amp; drop files or entire folders here to upload directly
-                  </span>
-                </div>
-                <div className="flex items-center gap-2 text-[11px] text-slate-400 group-hover:text-blue-600 shrink-0">
-                  <span className="hidden sm:inline">Nested trees preserved</span>
-                  <span className="font-semibold underline">Browse computer</span>
-                </div>
-              </div>
-            )}
 
             {/* COMPUTERS TOP STATUS BANNER (When synced items exist) */}
             {activeNav === 'computers' && displayedItems.length > 0 && (
@@ -1802,42 +1782,8 @@ export default function AsterDriveApp() {
                       ? 'Files and folders shared with you by other collaborators will show here.'
                       : 'Use the "+" button at the bottom right to upload files or drag and drop real documents, photos, and videos into your drive.'}
                   </p>
-                  <div className="mt-5 flex flex-col items-center gap-3 w-full max-w-sm">
-                    {activeNav === 'my-drive' ? (
-                      <>
-                        <div 
-                          onClick={() => fileInputRef.current?.click()}
-                          className="w-full p-5 border-2 border-dashed border-slate-200 hover:border-blue-400 bg-slate-50/70 hover:bg-blue-50/40 rounded-2xl cursor-pointer transition-all flex flex-col items-center justify-center group"
-                        >
-                          <div className="w-10 h-10 rounded-xl bg-blue-100/80 text-blue-600 flex items-center justify-center mb-2 group-hover:scale-105 transition-transform">
-                            <UploadCloud className="w-5 h-5" />
-                          </div>
-                          <span className="text-xs font-semibold text-slate-800 group-hover:text-blue-700">
-                            Drag &amp; drop files or entire folders here
-                          </span>
-                          <span className="text-[11px] text-slate-400 mt-0.5">
-                            Preserves folder hierarchy automatically
-                          </span>
-                        </div>
-
-                        <div className="flex items-center gap-2 flex-wrap justify-center">
-                          <button 
-                            type="button"
-                            onClick={() => fileInputRef.current?.click()}
-                            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-medium transition-colors shadow-sm cursor-pointer"
-                          >
-                            Browse Files
-                          </button>
-                          <button 
-                            type="button"
-                            onClick={() => folderInputRef.current?.click()}
-                            className="px-4 py-2 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-xl text-xs font-medium transition-colors cursor-pointer"
-                          >
-                            Upload Folder
-                          </button>
-                        </div>
-                      </>
-                    ) : (
+                  {activeNav !== 'my-drive' && (
+                    <div className="mt-5 flex flex-col items-center gap-3 w-full max-w-sm">
                       <button 
                         type="button"
                         onClick={() => handleNavSelect('my-drive')}
@@ -1845,8 +1791,8 @@ export default function AsterDriveApp() {
                       >
                         ← Back to My Drive
                       </button>
-                    )}
-                  </div>
+                    </div>
+                  )}
                 </div>
               )
             ) : viewMode === 'grid' ? (

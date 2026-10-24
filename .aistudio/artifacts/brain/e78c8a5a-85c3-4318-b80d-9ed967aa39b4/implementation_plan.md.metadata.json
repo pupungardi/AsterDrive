@@ -1,6 +1,6 @@
 {
-  "summary": "Rencana penghapusan seluruh data mock dummy, tombol simulasi testing, dan tombol test file, digantikan dengan sistem penyimpanan file riil persisten berbasis IndexedDB dan LocalStorage di browser. Pengguna dapat mengunggah, melihat, memutar video, dan mengunduh file asli mereka sendiri.",
-  "updatedAt": "2026-10-16T19:14:39.125794415Z",
-  "requestFeedback": true,
-  "userFacing": true
+  "summary":  "Rencana implementasi untuk menghapus kedua elemen drag-and-drop (callout bar di bagian atas dan kotak drag-and-drop di empty state), sehingga tampilan AsterDrive bersih, rapi, dan tetap mempertahankan kemampuan upload via tombol aksi dan drag-and-drop langsung ke jendela browser.",
+  "updatedAt":  "2026-10-24T04:13:40.383197161Z",
+  "requestFeedback":  true,
+  "userFacing":  true
 }
