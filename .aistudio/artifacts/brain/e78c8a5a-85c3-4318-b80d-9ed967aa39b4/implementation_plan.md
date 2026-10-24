@@ -1,44 +1,49 @@
-# Rencana Implementasi: Tampilan Status Sync & Pengelolaan File di Tab Computers
+# Rencana Implementasi: Perbaikan Public Share Link & Sinkronisasi Folder Komputer
 
-Rencana ini berfokus pada penyempurnaan tab **Computers** untuk menampilkan status sinkronisasi secara rinci, memberikan kontrol penuh terhadap file yang baru diunggah untuk pencadangan (*backup*), serta memastikan file dari komputer dapat dikelola secara optimal.
-
----
-
-## 1. Analisis Kebutuhan
-- Pengguna telah mengunggah 2 file untuk sync & backup dan ingin **melihat status sync serta mengelola file di tab Computers**.
-- Saat ini file dengan sumber `source: 'computer'` tampil di tab Computers, namun:
-  1. Jika pengguna mengunggah file melalui My Drive atau drag-and-drop umum, file tersebut perlu dapat diubah/dihubungkan statusnya menjadi file Sync & Backup (`source: 'computer'`).
-  2. Kartu file dan baris tabel di tab Computers membutuhkan badge visual status sinkronisasi yang jelas (misal: *Synced*, *Last Synced Just Now*, ukuran, dan perangkat asal *This PC*).
-  3. Diperlukan aksi interaktif di banner Computers: tombol **"Sync Now / Refresh Sync"** dengan animasi progres singkat untuk memverifikasi file telah aman tersinkron, tombol **Unduh Asli**, serta menu konteks untuk mengelola file (lihat info properti, buka preview, hapus sync).
+Berdasarkan jawaban Anda, kami merancang dua perbaikan utama:
+1. **Public Share Link & Modal Dialog Berbagi:** Mengganti tautan `localhost` dengan URL publik Cloud Run (`https://ais-pre-owradbeu2qux37froeiwcs-7606689415.asia-southeast1.run.app`), serta menghadirkan **Modal Dialog Share Link** lengkap dengan opsi salin tautan dan izin akses.
+2. **Sinkronisasi Folder Komputer Otomatis:** Memperbaiki sistem upload folder agar secara otomatis membuat entitas folder asli (`type: 'folder'`, `source: 'computer'`), menyusun file di dalam foldernya, dan mendukung dialog pembuatan folder sync interaktif.
 
 ---
 
-## 2. Rincian Fitur & Modifikasi
+## 1. Rincian Fitur & Modifikasi
 
-### A. Indikator Status & Filter Komprehensif di Tab Computers
-- **Banner Status Komputer:**
-  - Menampilkan jumlah file yang tersinkron, total ukuran yang dibackup, dan waktu sync terakhir (misal: *All files synced & up-to-date*).
-  - Menambahkan tombol interaktif **"Sync Now"** dengan status animasi putar (*spinner*) yang memberikan konfirmasi real-time bahwa file lokal dan cloud telah sinkron.
-- **Badge Status pada Grid / List Item:**
-  - Menampilkan badge hijau elegan `✓ Synced` pada setiap item file/folder yang berada di bawah sumber komputer.
-  - Menampilkan nama perangkat asal (misal: `This PC / Windows` atau nama folder sync).
+### A. Fitur Public Share Link & Modal Dialog Berbagi
+- **Deteksi URL Publik:**
+  - Menghindari penggunaan `http://localhost:3000` di dalam iframe.
+  - Menggunakan URL publik Cloud Run: `https://ais-pre-owradbeu2qux37froeiwcs-7606689415.asia-southeast1.run.app/share/[fileId]`.
+- **Modal Dialog Share Interaktif:**
+  - Saat menekan tombol **Share Link** (dari menu titik tiga, panel detail, atau pemutar video), aplikasi akan membuka popup modal yang elegan:
+    - Menampilkan preview file (nama, ikon, ukuran).
+    - Menampilkan kotak input URL publik siap salin.
+    - Tombol **"Copy Link"** dengan status feedback (*Copied!*).
+    - Tombol **"Share via Apps"** menggunakan *Web Share API* bawaan peramban (WhatsApp, Telegram, Email, dll).
+    - Status privasi: *"Anyone with this public link can view & download"*.
 
-### B. Kemudahan Menghubungkan File ke Sync & Backup
-- Menambahkan opsi di menu item (klik kanan / tombol aksi titik tiga) serta di panel info detail file: **"Add to Computer Sync & Backup"** atau **"Toggle Computer Sync"**.
-  - Hal ini memudahkan jika 2 file yang baru diunggah masuk ke My Drive secara default, agar dapat langsung dialihkan/ditautkan ke tab Computers dengan 1 klik.
-
-### C. Pengelolaan & Tindakan Cepat di Tab Computers
-- **Download Asli Langsung:** Memastikan tombol unduh langsung mengambil blob biner riil dari IndexedDB.
-- **Pratinjau File:** File video, gambar, atau dokumen dapat dibuka langsung dari tab Computers.
-- **Hapus / Putus Sinkronisasi:** Opsi untuk melepas file dari sinkronisasi komputer tanpa merusak file di My Drive, atau menghapusnya jika diinginkan.
+### B. Fitur Sinkronisasi Folder Komputer Otomatis
+- **Perbaikan `handleComputerUpload`:**
+  - Saat pengguna memilih folder melalui pemilih folder (`webkitdirectory`), sistem akan:
+    1. Mengekstrak nama folder utama dan subfolder dari `webkitRelativePath`.
+    2. Membuat entitas folder nyata (`type: 'folder'`, `source: 'computer'`, `computerDevice: 'This PC'`) di dalam state `driveItems` dan menyimpannya di `localStorage`.
+    3. Menyimpan file-file di dalam folder tersebut (`parentId: folderId`).
+    4. Menyimpan data biner asli setiap file ke dalam IndexedDB.
+- **Dialog Interaktif "Sync Folder":**
+  - Memberikan opsi dialog pembuatan folder sinkronisasi:
+    - Pilih folder lokal dari komputer via folder browser picker.
+    - Opsi cepat: Buat nama folder sinkronisasi baru (misal: `Dokumen Kerja`, `Photos Backup`, `Project Files`) lalu langsung pilih berkas untuk dimasukkan ke dalamnya.
+- **Dukungan Drag-and-Drop Folder:**
+  - Menyeret folder langsung ke tab Computers akan otomatis membentuk folder dan file yang tersinkronisasi.
 
 ---
 
-## 3. Langkah Verifikasi
-1. **Linter:** Jalankan `lint_applet` untuk memastikan tidak ada kesalahan tipe TypeScript.
-2. **Kompilasi:** Jalankan `compile_applet` untuk menjamin build Next.js sukses.
-3. **Uji Fungsional:**
-   - Masuk ke tab **Computers**: verifikasi file yang diunggah tampil dengan badge status `Synced` dan nama perangkat yang jelas.
-   - Klik tombol **Sync Now** untuk memverifikasi feedback visual sinkronisasi real-time.
-   - Lakukan klik pada file untuk melihat detail sinkronisasi di sidebar properties (Path, Device, Timestamp).
-   - Unduh file untuk memastikan file biner asli terunduh dengan sempurna.
+## 2. Langkah-Langkah Verifikasi
+1. **Linter & Tipe:** Jalankan `lint_applet` untuk memastikan seluruh tipe data TypeScript valid.
+2. **Uji Kompilasi:** Jalankan `compile_applet` untuk memverifikasi proses build Next.js sukses.
+3. **Uji Fungsional Share Link:**
+   - Klik tombol **Share Link** pada file apa pun.
+   - Pastikan modal share terbuka dan tautan yang dihasilkan menggunakan URL publik Cloud Run (bukan localhost).
+   - Uji tombol **Copy Link** untuk memastikan tautan tersalin dengan benar ke clipboard.
+4. **Uji Fungsional Sync Folder:**
+   - Klik **Sync Folder** di tab Computers dan pilih folder dari PC.
+   - Verifikasi folder muncul sebagai folder asli dengan ikon folder dan badge `✓ Synced`.
+   - Buka folder tersebut dan pastikan file-file di dalamnya tersimpan dan dapat diunduh/dilihat.

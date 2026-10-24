@@ -56,8 +56,10 @@ import {
   Laptop,
   UploadCloud,
   CheckCircle2,
-  RefreshCw,
-  Maximize2
+  Maximize2,
+  Copy,
+  FolderPlus,
+  RefreshCw
 } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -162,6 +164,7 @@ type ProfileDetailView = 'personal' | 'security' | 'settings' | 'offline' | 'not
 // --- MAIN APPLICATION COMPONENT ---
 
 const STORAGE_KEY = 'asterdrive_real_items_v2';
+const PUBLIC_APP_URL = 'https://ais-pre-owradbeu2qux37froeiwcs-7606689415.asia-southeast1.run.app';
 
 export default function AsterDriveApp() {
   const [driveItems, setDriveItems] = useState<DriveItem[]>(initialData);
@@ -268,6 +271,12 @@ export default function AsterDriveApp() {
 
   // Computer sync modal state
   const [isSyncModalOpen, setIsSyncModalOpen] = useState(false);
+  const [isNewSyncFolderModalOpen, setIsNewSyncFolderModalOpen] = useState(false);
+  const [newSyncFolderName, setNewSyncFolderName] = useState('');
+
+  // Public Share Link modal state
+  const [shareModalItem, setShareModalItem] = useState<DriveItem | null>(null);
+  const [copiedShareLink, setCopiedShareLink] = useState(false);
 
   // Drag-and-drop state
   const [isDraggingOver, setIsDraggingOver] = useState(false);
@@ -353,19 +362,21 @@ export default function AsterDriveApp() {
     }
   };
 
+  const getPublicShareUrl = (item: DriveItem) => {
+    if (typeof window !== 'undefined') {
+      const origin = window.location.origin;
+      if (origin.includes('localhost') || origin.includes('127.0.0.1')) {
+        return `${PUBLIC_APP_URL}/share/${item.id}`;
+      }
+      return `${origin}/share/${item.id}`;
+    }
+    return `${PUBLIC_APP_URL}/share/${item.id}`;
+  };
+
   const handleShareItem = (item: DriveItem) => {
     setActiveItemMenu(null);
-    if (typeof window !== 'undefined') {
-      const shareUrl = `${window.location.origin}/share/${item.id}`;
-      if (navigator.clipboard) {
-        navigator.clipboard.writeText(shareUrl).catch(() => {});
-      }
-    }
-    showToast({
-      type: 'info',
-      title: 'Share Link Copied',
-      message: `Shareable link for "${item.name}" copied to clipboard.`
-    });
+    setShareModalItem(item);
+    setCopiedShareLink(false);
   };
 
   const handleToggleStarSingle = (item: DriveItem) => {
@@ -488,6 +499,38 @@ export default function AsterDriveApp() {
       type: 'success',
       title: newSource === 'computer' ? 'Linked to Computer Sync' : 'Removed from Computer Sync',
       message: `${selectedList.length} item(s) ${newSource === 'computer' ? 'are now visible in the Computers tab and marked as synced.' : 'are now stored in My Drive only.'}`
+    });
+  };
+
+  const handleCreateNewSyncFolder = () => {
+    const trimmed = newSyncFolderName.trim();
+    if (!trimmed) {
+      showToast({
+        type: 'warning',
+        title: 'Folder Name Required',
+        message: 'Please enter a name for the new sync folder.'
+      });
+      return;
+    }
+    const folderId = Math.random().toString(36).substring(2, 9);
+    const newFolder: DriveItem = {
+      id: folderId,
+      parentId: currentFolderId,
+      name: trimmed,
+      type: 'folder',
+      updatedAt: new Date().toISOString(),
+      owner: 'me',
+      source: 'computer',
+      computerDevice: 'This PC',
+      folderPath: trimmed
+    };
+    setDriveItems(prev => [...prev, newFolder]);
+    setIsNewSyncFolderModalOpen(false);
+    setNewSyncFolderName('');
+    showToast({
+      type: 'success',
+      title: 'Sync Folder Created',
+      message: `Folder "${trimmed}" created and ready for computer backup.`
     });
   };
 
@@ -927,7 +970,11 @@ export default function AsterDriveApp() {
   };
 
   // Dedicated Computer Sync & Backup Upload handler
-  const handleComputerUpload = (e: React.ChangeEvent<HTMLInputElement>, deviceName: string = 'My Computer') => {
+  const handleComputerUpload = (
+    e: React.ChangeEvent<HTMLInputElement>, 
+    deviceName: string = 'This PC',
+    forcedFolderName?: string
+  ) => {
     if (e.target.files && e.target.files.length > 0) {
       const filesArray = Array.from(e.target.files);
       const incomingBytes = filesArray.reduce((acc, file) => acc + (file.size || 0), 0);
@@ -943,48 +990,158 @@ export default function AsterDriveApp() {
         return;
       }
 
-      const newItems: DriveItem[] = filesArray.map(file => {
-        const isVideo = file.type.includes('video') || !!file.name.match(/\.(mp4|mov|webm|mkv|avi|m4v)$/i);
-        let videoUrl: string | undefined = undefined;
-        if (isVideo) {
-          try {
-            videoUrl = URL.createObjectURL(file);
-          } catch (err) {
-            console.error('Error creating object URL for video', err);
-          }
-        }
-        const relPath = (file as any).webkitRelativePath;
-        const folderName = relPath && relPath.includes('/') ? relPath.split('/')[0] : 'Synced Backup Folder';
+      const hasRelativePaths = filesArray.some(f => (f as any).webkitRelativePath && (f as any).webkitRelativePath.includes('/'));
+      const targetRootId = currentFolderId;
 
-        return {
-          id: Math.random().toString(36).substring(7),
-          parentId: 'root',
-          name: file.name,
-          type: file.type.includes('image') ? 'image' : 
-                isVideo ? 'video' : 
-                file.type.includes('spreadsheet') || file.name.endsWith('.xlsx') || file.name.endsWith('.csv') ? 'spreadsheet' :
-                file.type.includes('zip') || file.name.endsWith('.zip') || file.name.endsWith('.rar') ? 'archive' : 'document',
-          size: file.size,
-          updatedAt: new Date().toISOString(),
-          owner: 'me',
-          source: 'computer',
-          videoUrl,
-          computerDevice: deviceName,
-          folderPath: folderName
-        };
-      });
+      const newFolderItems: DriveItem[] = [];
+      let newFileItems: DriveItem[] = [];
+
+      if (hasRelativePaths) {
+        interface DiscoveredFolder {
+          fullPath: string;
+          name: string;
+          parentPath: string;
+        }
+        const discoveredFolders: DiscoveredFolder[] = [];
+        const filesWithFolder: { file: File; folderPath: string }[] = [];
+
+        for (const file of filesArray) {
+          const relPath = (file as any).webkitRelativePath;
+          let folderPath = '';
+          if (relPath && relPath.includes('/')) {
+            const parts = relPath.split('/');
+            folderPath = parts.slice(0, -1).join('/');
+            let accum = '';
+            for (let p = 0; p < parts.length - 1; p++) {
+              const prev = accum;
+              accum = accum ? `${accum}/${parts[p]}` : parts[p];
+              if (!discoveredFolders.some(f => f.fullPath === accum)) {
+                discoveredFolders.push({
+                  fullPath: accum,
+                  name: parts[p],
+                  parentPath: prev
+                });
+              }
+            }
+          }
+          filesWithFolder.push({ file, folderPath });
+        }
+
+        discoveredFolders.sort((a, b) => a.fullPath.split('/').length - b.fullPath.split('/').length);
+        const folderIdMap = new Map<string, string>();
+        folderIdMap.set('', targetRootId);
+
+        for (const folder of discoveredFolders) {
+          const parentId = folderIdMap.get(folder.parentPath) || targetRootId;
+          const folderId = Math.random().toString(36).substring(2, 9);
+          folderIdMap.set(folder.fullPath, folderId);
+
+          newFolderItems.push({
+            id: folderId,
+            parentId: parentId,
+            name: folder.name,
+            type: 'folder',
+            updatedAt: new Date().toISOString(),
+            owner: 'me',
+            source: 'computer',
+            computerDevice: deviceName,
+            folderPath: folder.name
+          });
+        }
+
+        newFileItems = filesWithFolder.map(({ file, folderPath }) => {
+          const isVideo = file.type.includes('video') || !!file.name.match(/\.(mp4|mov|webm|mkv|avi|m4v)$/i);
+          let videoUrl: string | undefined = undefined;
+          if (isVideo) {
+            try {
+              videoUrl = URL.createObjectURL(file);
+            } catch (err) {
+              console.error('Error creating object URL for video', err);
+            }
+          }
+
+          const parentId = folderIdMap.get(folderPath) || targetRootId;
+
+          return {
+            id: Math.random().toString(36).substring(2, 9),
+            parentId: parentId,
+            name: file.name,
+            type: file.type.includes('image') ? 'image' : 
+                  isVideo ? 'video' : 
+                  file.type.includes('spreadsheet') || file.name.endsWith('.xlsx') || file.name.endsWith('.csv') ? 'spreadsheet' :
+                  file.type.includes('zip') || file.name.endsWith('.zip') || file.name.endsWith('.rar') || file.name.endsWith('.7z') ? 'archive' : 'document',
+            size: file.size,
+            updatedAt: new Date().toISOString(),
+            owner: 'me',
+            source: 'computer',
+            videoUrl,
+            computerDevice: deviceName,
+            folderPath: folderPath || undefined
+          };
+        });
+      } else {
+        // Flat file selection: if forcedFolderName or targetRootId === 'root', create a dedicated folder container
+        let parentFolderId = targetRootId;
+        const folderTitle = forcedFolderName || (targetRootId === 'root' ? 'Synced Folder' : null);
+
+        if (folderTitle) {
+          const folderId = Math.random().toString(36).substring(2, 9);
+          parentFolderId = folderId;
+          newFolderItems.push({
+            id: folderId,
+            parentId: targetRootId,
+            name: folderTitle,
+            type: 'folder',
+            updatedAt: new Date().toISOString(),
+            owner: 'me',
+            source: 'computer',
+            computerDevice: deviceName,
+            folderPath: folderTitle
+          });
+        }
+
+        newFileItems = filesArray.map(file => {
+          const isVideo = file.type.includes('video') || !!file.name.match(/\.(mp4|mov|webm|mkv|avi|m4v)$/i);
+          let videoUrl: string | undefined = undefined;
+          if (isVideo) {
+            try {
+              videoUrl = URL.createObjectURL(file);
+            } catch (err) {
+              console.error('Error creating object URL for video', err);
+            }
+          }
+
+          return {
+            id: Math.random().toString(36).substring(2, 9),
+            parentId: parentFolderId,
+            name: file.name,
+            type: file.type.includes('image') ? 'image' : 
+                  isVideo ? 'video' : 
+                  file.type.includes('spreadsheet') || file.name.endsWith('.xlsx') || file.name.endsWith('.csv') ? 'spreadsheet' :
+                  file.type.includes('zip') || file.name.endsWith('.zip') || file.name.endsWith('.rar') || file.name.endsWith('.7z') ? 'archive' : 'document',
+            size: file.size,
+            updatedAt: new Date().toISOString(),
+            owner: 'me',
+            source: 'computer',
+            videoUrl,
+            computerDevice: deviceName,
+            folderPath: folderTitle || undefined
+          };
+        });
+      }
 
       // Save binary file blobs to IndexedDB
-      newItems.forEach((item, idx) => {
+      newFileItems.forEach((item, idx) => {
         saveFileBlob(item.id, filesArray[idx]);
       });
 
-      setDriveItems(prev => [...prev, ...newItems]);
+      setDriveItems(prev => [...prev, ...newFolderItems, ...newFileItems]);
       setIsSyncModalOpen(false);
+      setIsNewSyncFolderModalOpen(false);
       showToast({
         type: 'success',
         title: 'Computer Sync Completed',
-        message: `${newItems.length} file(s) from "${deviceName}" successfully backed up and synced.`
+        message: `${newFileItems.length} file(s)${newFolderItems.length > 0 ? ` in ${newFolderItems.length} folder(s)` : ''} successfully synced from "${deviceName}".`
       });
       e.target.value = '';
     }
@@ -1048,7 +1205,8 @@ export default function AsterDriveApp() {
 
   // Compute breadcrumbs
   const breadcrumbs = useMemo(() => {
-    const crumbs = [{ id: 'root', name: 'My Drive' }];
+    const rootName = activeNav === 'computers' ? 'Computers' : 'My Drive';
+    const crumbs = [{ id: 'root', name: rootName }];
     let currentId = currentFolderId;
     const path = [];
     
@@ -1062,7 +1220,7 @@ export default function AsterDriveApp() {
       }
     }
     return [...crumbs, ...path];
-  }, [currentFolderId, driveItems]);
+  }, [currentFolderId, driveItems, activeNav]);
 
   // Compute displayed items
   const displayedItems = useMemo(() => {
@@ -1080,7 +1238,7 @@ export default function AsterDriveApp() {
       } else if (activeNav === 'shared') {
         items = items.filter(item => item.owner !== 'me' && !item.trashed);
       } else if (activeNav === 'computers') {
-        items = items.filter(item => item.source === 'computer' && !item.trashed);
+        items = items.filter(item => item.source === 'computer' && !item.trashed && item.parentId === currentFolderId);
       } else if (activeNav === 'trash') {
         items = items.filter(item => item.trashed);
       } else {
@@ -1142,7 +1300,7 @@ export default function AsterDriveApp() {
     setActiveNav(itemId);
     setSearchQuery('');
     setSelectedItems(new Set());
-    if (itemId === 'my-drive') {
+    if (itemId === 'my-drive' || itemId === 'computers') {
       setCurrentFolderId('root');
     }
     setIsMobileMenuOpen(false);
@@ -1609,7 +1767,7 @@ export default function AsterDriveApp() {
           <div className="flex items-center text-sm">
             {searchQuery ? (
               <span className="font-medium text-slate-800 text-lg">Search results for &ldquo;{searchQuery}&rdquo;</span>
-            ) : activeNav !== 'my-drive' ? (
+            ) : (activeNav !== 'my-drive' && activeNav !== 'computers') ? (
               <div className="flex items-center gap-2">
                 <span className="font-semibold text-slate-800 text-xl">
                   {navigation.find(n => n.id === activeNav)?.label || activeNav}
@@ -2326,12 +2484,14 @@ export default function AsterDriveApp() {
         ref={folderInputRef} 
         onChange={handleFileUpload} 
         className="hidden" 
-        suppressHydrationWarning
+        multiple
+        {...({ webkitdirectory: '', directory: '' } as unknown as React.InputHTMLAttributes<HTMLInputElement>)}
+        suppressHydrationWarning 
       />
       <input 
         type="file" 
         ref={computerFileInputRef} 
-        onChange={(e) => handleComputerUpload(e, 'My PC')} 
+        onChange={(e) => handleComputerUpload(e, 'This PC')} 
         className="hidden" 
         multiple 
         suppressHydrationWarning
@@ -2339,9 +2499,11 @@ export default function AsterDriveApp() {
       <input 
         type="file" 
         ref={computerFolderInputRef} 
-        onChange={(e) => handleComputerUpload(e, 'My PC')} 
+        onChange={(e) => handleComputerUpload(e, 'This PC')} 
         className="hidden" 
-        suppressHydrationWarning
+        multiple
+        {...({ webkitdirectory: '', directory: '' } as unknown as React.InputHTMLAttributes<HTMLInputElement>)}
+        suppressHydrationWarning 
       />
 
       {/* DELETE CONFIRMATION MODAL */}
@@ -3701,6 +3863,24 @@ export default function AsterDriveApp() {
                 <div 
                   onClick={() => {
                     setIsSyncModalOpen(false);
+                    setNewSyncFolderName('');
+                    setIsNewSyncFolderModalOpen(true);
+                  }}
+                  className="p-4 rounded-xl border border-slate-200 hover:border-emerald-500 bg-slate-50/50 hover:bg-emerald-50/30 transition-all cursor-pointer flex items-center justify-between group"
+                >
+                  <div className="flex items-center gap-3">
+                    <FolderPlus className="w-6 h-6 text-emerald-600 shrink-0" />
+                    <div>
+                      <h4 className="font-semibold text-slate-900 text-sm group-hover:text-emerald-700 transition-colors">Create New Sync Folder</h4>
+                      <p className="text-xs text-slate-500">Name a new folder and sync files from this PC inside it</p>
+                    </div>
+                  </div>
+                  <span className="text-xs font-semibold text-emerald-600 shrink-0 ml-2">New Folder →</span>
+                </div>
+
+                <div 
+                  onClick={() => {
+                    setIsSyncModalOpen(false);
                     computerFileInputRef.current?.click();
                   }}
                   className="p-4 rounded-xl border border-slate-200 hover:border-indigo-500 bg-slate-50/50 hover:bg-indigo-50/30 transition-all cursor-pointer flex items-center justify-between group"
@@ -3730,6 +3910,232 @@ export default function AsterDriveApp() {
                   className="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
                 >
                   Close
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* NEW SYNC FOLDER MODAL */}
+      <AnimatePresence>
+        {isNewSyncFolderModalOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[110] bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4"
+            onClick={() => setIsNewSyncFolderModalOpen(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0, y: 10 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.95, opacity: 0, y: 10 }}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-white rounded-3xl shadow-2xl max-w-sm w-full p-6 border border-slate-100 overflow-hidden"
+            >
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
+                  <FolderPlus className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900">New Sync Folder</h3>
+                  <p className="text-xs text-slate-500">Create a folder for PC backup</p>
+                </div>
+              </div>
+
+              <div className="mb-5">
+                <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-2">
+                  Folder Name
+                </label>
+                <input
+                  type="text"
+                  value={newSyncFolderName}
+                  onChange={(e) => setNewSyncFolderName(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleCreateNewSyncFolder();
+                    if (e.key === 'Escape') setIsNewSyncFolderModalOpen(false);
+                  }}
+                  autoFocus
+                  className="w-full px-3.5 py-2.5 bg-slate-50 focus:bg-white border border-slate-300 focus:border-indigo-600 rounded-xl text-sm font-medium outline-none transition-all shadow-inner"
+                  placeholder="e.g. Work Documents, Photos"
+                  suppressHydrationWarning
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => setIsNewSyncFolderModalOpen(false)}
+                  className="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCreateNewSyncFolder}
+                  className="px-5 py-2 text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl transition-colors shadow-sm cursor-pointer"
+                >
+                  Create Folder
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* PUBLIC SHARE LINK MODAL */}
+      <AnimatePresence>
+        {shareModalItem && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[120] bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4"
+            onClick={() => setShareModalItem(null)}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0, y: 15 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.95, opacity: 0, y: 15 }}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-white rounded-3xl shadow-2xl max-w-md w-full p-6 border border-slate-100 overflow-hidden"
+            >
+              <div className="flex items-start justify-between mb-5">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold shadow-xs">
+                    <Share2 className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold text-slate-900">Share Public Link</h3>
+                    <p className="text-xs text-slate-500">Anyone with this link can view &amp; download</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShareModalItem(null)}
+                  className="p-1.5 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
+                  aria-label="Close share dialog"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Shared Item Card */}
+              <div className="p-3.5 bg-slate-50 border border-slate-200/80 rounded-2xl flex items-center gap-3 mb-5">
+                <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center shrink-0 border border-slate-200 shadow-2xs">
+                  {getIconForType(shareModalItem.type, "w-6 h-6")}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <h4 className="text-sm font-semibold text-slate-900 truncate" title={shareModalItem.name}>
+                    {shareModalItem.name}
+                  </h4>
+                  <p className="text-[11px] text-slate-500 font-mono">
+                    {formatBytes(shareModalItem.size)} • {formatDateSafe(shareModalItem.updatedAt)}
+                  </p>
+                </div>
+              </div>
+
+              {/* Public Link Box */}
+              <div className="mb-5">
+                <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-2">
+                  Public Share Link (Cloud Run)
+                </label>
+                <div className="flex items-center gap-2">
+                  <div className="flex-1 bg-slate-100 border border-slate-200 rounded-xl px-3 py-2 text-xs font-mono text-slate-700 truncate select-all">
+                    {getPublicShareUrl(shareModalItem)}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const url = getPublicShareUrl(shareModalItem);
+                      if (navigator.clipboard) {
+                        navigator.clipboard.writeText(url);
+                      }
+                      setCopiedShareLink(true);
+                      showToast({
+                        type: 'success',
+                        title: 'Public Link Copied!',
+                        message: 'Cloud Run public link copied to clipboard.'
+                      });
+                      setTimeout(() => setCopiedShareLink(false), 3000);
+                    }}
+                    className={cn(
+                      "px-4 py-2 rounded-xl text-xs font-semibold transition-all shrink-0 cursor-pointer flex items-center gap-1.5 shadow-xs",
+                      copiedShareLink 
+                        ? "bg-emerald-600 text-white" 
+                        : "bg-blue-600 hover:bg-blue-700 text-white"
+                    )}
+                  >
+                    {copiedShareLink ? (
+                      <>
+                        <Check className="w-3.5 h-3.5" />
+                        <span>Copied!</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-3.5 h-3.5" />
+                        <span>Copy Link</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              {/* Quick Share Apps */}
+              <div className="mb-6 pt-4 border-t border-slate-100">
+                <span className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-2.5">
+                  Share Directly
+                </span>
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const url = getPublicShareUrl(shareModalItem);
+                      const text = encodeURIComponent(`Lihat dan unduh file "${shareModalItem.name}" di AsterDrive:\n${url}`);
+                      window.open(`https://api.whatsapp.com/send?text=${text}`, '_blank');
+                    }}
+                    className="p-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200/80 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                  >
+                    <span>WhatsApp</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const url = getPublicShareUrl(shareModalItem);
+                      const text = encodeURIComponent(`AsterDrive Shared File: ${shareModalItem.name}`);
+                      window.open(`https://t.me/share/url?url=${encodeURIComponent(url)}&text=${text}`, '_blank');
+                    }}
+                    className="p-2 bg-sky-50 hover:bg-sky-100 text-sky-800 border border-sky-200/80 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                  >
+                    <span>Telegram</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const url = getPublicShareUrl(shareModalItem);
+                      const subject = encodeURIComponent(`Shared File: ${shareModalItem.name}`);
+                      const body = encodeURIComponent(`Hello,\n\nI shared "${shareModalItem.name}" with you via AsterDrive.\n\nYou can access and download it here:\n${url}\n\nAsterDrive Cloud Storage`);
+                      window.location.href = `mailto:?subject=${subject}&body=${body}`;
+                    }}
+                    className="p-2 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                  >
+                    <span>Email</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Footer status */}
+              <div className="flex items-center justify-between text-xs text-slate-500">
+                <span className="inline-flex items-center gap-1 text-emerald-700 font-medium">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                  Public Cloud Access Active
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setShareModalItem(null)}
+                  className="font-semibold text-slate-700 hover:text-slate-900 cursor-pointer"
+                >
+                  Done
                 </button>
               </div>
             </motion.div>
