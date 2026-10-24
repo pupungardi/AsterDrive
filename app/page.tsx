@@ -59,7 +59,11 @@ import {
   Maximize2,
   Copy,
   FolderPlus,
-  RefreshCw
+  RefreshCw,
+  Home,
+  Activity as ActivityIcon,
+  MessageSquare,
+  Database
 } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -163,11 +167,36 @@ type ProfileDetailView = 'personal' | 'security' | 'settings' | 'offline' | 'not
 
 // --- MAIN APPLICATION COMPONENT ---
 
+interface ActivityItem {
+  id: string;
+  type: 'upload' | 'sync' | 'share' | 'trash' | 'restore' | 'star' | 'folder';
+  title: string;
+  description: string;
+  timestamp: string;
+}
+
 const STORAGE_KEY = 'asterdrive_real_items_v2';
+const ACTIVITIES_STORAGE_KEY = 'asterdrive_real_activities_v1';
 const PUBLIC_APP_URL = 'https://ais-pre-owradbeu2qux37froeiwcs-7606689415.asia-southeast1.run.app';
 
 export default function AsterDriveApp() {
   const [driveItems, setDriveItems] = useState<DriveItem[]>(initialData);
+  const [activities, setActivities] = useState<ActivityItem[]>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem(ACTIVITIES_STORAGE_KEY);
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed)) {
+            return parsed;
+          }
+        }
+      } catch (e) {
+        console.warn('Failed to load activities', e);
+      }
+    }
+    return [];
+  });
   const [currentFolderId, setCurrentFolderId] = useState<string>('root');
   const [searchQuery, setSearchQuery] = useState('');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
@@ -177,6 +206,27 @@ export default function AsterDriveApp() {
   const [activeNav, setActiveNav] = useState('my-drive');
   const [showUploadMenu, setShowUploadMenu] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+
+  // Helper to record real activities
+  const logActivity = (type: ActivityItem['type'], title: string, description: string) => {
+    const newAct: ActivityItem = {
+      id: Math.random().toString(36).substring(2, 9),
+      type,
+      title,
+      description,
+      timestamp: new Date().toISOString()
+    };
+    setActivities(prev => [newAct, ...prev.slice(0, 49)]);
+  };
+
+  // Save activities to localStorage
+  React.useEffect(() => {
+    try {
+      localStorage.setItem(ACTIVITIES_STORAGE_KEY, JSON.stringify(activities));
+    } catch (e) {
+      console.warn('Failed to save activities', e);
+    }
+  }, [activities]);
   
   // Storage plan state: defaults to Free Plan (1 GB)
   const [currentPlan, setCurrentPlan] = useState<StoragePlan>(STORAGE_PLANS[0]);
@@ -1278,13 +1328,8 @@ export default function AsterDriveApp() {
 
   const handleNavSelect = (itemId: string) => {
     if (itemId === 'cloud-storage') {
-      setIsUpgradeModalOpen(true);
+      setActiveNav('storage');
       setIsMobileMenuOpen(false);
-      showToast({
-        type: 'info',
-        title: 'Cloud Storage & Quota',
-        message: `Currently using ${formatBytes(totalUsedBytes)} of ${currentPlan.storage} (${Math.round(storagePercentage)}%)`
-      });
       return;
     }
     if (itemId === 'backup') {
@@ -1306,13 +1351,30 @@ export default function AsterDriveApp() {
     setIsMobileMenuOpen(false);
   };
 
-  const navigation = [
-    { id: 'my-drive', label: 'My Drive', icon: HardDrive },
+  const primaryNavigation = [
+    { id: 'my-drive', label: 'My Drive', icon: Home },
     { id: 'computers', label: 'Computers', icon: Computer },
     { id: 'shared', label: 'Shared with me', icon: Users },
     { id: 'recent', label: 'Recent', icon: Clock },
     { id: 'starred', label: 'Starred', icon: Star },
+  ];
+
+  const workspaceNavigation = [
+    { id: 'storage', label: 'Storage', icon: Database },
+    { id: 'activity', label: 'Activity', icon: ActivityIcon },
+    { id: 'people', label: 'People', icon: Users },
     { id: 'trash', label: 'Trash', icon: Trash2 },
+    { id: 'security', label: 'Security', icon: Shield },
+    { id: 'feedback', label: 'Feedback', icon: MessageSquare },
+  ];
+
+  const navigation = [...primaryNavigation, ...workspaceNavigation];
+
+  const footerLinks = [
+    { label: 'About us', action: () => { setIsProfileMenuOpen(true); setActiveProfileDetail('about'); } },
+    { label: 'Help center', action: () => { setIsProfileMenuOpen(true); setActiveProfileDetail('contact'); } },
+    { label: 'Privacy', action: () => { setIsProfileMenuOpen(true); setActiveProfileDetail('privacy'); } },
+    { label: 'Terms', action: () => { setIsProfileMenuOpen(true); setActiveProfileDetail('terms'); } },
   ];
 
   const selectedItemDetails = selectedItems.size === 1 
@@ -1321,7 +1383,7 @@ export default function AsterDriveApp() {
 
   return (
     <div 
-      className="flex h-screen bg-slate-50 font-sans text-slate-800 overflow-hidden select-none relative" 
+      className="flex h-screen bg-[#0c0e14] font-sans text-slate-100 overflow-hidden select-none relative" 
       suppressHydrationWarning
       onDragEnter={handleWindowDragEnter}
       onDragOver={handleWindowDragOver}
@@ -1336,29 +1398,29 @@ export default function AsterDriveApp() {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.15 }}
-            className="fixed inset-0 z-[100] bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-6 sm:p-10 pointer-events-none"
+            className="fixed inset-0 z-[100] bg-black/75 backdrop-blur-md flex items-center justify-center p-6 sm:p-10 pointer-events-none"
           >
             <motion.div
               initial={{ scale: 0.9, y: 15 }}
               animate={{ scale: 1, y: 0 }}
               exit={{ scale: 0.9, y: 15 }}
               transition={{ type: "spring", stiffness: 350, damping: 25 }}
-              className="max-w-lg w-full bg-white/95 backdrop-blur-xl border-2 border-dashed border-blue-500 rounded-3xl p-8 sm:p-10 text-center shadow-2xl flex flex-col items-center"
+              className="max-w-lg w-full bg-[#141824]/95 backdrop-blur-xl border-2 border-dashed border-orange-500 rounded-3xl p-8 sm:p-10 text-center shadow-2xl flex flex-col items-center"
             >
-              <div className="w-20 h-20 rounded-2xl bg-blue-100 text-blue-600 flex items-center justify-center mb-5 shadow-inner animate-bounce">
+              <div className="w-20 h-20 rounded-2xl bg-orange-500/10 text-orange-400 border border-orange-500/20 flex items-center justify-center mb-5 shadow-inner animate-bounce">
                 <UploadCloud className="w-10 h-10" />
               </div>
-              <h2 className="text-xl sm:text-2xl font-bold text-slate-900 mb-2">
+              <h2 className="text-xl sm:text-2xl font-bold text-white mb-2">
                 Drop files or folders here
               </h2>
-              <p className="text-slate-600 text-sm mb-4 max-w-sm">
+              <p className="text-slate-400 text-sm mb-4 max-w-sm">
                 Release anywhere to upload into{' '}
-                <span className="font-semibold text-blue-600">
+                <span className="font-semibold text-orange-400">
                   {currentFolderId === 'root' ? (activeNav === 'computers' ? 'Synced Computers' : 'My Drive') : (driveItems.find(i => i.id === currentFolderId)?.name || 'Current Folder')}
                 </span>
               </p>
-              <div className="flex items-center gap-2 text-xs font-medium text-slate-600 bg-slate-100/90 px-3.5 py-2 rounded-full border border-slate-200/60">
-                <Folder className="w-4 h-4 text-blue-500" />
+              <div className="flex items-center gap-2 text-xs font-medium text-slate-400 bg-[#0f121a] px-3.5 py-2 rounded-full border border-[#252d3f]">
+                <Folder className="w-4 h-4 text-orange-500" />
                 <span>Entire nested folder structures are preserved automatically</span>
               </div>
             </motion.div>
@@ -1373,7 +1435,7 @@ export default function AsterDriveApp() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-40 bg-slate-900/50 backdrop-blur-xs lg:hidden cursor-pointer"
+            className="fixed inset-0 z-40 bg-black/70 backdrop-blur-xs lg:hidden cursor-pointer"
             onClick={() => setIsMobileMenuOpen(false)}
           />
         )}
@@ -1382,24 +1444,26 @@ export default function AsterDriveApp() {
       {/* SIDEBAR */}
       <aside
         className={cn(
-          "w-64 bg-slate-50 border-r border-slate-200 flex flex-col transition-transform duration-200 ease-in-out shrink-0 select-none",
+          "w-64 bg-[#0c0e14] border-r border-[#1e2433] flex flex-col transition-transform duration-200 ease-in-out shrink-0 select-none",
           "fixed inset-y-0 left-0 z-50 lg:static lg:inset-auto lg:z-0 lg:translate-x-0",
           isMobileMenuOpen ? "translate-x-0 shadow-2xl" : "-translate-x-full lg:translate-x-0"
         )}
       >
-        <div className="h-16 flex items-center justify-between px-6 border-b border-transparent shrink-0">
+        <div className="h-16 flex items-center justify-between px-5 border-b border-[#181d2a] shrink-0">
           <button
             type="button"
             onClick={() => handleNavSelect('my-drive')}
-            className="flex items-center gap-2 text-blue-600 font-display font-semibold text-xl tracking-tight cursor-pointer hover:opacity-90 transition-opacity"
+            className="flex items-center gap-2.5 text-white font-display font-bold text-xl tracking-tight cursor-pointer hover:opacity-90 transition-opacity"
             title="AsterDrive - Home"
           >
-            <Cloud className="w-7 h-7 fill-blue-100 stroke-blue-600" />
-            AsterDrive
+            <div className="w-8 h-8 rounded-xl bg-orange-500/10 border border-orange-500/20 text-orange-500 flex items-center justify-center">
+              <Cloud className="w-5 h-5 fill-orange-500/20 stroke-orange-500" />
+            </div>
+            <span>AsterDrive</span>
           </button>
           <button 
             type="button"
-            className="lg:hidden text-slate-400 hover:text-slate-600 hover:bg-slate-200 p-2 rounded-xl transition-colors cursor-pointer"
+            className="lg:hidden text-slate-400 hover:text-white hover:bg-[#181d2a] p-2 rounded-xl transition-colors cursor-pointer"
             onClick={() => setIsMobileMenuOpen(false)}
             aria-label="Close menu"
           >
@@ -1407,127 +1471,115 @@ export default function AsterDriveApp() {
           </button>
         </div>
 
-        <nav className="flex-1 px-3 py-4 space-y-1.5 overflow-y-auto pointer-events-auto touch-manipulation">
-          {navigation.map((item) => {
-            const isActive = activeNav === item.id;
-            const Icon = item.icon;
-            return (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => handleNavSelect(item.id)}
-                className={cn(
-                  "w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all duration-150 text-left select-none cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-blue-500",
-                  "active:scale-[0.98] active:bg-slate-200/80",
-                  isActive
-                    ? "bg-blue-100/70 text-blue-700 font-semibold shadow-xs border border-blue-200/50"
-                    : "text-slate-600 hover:bg-slate-100/90 hover:text-slate-900"
-                )}
-                aria-current={isActive ? 'page' : undefined}
-              >
-                <Icon className={cn("w-5 h-5 shrink-0 transition-colors", isActive ? "text-blue-600" : "text-slate-500")} />
-                <span className="truncate flex-1">{item.label}</span>
-                {item.id === 'trash' && driveItems.some(i => i.trashed) && (
-                  <span className="w-2 h-2 rounded-full bg-rose-500 shrink-0" title="Trash contains files" />
-                )}
-              </button>
-            );
-          })}
+        <nav className="flex-1 px-3 py-3 space-y-1 overflow-y-auto pointer-events-auto touch-manipulation">
+          {/* PRIMARY NAV ITEMS */}
+          <div className="space-y-1">
+            {primaryNavigation.map((item) => {
+              const isActive = activeNav === item.id;
+              const Icon = item.icon;
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => handleNavSelect(item.id)}
+                  className={cn(
+                    "w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all duration-150 text-left select-none cursor-pointer outline-none",
+                    isActive
+                      ? "bg-[#251710] text-orange-400 font-semibold border border-orange-500/40 shadow-xs"
+                      : "text-slate-400 hover:bg-[#141824] hover:text-white"
+                  )}
+                  aria-current={isActive ? 'page' : undefined}
+                >
+                  <Icon className={cn("w-4 h-4 shrink-0 transition-colors", isActive ? "text-orange-500" : "text-slate-400")} />
+                  <span className="truncate flex-1">{item.label}</span>
+                </button>
+              );
+            })}
+          </div>
 
-          {/* CLOUD SERVICES & BACKUP MENU ITEMS */}
-          <div className="pt-3 mt-3 border-t border-slate-200/60">
-            <p className="px-3.5 pb-2 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
-              Cloud & Sync
+          {/* WORKSPACE SECTION (Screenshot 1) */}
+          <div className="pt-4 mt-2">
+            <p className="px-3.5 pb-2 text-[11px] font-bold uppercase tracking-widest text-slate-500">
+              Workspace
             </p>
             <div className="space-y-1">
-              <button
-                type="button"
-                onClick={() => handleNavSelect('cloud-storage')}
-                className="w-full flex items-center justify-between gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium text-slate-700 hover:bg-blue-50/80 hover:text-blue-700 transition-all text-left select-none cursor-pointer group active:scale-[0.98] outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
-                title="Manage Cloud Storage Quota & Plans"
-              >
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="w-6 h-6 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 group-hover:bg-blue-100 transition-colors">
-                    <Cloud className="w-4 h-4" />
-                  </div>
-                  <span className="truncate font-medium">Cloud Storage</span>
-                </div>
-                <span className={cn(
-                  "text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 border",
-                  currentPlan.isFree 
-                    ? "bg-emerald-50 text-emerald-700 border-emerald-200/70" 
-                    : "bg-blue-50 text-blue-700 border-blue-200/70"
-                )}>
-                  {Math.round(storagePercentage)}%
-                </span>
-              </button>
+              {workspaceNavigation.map((item) => {
+                const isActive = activeNav === item.id;
+                const Icon = item.icon;
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => handleNavSelect(item.id)}
+                    className={cn(
+                      "w-full flex items-center gap-3 px-3.5 py-2 rounded-xl text-sm font-medium transition-all duration-150 text-left select-none cursor-pointer outline-none",
+                      isActive
+                        ? "bg-[#251710] text-orange-400 font-semibold border border-orange-500/40 shadow-xs"
+                        : "text-slate-400 hover:bg-[#141824] hover:text-white"
+                    )}
+                    aria-current={isActive ? 'page' : undefined}
+                  >
+                    <Icon className={cn("w-4 h-4 shrink-0 transition-colors", isActive ? "text-orange-500" : "text-slate-400")} />
+                    <span className="truncate flex-1">{item.label}</span>
+                    {item.id === 'trash' && driveItems.some(i => i.trashed) && (
+                      <span className="w-2 h-2 rounded-full bg-rose-500 shrink-0" title="Trash contains files" />
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
 
-              <button
-                type="button"
-                onClick={() => handleNavSelect('backup')}
-                className="w-full flex items-center justify-between gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium text-slate-700 hover:bg-indigo-50/80 hover:text-indigo-700 transition-all text-left select-none cursor-pointer group active:scale-[0.98] outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
-                title="Backup and sync local PC / Mac folders"
-              >
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="w-6 h-6 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0 group-hover:bg-indigo-100 transition-colors">
-                    <UploadCloud className="w-4 h-4" />
-                  </div>
-                  <span className="truncate font-medium">Backup & Sync</span>
-                </div>
-                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200/70 shrink-0">
-                  Sync PC
-                </span>
-              </button>
+          {/* FOOTER LINKS (Screenshot 1) */}
+          <div className="pt-4 mt-2 border-t border-[#1a202d] px-3.5">
+            <div className="flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-slate-500">
+              {footerLinks.map((link, idx) => (
+                <button
+                  key={idx}
+                  type="button"
+                  onClick={link.action}
+                  className="hover:text-slate-300 transition-colors cursor-pointer"
+                >
+                  {link.label}
+                </button>
+              ))}
             </div>
           </div>
         </nav>
 
-        {/* CLOUD STORAGE WIDGET IN SIDEBAR / SLIDER */}
-        <div className="p-3.5 m-3 rounded-2xl bg-white border border-slate-200/80 shadow-xs shrink-0 select-none">
+        {/* BOTTOM STORAGE WIDGET */}
+        <div className="p-3 m-3 rounded-2xl bg-[#141824] border border-[#252d3f] shrink-0 select-none">
           <div 
-            onClick={() => {
-              setIsUpgradeModalOpen(true);
-              setIsMobileMenuOpen(false);
-            }}
+            onClick={() => handleNavSelect('storage')}
             className="cursor-pointer group"
           >
             <div className="flex items-center justify-between gap-2 mb-2">
               <div className="flex items-center gap-2 min-w-0">
-                <div className="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 group-hover:bg-blue-100 transition-colors">
-                  <Cloud className="w-4 h-4" />
+                <div className="w-6 h-6 rounded-lg bg-orange-500/10 text-orange-400 flex items-center justify-center shrink-0">
+                  <Database className="w-3.5 h-3.5" />
                 </div>
-                <div className="min-w-0">
-                  <span className="text-xs font-semibold text-slate-800 block truncate group-hover:text-blue-600 transition-colors">
-                    Cloud Storage
-                  </span>
-                </div>
+                <span className="text-xs font-semibold text-white block truncate group-hover:text-orange-400 transition-colors">
+                  Storage
+                </span>
               </div>
-              <span className={cn(
-                "text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 border",
-                currentPlan.isFree 
-                  ? "bg-emerald-50 text-emerald-700 border-emerald-200/80" 
-                  : "bg-blue-50 text-blue-700 border-blue-200/80"
-              )}>
-                {currentPlan.isFree ? "FREE" : "PRO"}
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-orange-500/10 text-orange-400 border border-orange-500/20">
+                {currentPlan.isFree ? "1 GB FREE" : currentPlan.storage}
               </span>
             </div>
 
             {/* Storage Progress Bar */}
-            <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden mb-2">
+            <div className="w-full bg-[#1e2433] h-2 rounded-full overflow-hidden mb-2">
               <div 
-                className={cn(
-                  "h-full rounded-full transition-all duration-300",
-                  storagePercentage > 90 ? "bg-rose-500" : storagePercentage > 75 ? "bg-amber-500" : "bg-blue-600"
-                )}
+                className="h-full bg-orange-500 rounded-full transition-all duration-300"
                 style={{ width: `${Math.min(100, Math.max(storagePercentage, 2))}%` }} 
               />
             </div>
 
-            <div className="flex items-center justify-between text-[11px] text-slate-500">
+            <div className="flex items-center justify-between text-[11px] text-slate-400">
               <span className="font-mono tabular-nums">
                 {formatBytes(totalUsedBytes)} of {currentPlan.storage}
               </span>
-              <span className="font-medium font-mono">
+              <span className="font-medium font-mono text-orange-400">
                 {Math.round(storagePercentage)}%
               </span>
             </div>
@@ -1535,45 +1587,42 @@ export default function AsterDriveApp() {
 
           <button
             type="button"
-            onClick={() => {
-              setIsUpgradeModalOpen(true);
-              setIsMobileMenuOpen(false);
-            }}
-            className="mt-3 w-full py-1.5 px-3 rounded-xl border border-slate-200 hover:border-blue-300 bg-slate-50 hover:bg-blue-50 text-slate-700 hover:text-blue-700 text-xs font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs active:scale-[0.98]"
+            onClick={() => setIsUpgradeModalOpen(true)}
+            className="mt-2.5 w-full py-1.5 px-3 rounded-xl bg-orange-600 hover:bg-orange-500 text-white text-xs font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-md shadow-orange-600/20"
           >
-            <Sparkles className="w-3.5 h-3.5 text-blue-600" />
-            {currentPlan.isFree ? 'Get More Storage' : 'Manage Subscription'}
+            <Sparkles className="w-3.5 h-3.5" />
+            Buy storage
           </button>
         </div>
       </aside>
 
       {/* MAIN CONTENT */}
-      <div className="flex-1 flex flex-col min-w-0 bg-white rounded-tl-2xl border-t border-l border-slate-200 shadow-sm overflow-hidden lg:my-2 lg:mr-2">
+      <div className="flex-1 flex flex-col min-w-0 bg-[#0f1219] rounded-tl-2xl border-t border-l border-[#1e2433] shadow-2xl overflow-hidden lg:my-2 lg:mr-2">
         {/* HEADER */}
-        <header className="h-16 flex items-center justify-between px-4 lg:px-6 border-b border-slate-100 gap-4 shrink-0" suppressHydrationWarning>
+        <header className="h-16 flex items-center justify-between px-4 lg:px-6 border-b border-[#1e2433] gap-4 shrink-0 bg-[#0f1219]" suppressHydrationWarning>
           <div className="flex items-center gap-3 flex-1 max-w-2xl" suppressHydrationWarning>
             <button 
               type="button"
-              className="lg:hidden text-slate-500 hover:bg-slate-100 p-2 rounded-xl transition-colors -ml-2 shrink-0 cursor-pointer"
+              className="lg:hidden text-slate-400 hover:bg-[#181d2a] hover:text-white p-2 rounded-xl transition-colors -ml-2 shrink-0 cursor-pointer"
               onClick={() => setIsMobileMenuOpen(true)}
               aria-label="Open sidebar"
             >
               <Menu className="w-5 h-5" />
             </button>
             <div className="relative w-full" suppressHydrationWarning>
-              <Search className="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <Search className="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
               <input
                 type="text"
                 placeholder="Search in Drive"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 bg-slate-100/80 hover:bg-slate-100 focus:bg-white border border-transparent focus:border-slate-300 rounded-xl text-sm outline-none transition-all"
+                className="w-full pl-10 pr-4 py-2 bg-[#141824] hover:bg-[#181d2a] focus:bg-[#161b26] border border-[#252d3f] focus:border-orange-500/80 rounded-xl text-sm text-white placeholder:text-slate-500 outline-none transition-all"
                 suppressHydrationWarning
               />
               {searchQuery && (
                 <button 
                   onClick={() => setSearchQuery('')}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
                 >
                   <X className="w-4 h-4" />
                 </button>
@@ -1582,6 +1631,16 @@ export default function AsterDriveApp() {
           </div>
           
           <div className="flex items-center gap-1 sm:gap-2 shrink-0">
+            {/* Quick Upload Action Button */}
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="px-3.5 py-1.5 rounded-xl bg-orange-600 hover:bg-orange-500 text-white font-medium text-xs flex items-center gap-1.5 shadow-md shadow-orange-600/20 transition-all cursor-pointer"
+              title="Upload file directly"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Upload</span>
+            </button>
+
             <button 
               onClick={() => {
                 showToast({
@@ -1591,7 +1650,7 @@ export default function AsterDriveApp() {
                 });
                 setIsProfileMenuOpen(true);
               }}
-              className="p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600 rounded-full transition-colors hidden sm:block"
+              className="p-2 text-slate-400 hover:bg-[#181d2a] hover:text-white rounded-full transition-colors hidden sm:block"
               title="Settings"
             >
               <Settings className="w-5 h-5" />
@@ -1604,7 +1663,7 @@ export default function AsterDriveApp() {
                   message: 'You have no unread notifications.'
                 });
               }}
-              className="p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600 rounded-full transition-colors hidden sm:block"
+              className="p-2 text-slate-400 hover:bg-[#181d2a] hover:text-white rounded-full transition-colors hidden sm:block"
               title="Notifications"
             >
               <Bell className="w-5 h-5" />
@@ -1618,8 +1677,8 @@ export default function AsterDriveApp() {
                   setIsHeaderMenuOpen(!isHeaderMenuOpen);
                 }}
                 className={cn(
-                  "p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-700 rounded-full transition-colors",
-                  isHeaderMenuOpen && "bg-slate-100 text-slate-900"
+                  "p-2 text-slate-400 hover:bg-[#181d2a] hover:text-white rounded-full transition-colors",
+                  isHeaderMenuOpen && "bg-[#181d2a] text-white"
                 )}
                 title="More options"
                 aria-label="More options"
@@ -1638,33 +1697,30 @@ export default function AsterDriveApp() {
                       initial={{ opacity: 0, scale: 0.95, y: -4 }}
                       animate={{ opacity: 1, scale: 1, y: 0 }}
                       exit={{ opacity: 0, scale: 0.95, y: -4 }}
-                      className="absolute right-0 top-full mt-2 w-64 bg-white rounded-2xl shadow-xl border border-slate-200 py-2 z-40 overflow-hidden divide-y divide-slate-100"
+                      className="absolute right-0 top-full mt-2 w-64 bg-[#141824] rounded-2xl shadow-2xl border border-[#252d3f] py-2 z-40 overflow-hidden divide-y divide-[#1e2433] text-white"
                       onClick={(e) => e.stopPropagation()}
                     >
                       {/* Storage Overview */}
                       <div 
                         onClick={() => {
-                          setIsUpgradeModalOpen(true);
+                          handleNavSelect('storage');
                           setIsHeaderMenuOpen(false);
                         }}
-                        className="px-4 py-2.5 hover:bg-slate-50 cursor-pointer transition-colors"
+                        className="px-4 py-2.5 hover:bg-[#1b2131] cursor-pointer transition-colors"
                       >
                         <div className="flex items-center justify-between text-xs mb-1">
-                          <span className="font-semibold text-slate-800">Cloud Storage</span>
-                          <span className={cn(
-                            "font-bold text-[10px] px-1.5 py-0.5 rounded-full",
-                            currentPlan.isFree ? "bg-emerald-100 text-emerald-800" : "bg-blue-100 text-blue-800"
-                          )}>
+                          <span className="font-semibold text-white">Cloud Storage</span>
+                          <span className="font-bold text-[10px] px-1.5 py-0.5 rounded-full bg-orange-500/10 text-orange-400 border border-orange-500/20">
                             {currentPlan.name}
                           </span>
                         </div>
-                        <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden mb-1">
+                        <div className="w-full bg-[#1e2433] h-1.5 rounded-full overflow-hidden mb-1">
                           <div 
-                            className="h-full bg-blue-600 rounded-full transition-all" 
+                            className="h-full bg-orange-500 rounded-full transition-all" 
                             style={{ width: `${storagePercentage}%` }} 
                           />
                         </div>
-                        <p className="text-[11px] text-slate-500">
+                        <p className="text-[11px] text-slate-400">
                           {formatBytes(totalUsedBytes)} of {currentPlan.storage} used
                         </p>
                       </div>
@@ -1675,9 +1731,9 @@ export default function AsterDriveApp() {
                             fileInputRef.current?.click();
                             setIsHeaderMenuOpen(false);
                           }}
-                          className="w-full flex items-center gap-2.5 px-4 py-2 text-slate-700 hover:bg-slate-100 text-xs sm:text-sm text-left transition-colors"
+                          className="w-full flex items-center gap-2.5 px-4 py-2 text-slate-300 hover:bg-[#1b2131] hover:text-white text-xs sm:text-sm text-left transition-colors"
                         >
-                          <File className="w-4 h-4 text-blue-600" />
+                          <File className="w-4 h-4 text-orange-500" />
                           Upload Files
                         </button>
                         <button
@@ -1685,7 +1741,7 @@ export default function AsterDriveApp() {
                             folderInputRef.current?.click();
                             setIsHeaderMenuOpen(false);
                           }}
-                          className="w-full flex items-center gap-2.5 px-4 py-2 text-slate-700 hover:bg-slate-100 text-xs sm:text-sm text-left transition-colors"
+                          className="w-full flex items-center gap-2.5 px-4 py-2 text-slate-300 hover:bg-[#1b2131] hover:text-white text-xs sm:text-sm text-left transition-colors"
                         >
                           <Folder className="w-4 h-4 text-amber-500" />
                           Upload Folder
@@ -1695,9 +1751,9 @@ export default function AsterDriveApp() {
                             setShowDetails(!showDetails);
                             setIsHeaderMenuOpen(false);
                           }}
-                          className="w-full flex items-center gap-2.5 px-4 py-2 text-slate-700 hover:bg-slate-100 text-xs sm:text-sm text-left transition-colors"
+                          className="w-full flex items-center gap-2.5 px-4 py-2 text-slate-300 hover:bg-[#1b2131] hover:text-white text-xs sm:text-sm text-left transition-colors"
                         >
-                          <Info className="w-4 h-4 text-slate-500" />
+                          <Info className="w-4 h-4 text-slate-400" />
                           {showDetails ? 'Hide Details Panel' : 'Show Details Panel'}
                         </button>
                         <button
@@ -1705,9 +1761,9 @@ export default function AsterDriveApp() {
                             setViewMode(viewMode === 'grid' ? 'list' : 'grid');
                             setIsHeaderMenuOpen(false);
                           }}
-                          className="w-full flex items-center gap-2.5 px-4 py-2 text-slate-700 hover:bg-slate-100 text-xs sm:text-sm text-left transition-colors"
+                          className="w-full flex items-center gap-2.5 px-4 py-2 text-slate-300 hover:bg-[#1b2131] hover:text-white text-xs sm:text-sm text-left transition-colors"
                         >
-                          {viewMode === 'grid' ? <ListIcon className="w-4 h-4 text-slate-500" /> : <LayoutGrid className="w-4 h-4 text-slate-500" />}
+                          {viewMode === 'grid' ? <ListIcon className="w-4 h-4 text-slate-400" /> : <LayoutGrid className="w-4 h-4 text-slate-400" />}
                           Switch to {viewMode === 'grid' ? 'List View' : 'Grid View'}
                         </button>
                       </div>
@@ -1718,9 +1774,9 @@ export default function AsterDriveApp() {
                             setIsProfileMenuOpen(true);
                             setIsHeaderMenuOpen(false);
                           }}
-                          className="w-full flex items-center gap-2.5 px-4 py-2 text-slate-700 hover:bg-slate-100 text-xs sm:text-sm text-left transition-colors"
+                          className="w-full flex items-center gap-2.5 px-4 py-2 text-slate-300 hover:bg-[#1b2131] hover:text-white text-xs sm:text-sm text-left transition-colors"
                         >
-                          <User className="w-4 h-4 text-blue-600" />
+                          <User className="w-4 h-4 text-orange-500" />
                           Account &amp; Profile Center
                         </button>
                         <button
@@ -1729,9 +1785,9 @@ export default function AsterDriveApp() {
                             setActiveProfileDetail('settings');
                             setIsHeaderMenuOpen(false);
                           }}
-                          className="w-full flex items-center gap-2.5 px-4 py-2 text-slate-700 hover:bg-slate-100 text-xs sm:text-sm text-left transition-colors"
+                          className="w-full flex items-center gap-2.5 px-4 py-2 text-slate-300 hover:bg-[#1b2131] hover:text-white text-xs sm:text-sm text-left transition-colors"
                         >
-                          <Settings className="w-4 h-4 text-slate-500" />
+                          <Settings className="w-4 h-4 text-slate-400" />
                           Settings
                         </button>
                         <button
@@ -1740,9 +1796,9 @@ export default function AsterDriveApp() {
                             setActiveProfileDetail('contact');
                             setIsHeaderMenuOpen(false);
                           }}
-                          className="w-full flex items-center gap-2.5 px-4 py-2 text-slate-700 hover:bg-slate-100 text-xs sm:text-sm text-left transition-colors"
+                          className="w-full flex items-center gap-2.5 px-4 py-2 text-slate-300 hover:bg-[#1b2131] hover:text-white text-xs sm:text-sm text-left transition-colors"
                         >
-                          <HelpCircle className="w-4 h-4 text-slate-500" />
+                          <HelpCircle className="w-4 h-4 text-slate-400" />
                           Help &amp; Contact Support
                         </button>
                       </div>
@@ -1754,7 +1810,7 @@ export default function AsterDriveApp() {
 
             <button 
               onClick={() => setIsProfileMenuOpen(true)}
-              className="w-9 h-9 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-sm ml-1 cursor-pointer hover:bg-blue-200 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 shadow-sm"
+              className="w-9 h-9 rounded-full bg-orange-500/10 border border-orange-500/30 text-orange-400 flex items-center justify-center font-bold text-sm ml-1 cursor-pointer hover:bg-orange-500/20 transition-colors shadow-sm"
               title="Account & Profile"
             >
               JS
@@ -1762,635 +1818,992 @@ export default function AsterDriveApp() {
           </div>
         </header>
 
-        {/* BREADCRUMBS & TOOLBAR */}
-        <div className="flex items-center justify-between px-4 lg:px-6 py-4 shrink-0">
-          <div className="flex items-center text-sm">
-            {searchQuery ? (
-              <span className="font-medium text-slate-800 text-lg">Search results for &ldquo;{searchQuery}&rdquo;</span>
-            ) : (activeNav !== 'my-drive' && activeNav !== 'computers') ? (
-              <div className="flex items-center gap-2">
-                <span className="font-semibold text-slate-800 text-xl">
-                  {navigation.find(n => n.id === activeNav)?.label || activeNav}
-                </span>
-                <span className="text-xs px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-500 font-medium">
-                  {displayedItems.length} {displayedItems.length === 1 ? 'item' : 'items'}
-                </span>
-              </div>
-            ) : (
-              <div className="flex items-center flex-wrap gap-1">
-                {breadcrumbs.map((crumb, idx) => (
-                  <React.Fragment key={crumb.id}>
-                    <button 
-                      onClick={() => {
-                        setCurrentFolderId(crumb.id);
-                        setSelectedItems(new Set());
-                      }}
-                      className={cn(
-                        "hover:bg-slate-100 px-2 py-1 rounded-md transition-colors",
-                        idx === breadcrumbs.length - 1 ? "font-semibold text-slate-800 text-xl" : "font-medium text-slate-500"
-                      )}
-                    >
-                      {crumb.name}
-                    </button>
-                    {idx < breadcrumbs.length - 1 && (
-                      <ChevronRight className="w-4 h-4 text-slate-400" />
-                    )}
-                  </React.Fragment>
-                ))}
-              </div>
-            )}
-          </div>
-          
-          <div className="flex items-center gap-1">
-            <AnimatePresence>
-              {selectedItems.size > 0 && (
-                <motion.div 
-                  initial={{ opacity: 0, width: 0 }}
-                  animate={{ opacity: 1, width: 'auto' }}
-                  exit={{ opacity: 0, width: 0 }}
-                  className="flex items-center gap-1 mr-2 border-r border-slate-200 pr-2 overflow-hidden"
-                >
-                  {activeNav === 'trash' ? (
-                    <>
-                      <button onClick={handleRestore} className="p-2 text-slate-500 hover:text-emerald-600 hover:bg-slate-100 rounded-md transition-colors" title="Restore">
-                        <RotateCcw className="w-5 h-5" />
-                      </button>
-                      <button onClick={() => setIsDeleteDialogOpen(true)} className="p-2 text-slate-500 hover:text-rose-600 hover:bg-slate-100 rounded-md transition-colors" title="Delete forever">
-                        <Trash2 className="w-5 h-5" />
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      <button onClick={handleToggleStar} className="p-2 text-slate-500 hover:text-amber-500 hover:bg-slate-100 rounded-md transition-colors" title="Toggle Star">
-                        <Star className="w-5 h-5" />
-                      </button>
-                      <button onClick={handleToggleSelectedComputerSync} className="p-2 text-slate-500 hover:text-indigo-600 hover:bg-slate-100 rounded-md transition-colors" title="Toggle Computer Sync & Backup">
-                        <Computer className="w-5 h-5" />
-                      </button>
-                      <button onClick={handleMoveToTrash} className="p-2 text-slate-500 hover:text-rose-600 hover:bg-slate-100 rounded-md transition-colors" title="Move to Trash">
-                        <Trash2 className="w-5 h-5" />
-                      </button>
-                    </>
-                  )}
-                </motion.div>
-              )}
-            </AnimatePresence>
-            <button 
-              onClick={() => setShowDetails(!showDetails)}
-              className={cn("p-2 rounded-lg transition-colors hidden lg:block", showDetails ? "bg-blue-50 text-blue-600" : "text-slate-400 hover:bg-slate-100 hover:text-slate-700")}
-              title="View details"
-            >
-              <Info className="w-5 h-5" />
-            </button>
-            <div className="w-px h-6 bg-slate-200 mx-2 hidden sm:block" />
-            <div className="flex items-center bg-slate-100 border border-slate-200 rounded-lg p-0.5">
-              <button 
-                onClick={() => setViewMode('list')}
-                className={cn("p-1.5 rounded-md transition-colors", viewMode === 'list' ? "bg-white text-slate-900 shadow-sm" : "text-slate-400 hover:text-slate-700")}
-                title="List view"
-              >
-                <ListIcon className="w-4 h-4" />
-              </button>
-              <button 
-                onClick={() => setViewMode('grid')}
-                className={cn("p-1.5 rounded-md transition-colors", viewMode === 'grid' ? "bg-white text-slate-900 shadow-sm" : "text-slate-400 hover:text-slate-700")}
-                title="Grid view"
-              >
-                <LayoutGrid className="w-4 h-4" />
-              </button>
+        {/* PAGE CONTENT ROUTER */}
+        {activeNav === 'storage' ? (
+          /* STORAGE PAGE VIEW (Matching Screenshot 2) */
+          <div className="flex-1 overflow-y-auto px-4 lg:px-8 py-6 space-y-6">
+            <div>
+              <span className="text-xs font-semibold uppercase tracking-wider text-orange-500">
+                Storage
+              </span>
+              <h1 className="text-3xl font-bold text-white tracking-tight mt-1">
+                Storage
+              </h1>
+              <p className="text-sm text-slate-400 mt-0.5">
+                Everything you&apos;re working on, in one place.
+              </p>
             </div>
-          </div>
-        </div>
 
-        {/* FILE LIST AREA */}
-        <div className="flex-1 flex overflow-hidden">
-          <div className="flex-1 overflow-y-auto px-4 lg:px-6 pb-6">
-
-            {/* COMPUTERS TOP STATUS BANNER (When synced items exist) */}
-            {activeNav === 'computers' && displayedItems.length > 0 && (
-              <div className="mb-5 p-4 bg-gradient-to-r from-blue-50/90 via-indigo-50/40 to-slate-50 border border-blue-100 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-3 shadow-2xs">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-sm shadow-blue-500/20">
-                    <Computer className="w-5 h-5" />
+            {/* Storage overview card */}
+            <div className="bg-[#141824] border border-[#252d3f] rounded-3xl p-6 sm:p-8 shadow-xl">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-6 border-b border-[#22293a]">
+                <div className="flex items-start gap-4">
+                  <div className="w-14 h-14 rounded-2xl bg-orange-500/10 border border-orange-500/20 text-orange-400 flex items-center justify-center shrink-0 shadow-inner">
+                    <Database className="w-7 h-7" />
                   </div>
                   <div>
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-semibold text-slate-900 text-sm">Computer Sync &amp; Backup</span>
-                      <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-emerald-700 bg-emerald-100/70 px-2 py-0.5 rounded-full">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                        Real-time Backup Active
+                    <span className="text-xs font-medium text-slate-400 uppercase tracking-wider">
+                      Storage overview
+                    </span>
+                    <div className="flex items-baseline gap-2 mt-1">
+                      <span className="text-3xl sm:text-4xl font-extrabold text-white font-mono">
+                        {totalUsedBytes === 0 ? '0 GB' : formatBytes(totalUsedBytes)}
+                      </span>
+                      <span className="text-sm font-medium text-slate-400">
+                        of {currentPlan.storage}
                       </span>
                     </div>
-                    <p className="text-xs text-slate-500 mt-0.5">
-                      {displayedItems.length} synced file(s) • Total backed up {formatBytes(displayedItems.reduce((acc, i) => acc + (i.size || 0), 0))} • Status: Up to date
+                    <p className="text-xs text-slate-400 mt-1">
+                      {totalUsedBytes === 0 ? 'No files stored yet' : `${driveItems.filter(i => !i.trashed).length} active file(s) across AsterDrive`}
                     </p>
                   </div>
                 </div>
-                <div className="flex items-center gap-2 flex-wrap shrink-0">
-                  <button 
-                    type="button"
-                    onClick={handleSyncNow}
-                    disabled={isSyncingNow}
-                    className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold transition-colors shadow-2xs flex items-center gap-1.5 cursor-pointer disabled:opacity-70"
-                    title="Verify local and cloud files match"
-                  >
-                    <RefreshCw className={cn("w-3.5 h-3.5", isSyncingNow && "animate-spin")} />
-                    {isSyncingNow ? 'Verifying...' : 'Sync Now'}
-                  </button>
-                  <button 
-                    type="button"
-                    onClick={() => computerFolderInputRef.current?.click()}
-                    className="px-3 py-1.5 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-lg text-xs font-semibold transition-colors shadow-2xs flex items-center gap-1.5 cursor-pointer"
-                  >
-                    <Folder className="w-3.5 h-3.5 text-amber-500" />
-                    Sync Folder
-                  </button>
-                  <button 
-                    type="button"
-                    onClick={() => computerFileInputRef.current?.click()}
-                    className="px-3 py-1.5 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-lg text-xs font-semibold transition-colors shadow-2xs flex items-center gap-1.5 cursor-pointer"
-                  >
-                    <UploadCloud className="w-3.5 h-3.5 text-blue-600" />
-                    Sync File
-                  </button>
-                  <button 
-                    type="button"
-                    onClick={() => setIsSyncModalOpen(true)}
-                    className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold transition-colors shadow-2xs flex items-center gap-1.5 cursor-pointer"
-                  >
-                    <Monitor className="w-3.5 h-3.5" />
-                    Presets
-                  </button>
+
+                <button
+                  type="button"
+                  onClick={() => setIsUpgradeModalOpen(true)}
+                  className="px-6 py-3 rounded-2xl bg-orange-600 hover:bg-orange-500 text-white font-semibold text-sm shadow-lg shadow-orange-600/25 transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95 shrink-0"
+                >
+                  <Sparkles className="w-4 h-4" />
+                  Buy storage
+                </button>
+              </div>
+
+              {/* Progress Bar */}
+              <div className="py-6">
+                <div className="flex items-center justify-between text-xs font-medium text-slate-400 mb-2">
+                  <span>Capacity Allocation</span>
+                  <span className="font-mono text-orange-400 font-semibold">{Math.round(storagePercentage)}%</span>
+                </div>
+                <div className="w-full bg-[#1e2433] h-3 rounded-full overflow-hidden p-0.5">
+                  <div
+                    className="h-full bg-orange-500 rounded-full transition-all duration-500 shadow-sm shadow-orange-500/50"
+                    style={{ width: `${Math.min(100, Math.max(storagePercentage, 2))}%` }}
+                  />
                 </div>
               </div>
-            )}
 
-            {displayedItems.length === 0 ? (
-              activeNav === 'computers' ? (
-                <div className="flex flex-col items-center justify-center py-10 px-4 max-w-xl mx-auto text-center">
-                  <div className="w-20 h-20 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center mb-5 shadow-sm">
-                    <Computer className="w-10 h-10" />
+              {/* Sub-cards Grid: Used & Free space */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="p-4 rounded-2xl bg-[#0f131d] border border-[#22293a] flex items-center justify-between">
+                  <div>
+                    <span className="text-xs font-medium text-slate-400 block mb-1">Used</span>
+                    <span className="text-xl font-bold text-white font-mono">
+                      {totalUsedBytes === 0 ? '0 GB' : formatBytes(totalUsedBytes)}
+                    </span>
                   </div>
-                  <h3 className="text-xl font-bold text-slate-900 mb-2">
-                    Sync &amp; Backup from your computer
-                  </h3>
-                  <p className="text-slate-600 text-sm leading-relaxed mb-6 max-w-md">
-                    Safely backup videos, photos, and project folders directly from your PC or Mac. Any synced files are accessible anytime, anywhere on AsterDrive.
-                  </p>
-
-                  {/* Quick link existing uploaded drive files to Computers */}
-                  {driveItems.filter(i => !i.trashed && i.source !== 'computer').length > 0 && (
-                    <div className="w-full mb-6 p-4 bg-gradient-to-r from-blue-50 via-indigo-50/50 to-blue-50 border border-blue-200 rounded-2xl text-left flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm">
-                      <div className="flex items-start gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center shrink-0 mt-0.5 shadow-sm shadow-blue-500/20">
-                          <Computer className="w-5 h-5" />
-                        </div>
-                        <div>
-                          <h4 className="text-sm font-bold text-slate-900">
-                            Sync {driveItems.filter(i => !i.trashed && i.source !== 'computer').length} uploaded file(s) to this PC
-                          </h4>
-                          <p className="text-xs text-slate-600 mt-0.5 leading-relaxed">
-                            We detected files in your Drive. Link them to Computer Sync &amp; Backup with one click.
-                          </p>
-                        </div>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={handleSyncAllDriveFilesToComputer}
-                        className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold shrink-0 shadow-sm transition-all cursor-pointer flex items-center justify-center gap-2 hover:shadow-md active:scale-95"
-                      >
-                        <CheckCircle2 className="w-4 h-4 text-blue-200" />
-                        Sync All to this PC
-                      </button>
-                    </div>
-                  )}
-
-                  {/* Real Backup Action Cards */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full mb-6 text-left">
-                    <div 
-                      onClick={() => computerFolderInputRef.current?.click()}
-                      className="p-4 rounded-xl border border-slate-200 hover:border-blue-500 bg-white hover:bg-blue-50/40 shadow-xs transition-all cursor-pointer group"
-                    >
-                      <div className="flex items-center gap-3 mb-2">
-                        <div className="w-9 h-9 rounded-lg bg-blue-100/70 text-blue-700 flex items-center justify-center font-bold">
-                          <Folder className="w-5 h-5 text-blue-600" />
-                        </div>
-                        <div>
-                          <h4 className="font-semibold text-slate-900 text-sm group-hover:text-blue-700 transition-colors">Backup Computer Folder</h4>
-                          <span className="text-[11px] text-slate-500">Select any local directory</span>
-                        </div>
-                      </div>
-                      <p className="text-xs text-slate-500 mb-3">Recreates entire directory structures and backs up all nested files.</p>
-                      <button 
-                        type="button" 
-                        className="text-xs font-semibold text-blue-600 group-hover:text-blue-700 flex items-center gap-1"
-                      >
-                        Select Folder from this PC →
-                      </button>
-                    </div>
-
-                    <div 
-                      onClick={() => computerFileInputRef.current?.click()}
-                      className="p-4 rounded-xl border border-slate-200 hover:border-indigo-500 bg-white hover:bg-indigo-50/40 shadow-xs transition-all cursor-pointer group"
-                    >
-                      <div className="flex items-center gap-3 mb-2">
-                        <div className="w-9 h-9 rounded-lg bg-indigo-100/70 text-indigo-700 flex items-center justify-center font-bold">
-                          <UploadCloud className="w-5 h-5 text-indigo-600" />
-                        </div>
-                        <div>
-                          <h4 className="font-semibold text-slate-900 text-sm group-hover:text-indigo-700 transition-colors">Backup Computer Files</h4>
-                          <span className="text-[11px] text-slate-500">Select individual files</span>
-                        </div>
-                      </div>
-                      <p className="text-xs text-slate-500 mb-3">Upload videos, images, archives, or documents directly from your computer.</p>
-                      <button 
-                        type="button" 
-                        className="text-xs font-semibold text-indigo-600 group-hover:text-indigo-700 flex items-center gap-1"
-                      >
-                        Browse Files from this PC →
-                      </button>
-                    </div>
+                  <div className="w-10 h-10 rounded-xl bg-orange-500/10 text-orange-400 border border-orange-500/20 flex items-center justify-center">
+                    <HardDrive className="w-5 h-5" />
                   </div>
+                </div>
 
-                  {/* Real Folder / File Sync Buttons */}
-                  <div className="flex items-center gap-2.5 flex-wrap justify-center">
-                    <button 
-                      type="button"
-                      onClick={() => computerFolderInputRef.current?.click()}
-                      className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-semibold transition-colors shadow-sm cursor-pointer flex items-center gap-2"
-                    >
-                      <Folder className="w-4 h-4 text-blue-200" />
-                      Sync Folder from this Computer
-                    </button>
-                    <button 
-                      type="button"
-                      onClick={() => computerFileInputRef.current?.click()}
-                      className="px-4 py-2.5 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-xl text-sm font-medium transition-colors cursor-pointer flex items-center gap-2"
-                    >
-                      <UploadCloud className="w-4 h-4 text-slate-500" />
-                      Sync File
-                    </button>
-                    <button 
-                      type="button"
-                      onClick={() => handleNavSelect('my-drive')}
-                      className="px-3.5 py-2.5 text-slate-500 hover:text-slate-800 text-sm font-medium transition-colors cursor-pointer"
-                    >
-                      ← Back to My Drive
-                    </button>
+                <div className="p-4 rounded-2xl bg-[#0f131d] border border-[#22293a] flex items-center justify-between">
+                  <div>
+                    <span className="text-xs font-medium text-slate-400 block mb-1">Free space</span>
+                    <span className="text-xl font-bold text-white font-mono">
+                      {totalUsedBytes === 0 ? currentPlan.storage : formatBytes(Math.max(0, currentPlan.maxBytes - totalUsedBytes))}
+                    </span>
+                  </div>
+                  <div className="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center justify-center">
+                    <Cloud className="w-5 h-5" />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Detailed Analytics Chart */}
+            <StorageAnalyticsChart
+              items={driveItems}
+              plan={currentPlan}
+              onUpgradeClick={() => setIsUpgradeModalOpen(true)}
+            />
+          </div>
+        ) : activeNav === 'activity' ? (
+          /* ACTIVITY PAGE VIEW (Matching Screenshot 3) */
+          <div className="flex-1 overflow-y-auto px-4 lg:px-8 py-6 space-y-6">
+            <div>
+              <span className="text-xs font-semibold uppercase tracking-wider text-orange-500">
+                Activity
+              </span>
+              <h1 className="text-3xl font-bold text-white tracking-tight mt-1">
+                Activity
+              </h1>
+              <p className="text-sm text-slate-400 mt-0.5">
+                Everything you&apos;re working on, in one place.
+              </p>
+            </div>
+
+            {/* Main Card: Recent activity */}
+            <div className="bg-[#141824] border border-[#252d3f] rounded-3xl p-6 sm:p-8 shadow-xl">
+              <div className="flex items-center justify-between mb-6 pb-4 border-b border-[#22293a]">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-orange-500/10 border border-orange-500/20 text-orange-400 flex items-center justify-center">
+                    <Clock className="w-5 h-5" />
+                  </div>
+                  <h3 className="text-lg font-bold text-white">Recent activity</h3>
+                </div>
+                <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-orange-500/10 text-orange-400 border border-orange-500/20 font-mono">
+                  {activities.length}
+                </span>
+              </div>
+
+              {activities.length === 0 ? (
+                <div className="text-center py-12">
+                  <h4 className="text-base font-semibold text-white mb-3">No activity to show</h4>
+                  <div className="border-2 border-dashed border-[#262e40] rounded-2xl p-8 max-w-md mx-auto text-slate-400 text-sm">
+                    Uploads and changes will appear here.
                   </div>
                 </div>
               ) : (
-                <div className="flex flex-col items-center justify-center h-full text-center px-4">
-                  <div className="w-24 h-24 bg-slate-50 rounded-full flex items-center justify-center mb-4">
-                    {activeNav === 'shared' ? <Users className="w-10 h-10 text-slate-300" /> :
-                     activeNav === 'recent' ? <Clock className="w-10 h-10 text-slate-300" /> :
-                     activeNav === 'starred' ? <Star className="w-10 h-10 text-slate-300" /> :
-                     activeNav === 'trash' ? <Trash2 className="w-10 h-10 text-slate-300" /> :
-                     <FolderOpen className="w-10 h-10 text-slate-300" />}
+                <div className="space-y-3">
+                  {activities.map((act) => (
+                    <div 
+                      key={act.id} 
+                      className="p-3.5 bg-[#0f131d] border border-[#22293a] rounded-2xl flex items-center justify-between gap-4"
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-9 h-9 rounded-xl bg-orange-500/10 text-orange-400 border border-orange-500/20 flex items-center justify-center shrink-0">
+                          {act.type === 'upload' ? <UploadCloud className="w-4 h-4" /> :
+                           act.type === 'sync' ? <RefreshCw className="w-4 h-4" /> :
+                           act.type === 'share' ? <Share2 className="w-4 h-4" /> :
+                           act.type === 'trash' ? <Trash2 className="w-4 h-4 text-rose-400" /> :
+                           act.type === 'folder' ? <Folder className="w-4 h-4 text-amber-400" /> :
+                           <Clock className="w-4 h-4" />}
+                        </div>
+                        <div className="min-w-0">
+                          <h4 className="text-sm font-semibold text-white truncate">{act.title}</h4>
+                          <p className="text-xs text-slate-400 truncate">{act.description}</p>
+                        </div>
+                      </div>
+                      <span className="text-[11px] font-mono text-slate-500 shrink-0">
+                        {formatDateSafe(act.timestamp)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        ) : activeNav === 'people' ? (
+          /* PEOPLE PAGE VIEW */
+          <div className="flex-1 overflow-y-auto px-4 lg:px-8 py-6 space-y-6">
+            <div>
+              <span className="text-xs font-semibold uppercase tracking-wider text-orange-500">
+                People
+              </span>
+              <h1 className="text-3xl font-bold text-white tracking-tight mt-1">
+                Team &amp; Collaborators
+              </h1>
+              <p className="text-sm text-slate-400 mt-0.5">
+                Manage team members, permissions, and workspace access.
+              </p>
+            </div>
+
+            <div className="bg-[#141824] border border-[#252d3f] rounded-3xl p-6 sm:p-8 shadow-xl">
+              <div className="flex items-center justify-between mb-6 pb-4 border-b border-[#22293a]">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-orange-500/10 border border-orange-500/20 text-orange-400 flex items-center justify-center">
+                    <Users className="w-5 h-5" />
                   </div>
-                  <h3 className="text-lg font-semibold text-slate-900 mb-1">
-                    {activeNav === 'shared' ? 'Nothing shared with you' :
-                     activeNav === 'recent' ? 'No recent files' :
-                     activeNav === 'starred' ? 'No starred files' :
-                     activeNav === 'trash' ? 'Trash is empty' :
-                     'Your drive is empty'}
-                  </h3>
-                  <p className="text-slate-500 max-w-sm text-sm">
-                    {activeNav === 'trash' 
-                      ? 'Files in trash are kept safely before being permanently deleted.'
-                      : activeNav === 'starred'
-                      ? 'Star files or folders to easily find them here anytime.'
-                      : activeNav === 'recent'
-                      ? 'Files you have recently opened or edited will appear here.'
-                      : activeNav === 'shared'
-                      ? 'Files and folders shared with you by other collaborators will show here.'
-                      : 'Use the "+" button at the bottom right to upload files or drag and drop real documents, photos, and videos into your drive.'}
-                  </p>
-                  {activeNav !== 'my-drive' && (
-                    <div className="mt-5 flex flex-col items-center gap-3 w-full max-w-sm">
+                  <div>
+                    <h3 className="text-base font-bold text-white">Workspace Members</h3>
+                    <p className="text-xs text-slate-400">People with shared access to your files</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    showToast({
+                      type: 'info',
+                      title: 'Invite Link',
+                      message: 'Collaborator invitation link copied to clipboard.'
+                    });
+                  }}
+                  className="px-4 py-2 bg-orange-600 hover:bg-orange-500 text-white rounded-xl text-xs font-semibold shadow-md shadow-orange-600/20 transition-all cursor-pointer flex items-center gap-1.5"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  Invite People
+                </button>
+              </div>
+
+              <div className="space-y-3">
+                <div className="p-4 bg-[#0f131d] border border-[#22293a] rounded-2xl flex items-center justify-between gap-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-orange-500/20 text-orange-400 font-bold flex items-center justify-center text-sm border border-orange-500/30">
+                      JS
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold text-white text-sm">John Smith</span>
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-orange-500/10 text-orange-400 border border-orange-500/20">
+                          Owner
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-400">john.smith@example.com</p>
+                    </div>
+                  </div>
+                  <span className="text-xs text-emerald-400 font-medium">Active now</span>
+                </div>
+
+                <div className="p-4 bg-[#0f131d] border border-[#22293a] rounded-2xl flex items-center justify-between gap-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-blue-500/20 text-blue-400 font-bold flex items-center justify-center text-sm border border-blue-500/30">
+                      CL
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold text-white text-sm">Colleague Team</span>
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                          Editor
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-400">colleague@example.com</p>
+                    </div>
+                  </div>
+                  <span className="text-xs text-slate-400 font-mono">Shared {driveItems.filter(i => i.owner !== 'me').length} file(s)</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : activeNav === 'security' ? (
+          /* SECURITY PAGE VIEW */
+          <div className="flex-1 overflow-y-auto px-4 lg:px-8 py-6 space-y-6">
+            <div>
+              <span className="text-xs font-semibold uppercase tracking-wider text-orange-500">
+                Security
+              </span>
+              <h1 className="text-3xl font-bold text-white tracking-tight mt-1">
+                Security &amp; Encryption
+              </h1>
+              <p className="text-sm text-slate-400 mt-0.5">
+                Manage encryption standards, session safeguards, and authentication protocols.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="bg-[#141824] border border-[#252d3f] rounded-3xl p-6 shadow-xl">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-10 h-10 rounded-xl bg-orange-500/10 text-orange-400 border border-orange-500/20 flex items-center justify-center">
+                    <ShieldCheck className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-white text-base">End-to-End Encryption</h3>
+                    <p className="text-xs text-emerald-400">Active (AES-256 Standards)</p>
+                  </div>
+                </div>
+                <p className="text-xs text-slate-400 leading-relaxed">
+                  All stored files, shared links, and computer synchronized buffers are encrypted in transit and at rest.
+                </p>
+              </div>
+
+              <div className="bg-[#141824] border border-[#252d3f] rounded-3xl p-6 shadow-xl">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-10 h-10 rounded-xl bg-orange-500/10 text-orange-400 border border-orange-500/20 flex items-center justify-center">
+                    <Lock className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-white text-base">Two-Factor Authentication</h3>
+                    <p className="text-xs text-emerald-400">Protected</p>
+                  </div>
+                </div>
+                <p className="text-xs text-slate-400 leading-relaxed">
+                  Biometric credentials and multi-factor authentication are verified during file access and public link sharing.
+                </p>
+              </div>
+            </div>
+          </div>
+        ) : activeNav === 'feedback' ? (
+          /* FEEDBACK PAGE VIEW */
+          <div className="flex-1 overflow-y-auto px-4 lg:px-8 py-6 space-y-6">
+            <div>
+              <span className="text-xs font-semibold uppercase tracking-wider text-orange-500">
+                Feedback
+              </span>
+              <h1 className="text-3xl font-bold text-white tracking-tight mt-1">
+                Help &amp; Product Feedback
+              </h1>
+              <p className="text-sm text-slate-400 mt-0.5">
+                We would love to hear your thoughts on AsterDrive experience and new features.
+              </p>
+            </div>
+
+            <div className="bg-[#141824] border border-[#252d3f] rounded-3xl p-6 sm:p-8 max-w-xl shadow-xl">
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">
+                    Feedback Category
+                  </label>
+                  <select className="w-full px-3.5 py-2.5 bg-[#0f131d] border border-[#252d3f] rounded-xl text-sm text-white focus:border-orange-500 outline-none">
+                    <option>General Experience &amp; Design</option>
+                    <option>Computer Sync &amp; Backup</option>
+                    <option>Storage Plans &amp; Quota</option>
+                    <option>Feature Request</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">
+                    Your Comments
+                  </label>
+                  <textarea
+                    rows={4}
+                    placeholder="Tell us what you like or what could be improved..."
+                    className="w-full px-3.5 py-2.5 bg-[#0f131d] border border-[#252d3f] rounded-xl text-sm text-white placeholder:text-slate-500 focus:border-orange-500 outline-none resize-none"
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    showToast({
+                      type: 'success',
+                      title: 'Feedback Received',
+                      message: 'Thank you for helping us improve AsterDrive!'
+                    });
+                    handleNavSelect('my-drive');
+                  }}
+                  className="w-full py-2.5 bg-orange-600 hover:bg-orange-500 text-white font-semibold text-sm rounded-xl shadow-md shadow-orange-600/20 transition-all cursor-pointer"
+                >
+                  Submit Feedback
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : (
+          /* DRIVE, COMPUTERS, SHARED, RECENT, STARRED, TRASH VIEWS */
+          <>
+            {/* BREADCRUMBS & TOOLBAR */}
+            <div className="flex items-center justify-between px-4 lg:px-6 py-4 shrink-0 border-b border-[#181d2a]">
+              <div className="flex items-center text-sm">
+                {searchQuery ? (
+                  <span className="font-semibold text-white text-lg">Search results for &ldquo;{searchQuery}&rdquo;</span>
+                ) : (activeNav !== 'my-drive' && activeNav !== 'computers') ? (
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-white text-xl">
+                      {navigation.find(n => n.id === activeNav)?.label || activeNav}
+                    </span>
+                    <span className="text-xs px-2.5 py-0.5 rounded-full bg-orange-500/10 text-orange-400 border border-orange-500/20 font-medium">
+                      {displayedItems.length} {displayedItems.length === 1 ? 'item' : 'items'}
+                    </span>
+                  </div>
+                ) : (
+                  <div className="flex items-center flex-wrap gap-1">
+                    {breadcrumbs.map((crumb, idx) => (
+                      <React.Fragment key={crumb.id}>
+                        <button 
+                          onClick={() => {
+                            setCurrentFolderId(crumb.id);
+                            setSelectedItems(new Set());
+                          }}
+                          className={cn(
+                            "hover:bg-[#181d2a] px-2 py-1 rounded-md transition-colors cursor-pointer",
+                            idx === breadcrumbs.length - 1 ? "font-bold text-white text-xl" : "font-medium text-slate-400 hover:text-slate-200"
+                          )}
+                        >
+                          {crumb.name}
+                        </button>
+                        {idx < breadcrumbs.length - 1 && (
+                          <ChevronRight className="w-4 h-4 text-slate-600" />
+                        )}
+                      </React.Fragment>
+                    ))}
+                  </div>
+                )}
+              </div>
+              
+              <div className="flex items-center gap-1">
+                <AnimatePresence>
+                  {selectedItems.size > 0 && (
+                    <motion.div 
+                      initial={{ opacity: 0, width: 0 }}
+                      animate={{ opacity: 1, width: 'auto' }}
+                      exit={{ opacity: 0, width: 0 }}
+                      className="flex items-center gap-1 mr-2 border-r border-[#252d3f] pr-2 overflow-hidden"
+                    >
+                      {activeNav === 'trash' ? (
+                        <>
+                          <button onClick={handleRestore} className="p-2 text-slate-400 hover:text-emerald-400 hover:bg-[#181d2a] rounded-lg transition-colors" title="Restore">
+                            <RotateCcw className="w-5 h-5" />
+                          </button>
+                          <button onClick={() => setIsDeleteDialogOpen(true)} className="p-2 text-slate-400 hover:text-rose-400 hover:bg-[#181d2a] rounded-lg transition-colors" title="Delete forever">
+                            <Trash2 className="w-5 h-5" />
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <button onClick={handleToggleStar} className="p-2 text-slate-400 hover:text-amber-400 hover:bg-[#181d2a] rounded-lg transition-colors" title="Toggle Star">
+                            <Star className="w-5 h-5" />
+                          </button>
+                          <button onClick={handleToggleSelectedComputerSync} className="p-2 text-slate-400 hover:text-orange-400 hover:bg-[#181d2a] rounded-lg transition-colors" title="Toggle Computer Sync & Backup">
+                            <Computer className="w-5 h-5" />
+                          </button>
+                          <button onClick={handleMoveToTrash} className="p-2 text-slate-400 hover:text-rose-400 hover:bg-[#181d2a] rounded-lg transition-colors" title="Move to Trash">
+                            <Trash2 className="w-5 h-5" />
+                          </button>
+                        </>
+                      )}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+                <button 
+                  onClick={() => setShowDetails(!showDetails)}
+                  className={cn("p-2 rounded-lg transition-colors hidden lg:block", showDetails ? "bg-orange-500/10 text-orange-400 border border-orange-500/30" : "text-slate-400 hover:bg-[#181d2a] hover:text-white")}
+                  title="View details"
+                >
+                  <Info className="w-5 h-5" />
+                </button>
+                <div className="w-px h-6 bg-[#252d3f] mx-2 hidden sm:block" />
+                <div className="flex items-center bg-[#141824] border border-[#252d3f] rounded-lg p-0.5">
+                  <button 
+                    onClick={() => setViewMode('list')}
+                    className={cn("p-1.5 rounded-md transition-colors", viewMode === 'list' ? "bg-[#222a3d] text-orange-400 shadow-sm" : "text-slate-400 hover:text-white")}
+                    title="List view"
+                  >
+                    <ListIcon className="w-4 h-4" />
+                  </button>
+                  <button 
+                    onClick={() => setViewMode('grid')}
+                    className={cn("p-1.5 rounded-md transition-colors", viewMode === 'grid' ? "bg-[#222a3d] text-orange-400 shadow-sm" : "text-slate-400 hover:text-white")}
+                    title="Grid view"
+                  >
+                    <LayoutGrid className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* FILE LIST AREA */}
+            <div className="flex-1 flex overflow-hidden">
+              <div className="flex-1 overflow-y-auto px-4 lg:px-6 py-6">
+
+                {/* COMPUTERS TOP STATUS BANNER */}
+                {activeNav === 'computers' && displayedItems.length > 0 && (
+                  <div className="mb-5 p-4 bg-[#141824] border border-[#252d3f] rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-3 shadow-lg">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-orange-500/10 border border-orange-500/20 text-orange-400 flex items-center justify-center shrink-0 shadow-sm">
+                        <Computer className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-semibold text-white text-sm">Computer Sync &amp; Backup</span>
+                          <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                            Real-time Backup Active
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-400 mt-0.5">
+                          {displayedItems.length} synced file(s) • Total backed up {formatBytes(displayedItems.reduce((acc, i) => acc + (i.size || 0), 0))} • Status: Up to date
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 flex-wrap shrink-0">
                       <button 
                         type="button"
-                        onClick={() => handleNavSelect('my-drive')}
-                        className="px-4 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-xl text-sm font-medium transition-colors cursor-pointer"
+                        onClick={handleSyncNow}
+                        disabled={isSyncingNow}
+                        className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-semibold transition-colors shadow-sm flex items-center gap-1.5 cursor-pointer disabled:opacity-70"
+                        title="Verify local and cloud files match"
                       >
-                        ← Back to My Drive
+                        <RefreshCw className={cn("w-3.5 h-3.5", isSyncingNow && "animate-spin")} />
+                        {isSyncingNow ? 'Verifying...' : 'Sync Now'}
+                      </button>
+                      <button 
+                        type="button"
+                        onClick={() => computerFolderInputRef.current?.click()}
+                        className="px-3 py-1.5 bg-[#1b2131] hover:bg-[#222a3d] border border-[#2d374d] text-white rounded-lg text-xs font-semibold transition-colors shadow-sm flex items-center gap-1.5 cursor-pointer"
+                      >
+                        <Folder className="w-3.5 h-3.5 text-amber-400" />
+                        Sync Folder
+                      </button>
+                      <button 
+                        type="button"
+                        onClick={() => computerFileInputRef.current?.click()}
+                        className="px-3 py-1.5 bg-[#1b2131] hover:bg-[#222a3d] border border-[#2d374d] text-white rounded-lg text-xs font-semibold transition-colors shadow-sm flex items-center gap-1.5 cursor-pointer"
+                      >
+                        <UploadCloud className="w-3.5 h-3.5 text-orange-400" />
+                        Sync File
+                      </button>
+                      <button 
+                        type="button"
+                        onClick={() => setIsSyncModalOpen(true)}
+                        className="px-3 py-1.5 bg-orange-600 hover:bg-orange-500 text-white rounded-lg text-xs font-semibold transition-colors shadow-sm flex items-center gap-1.5 cursor-pointer"
+                      >
+                        <Monitor className="w-3.5 h-3.5" />
+                        Presets
                       </button>
                     </div>
-                  )}
-                </div>
-              )
-            ) : viewMode === 'grid' ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
-                <AnimatePresence mode="popLayout">
-                  {displayedItems.map((item) => {
-                    const isSelected = selectedItems.has(item.id);
-                    return (
-                      <motion.div
-                        layout
-                        initial={{ opacity: 0, scale: 0.95 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        exit={{ opacity: 0, scale: 0.9 }}
-                        key={item.id}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          if (e.metaKey || e.ctrlKey) {
-                            toggleSelection(item.id);
-                          } else {
-                            if (item.type === 'folder') {
-                              handleItemClick(item);
-                            } else {
-                              setSelectedItems(new Set([item.id]));
-                            }
-                          }
-                        }}
-                        onDoubleClick={() => handleItemClick(item)}
-                        className={cn(
-                          "group relative flex flex-col p-4 rounded-xl border transition-all cursor-pointer select-none",
-                          isSelected 
-                            ? "bg-blue-50 border-blue-200 shadow-sm" 
-                            : "bg-white border-slate-200 hover:border-slate-300 hover:shadow-sm"
-                        )}
-                      >
-                        <div className="flex items-start justify-between mb-3">
-                          <div className={cn(
-                            "w-10 h-10 rounded-lg flex items-center justify-center transition-colors relative",
-                            item.type === 'folder' ? 'bg-blue-50 group-hover:bg-blue-100' : 
-                            item.type === 'video' ? 'bg-purple-50 group-hover:bg-purple-100' :
-                            'bg-slate-50 group-hover:bg-slate-100'
-                          )}>
-                            {getIconForType(item.type, "w-6 h-6")}
-                            {item.type === 'video' && (
-                              <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-purple-600 rounded-full flex items-center justify-center text-white shadow-2xs">
-                                <Play className="w-2.5 h-2.5 fill-white ml-0.5" />
-                              </div>
-                            )}
-                          </div>
-                          <div className="flex items-center gap-1">
-                            {item.starred && (
-                              <Star className="w-4 h-4 text-amber-400 fill-current" />
-                            )}
-                            <button 
-                              onClick={(e) => handleOpenItemMenu(item, e)}
-                              className="text-slate-400 hover:text-slate-700 sm:opacity-0 group-hover:opacity-100 opacity-90 transition-all p-1.5 rounded-lg hover:bg-slate-100 active:bg-slate-200 cursor-pointer"
-                              aria-label={`More options for ${item.name}`}
-                              title="More actions"
-                            >
-                              <MoreVertical className="w-5 h-5" />
-                            </button>
-                          </div>
-                        </div>
+                  </div>
+                )}
 
-                        <h4 className="font-medium text-slate-900 text-sm truncate mb-0.5" title={item.name}>
-                          {item.name}
-                        </h4>
+                {displayedItems.length === 0 ? (
+                  activeNav === 'computers' ? (
+                    <div className="flex flex-col items-center justify-center py-10 px-4 max-w-xl mx-auto text-center">
+                      <div className="w-20 h-20 bg-orange-500/10 border border-orange-500/20 text-orange-400 rounded-2xl flex items-center justify-center mb-5 shadow-sm">
+                        <Computer className="w-10 h-10" />
+                      </div>
+                      <h3 className="text-xl font-bold text-white mb-2">
+                        Sync &amp; Backup from your computer
+                      </h3>
+                      <p className="text-slate-400 text-sm leading-relaxed mb-6 max-w-md">
+                        Safely backup videos, photos, and project folders directly from your PC or Mac. Any synced files are accessible anytime, anywhere on AsterDrive.
+                      </p>
 
-                        {item.source === 'computer' ? (
-                          <div className="flex items-center justify-between text-[11px] font-medium mb-1.5 bg-emerald-50 text-emerald-800 px-2 py-1 rounded-md border border-emerald-200/80">
-                            <span className="inline-flex items-center gap-1 truncate font-semibold">
-                              <CheckCircle2 className="w-3 h-3 text-emerald-600 shrink-0" />
-                              Synced
-                            </span>
-                            <span className="text-[10px] text-emerald-700 font-mono truncate">
-                              {item.computerDevice || 'This PC'}
-                            </span>
+                      {/* Quick link existing uploaded drive files to Computers */}
+                      {driveItems.filter(i => !i.trashed && i.source !== 'computer').length > 0 && (
+                        <div className="w-full mb-6 p-4 bg-[#141824] border border-orange-500/30 rounded-2xl text-left flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-lg">
+                          <div className="flex items-start gap-3">
+                            <div className="w-10 h-10 rounded-xl bg-orange-500/10 border border-orange-500/20 text-orange-400 flex items-center justify-center shrink-0 mt-0.5">
+                              <Computer className="w-5 h-5" />
+                            </div>
+                            <div>
+                              <h4 className="text-sm font-bold text-white">
+                                Sync {driveItems.filter(i => !i.trashed && i.source !== 'computer').length} uploaded file(s) to this PC
+                              </h4>
+                              <p className="text-xs text-slate-400 mt-0.5 leading-relaxed">
+                                We detected files in your Drive. Link them to Computer Sync &amp; Backup with one click.
+                              </p>
+                            </div>
                           </div>
-                        ) : activeNav === 'computers' ? (
-                          <div className="flex items-center gap-1 text-[11px] text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200 font-medium mb-1">
-                            <Clock className="w-3 h-3 shrink-0" />
-                            <span>Queued for Sync</span>
-                          </div>
-                        ) : null}
-
-                        {item.type === 'video' && !item.trashed && (
                           <button
                             type="button"
+                            onClick={handleSyncAllDriveFilesToComputer}
+                            className="px-4 py-2.5 bg-orange-600 hover:bg-orange-500 text-white rounded-xl text-xs font-semibold shrink-0 shadow-md transition-all cursor-pointer flex items-center justify-center gap-2 active:scale-95"
+                          >
+                            <CheckCircle2 className="w-4 h-4 text-orange-200" />
+                            Sync All to this PC
+                          </button>
+                        </div>
+                      )}
+
+                      {/* Real Backup Action Cards */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full mb-6 text-left">
+                        <div 
+                          onClick={() => computerFolderInputRef.current?.click()}
+                          className="p-4 rounded-xl border border-[#252d3f] hover:border-orange-500/50 bg-[#141824] hover:bg-[#1a202e] shadow-sm transition-all cursor-pointer group"
+                        >
+                          <div className="flex items-center gap-3 mb-2">
+                            <div className="w-9 h-9 rounded-lg bg-amber-500/10 text-amber-400 border border-amber-500/20 flex items-center justify-center font-bold">
+                              <Folder className="w-5 h-5" />
+                            </div>
+                            <div>
+                              <h4 className="font-semibold text-white text-sm group-hover:text-orange-400 transition-colors">Backup Computer Folder</h4>
+                              <span className="text-[11px] text-slate-400">Select any local directory</span>
+                            </div>
+                          </div>
+                          <p className="text-xs text-slate-400 mb-3">Recreates entire directory structures and backs up all nested files.</p>
+                          <button 
+                            type="button" 
+                            className="text-xs font-semibold text-orange-400 group-hover:text-orange-300 flex items-center gap-1"
+                          >
+                            Select Folder from this PC →
+                          </button>
+                        </div>
+
+                        <div 
+                          onClick={() => computerFileInputRef.current?.click()}
+                          className="p-4 rounded-xl border border-[#252d3f] hover:border-orange-500/50 bg-[#141824] hover:bg-[#1a202e] shadow-sm transition-all cursor-pointer group"
+                        >
+                          <div className="flex items-center gap-3 mb-2">
+                            <div className="w-9 h-9 rounded-lg bg-orange-500/10 text-orange-400 border border-orange-500/20 flex items-center justify-center font-bold">
+                              <UploadCloud className="w-5 h-5" />
+                            </div>
+                            <div>
+                              <h4 className="font-semibold text-white text-sm group-hover:text-orange-400 transition-colors">Backup Computer Files</h4>
+                              <span className="text-[11px] text-slate-400">Select individual files</span>
+                            </div>
+                          </div>
+                          <p className="text-xs text-slate-400 mb-3">Upload videos, images, archives, or documents directly from your computer.</p>
+                          <button 
+                            type="button" 
+                            className="text-xs font-semibold text-orange-400 group-hover:text-orange-300 flex items-center gap-1"
+                          >
+                            Browse Files from this PC →
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Real Folder / File Sync Buttons */}
+                      <div className="flex items-center gap-2.5 flex-wrap justify-center">
+                        <button 
+                          type="button"
+                          onClick={() => computerFolderInputRef.current?.click()}
+                          className="px-4 py-2.5 bg-orange-600 hover:bg-orange-500 text-white rounded-xl text-sm font-semibold transition-colors shadow-md cursor-pointer flex items-center gap-2"
+                        >
+                          <Folder className="w-4 h-4 text-orange-200" />
+                          Sync Folder from this Computer
+                        </button>
+                        <button 
+                          type="button"
+                          onClick={() => computerFileInputRef.current?.click()}
+                          className="px-4 py-2.5 bg-[#1b2131] hover:bg-[#222a3d] border border-[#2d374d] text-white rounded-xl text-sm font-medium transition-colors cursor-pointer flex items-center gap-2"
+                        >
+                          <UploadCloud className="w-4 h-4 text-slate-400" />
+                          Sync File
+                        </button>
+                        <button 
+                          type="button"
+                          onClick={() => handleNavSelect('my-drive')}
+                          className="px-3.5 py-2.5 text-slate-400 hover:text-white text-sm font-medium transition-colors cursor-pointer"
+                        >
+                          ← Back to My Drive
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col items-center justify-center h-full text-center px-4 py-16">
+                      <div className="w-24 h-24 bg-[#141824] border border-[#252d3f] rounded-full flex items-center justify-center mb-4">
+                        {activeNav === 'shared' ? <Users className="w-10 h-10 text-slate-500" /> :
+                         activeNav === 'recent' ? <Clock className="w-10 h-10 text-slate-500" /> :
+                         activeNav === 'starred' ? <Star className="w-10 h-10 text-slate-500" /> :
+                         activeNav === 'trash' ? <Trash2 className="w-10 h-10 text-slate-500" /> :
+                         <FolderOpen className="w-10 h-10 text-slate-500" />}
+                      </div>
+                      <h3 className="text-lg font-semibold text-white mb-1">
+                        {activeNav === 'shared' ? 'Nothing shared with you' :
+                         activeNav === 'recent' ? 'No recent files' :
+                         activeNav === 'starred' ? 'No starred files' :
+                         activeNav === 'trash' ? 'Trash is empty' :
+                         'Your drive is empty'}
+                      </h3>
+                      <p className="text-slate-400 max-w-sm text-sm">
+                        {activeNav === 'trash' 
+                          ? 'Files in trash are kept safely before being permanently deleted.'
+                          : activeNav === 'starred'
+                          ? 'Star files or folders to easily find them here anytime.'
+                          : activeNav === 'recent'
+                          ? 'Files you have recently opened or edited will appear here.'
+                          : activeNav === 'shared'
+                          ? 'Files and folders shared with you by other collaborators will show here.'
+                          : 'Use the "+" button at the bottom right to upload files or drag and drop real documents, photos, and videos into your drive.'}
+                      </p>
+                      {activeNav !== 'my-drive' && (
+                        <div className="mt-5 flex flex-col items-center gap-3 w-full max-w-sm">
+                          <button 
+                            type="button"
+                            onClick={() => handleNavSelect('my-drive')}
+                            className="px-4 py-2 bg-orange-500/10 hover:bg-orange-500/20 text-orange-400 border border-orange-500/30 rounded-xl text-sm font-medium transition-colors cursor-pointer"
+                          >
+                            ← Back to My Drive
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )
+                ) : viewMode === 'grid' ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
+                    <AnimatePresence mode="popLayout">
+                      {displayedItems.map((item) => {
+                        const isSelected = selectedItems.has(item.id);
+                        return (
+                          <motion.div
+                            layout
+                            initial={{ opacity: 0, scale: 0.95 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.9 }}
+                            key={item.id}
                             onClick={(e) => {
                               e.stopPropagation();
-                              openVideoPreview(item);
+                              if (e.metaKey || e.ctrlKey) {
+                                toggleSelection(item.id);
+                              } else {
+                                if (item.type === 'folder') {
+                                  handleItemClick(item);
+                                } else {
+                                  setSelectedItems(new Set([item.id]));
+                                }
+                              }
                             }}
-                            className="my-2 w-full flex items-center justify-center gap-1.5 py-1.5 px-2 bg-purple-50 hover:bg-purple-100 text-purple-700 rounded-lg text-xs font-semibold transition-colors cursor-pointer"
+                            onDoubleClick={() => handleItemClick(item)}
+                            className={cn(
+                              "group relative flex flex-col p-4 rounded-2xl border transition-all cursor-pointer select-none",
+                              isSelected 
+                                ? "bg-[#251710] border-orange-500/60 shadow-lg shadow-orange-950/20" 
+                                : "bg-[#141824] border-[#252d3f] hover:border-orange-500/40 hover:shadow-md"
+                            )}
                           >
-                            <Play className="w-3 h-3 fill-purple-600" /> Watch Video
+                            <div className="flex items-start justify-between mb-3">
+                              <div className={cn(
+                                "w-10 h-10 rounded-xl flex items-center justify-center transition-colors relative",
+                                item.type === 'folder' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' : 
+                                item.type === 'video' ? 'bg-purple-500/10 text-purple-400 border border-purple-500/20' :
+                                'bg-[#1e2433] text-slate-300 border border-[#2d374d]'
+                              )}>
+                                {getIconForType(item.type, "w-6 h-6")}
+                                {item.type === 'video' && (
+                                  <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-orange-600 rounded-full flex items-center justify-center text-white shadow-2xs">
+                                    <Play className="w-2.5 h-2.5 fill-white ml-0.5" />
+                                  </div>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-1">
+                                {item.starred && (
+                                  <Star className="w-4 h-4 text-amber-400 fill-current" />
+                                )}
+                                <button 
+                                  onClick={(e) => handleOpenItemMenu(item, e)}
+                                  className="text-slate-400 hover:text-white sm:opacity-0 group-hover:opacity-100 opacity-90 transition-all p-1.5 rounded-lg hover:bg-[#1b2131] active:bg-[#252d3f] cursor-pointer"
+                                  aria-label={`More options for ${item.name}`}
+                                  title="More actions"
+                                >
+                                  <MoreVertical className="w-5 h-5" />
+                                </button>
+                              </div>
+                            </div>
+
+                            <h4 className="font-semibold text-white text-sm truncate mb-0.5" title={item.name}>
+                              {item.name}
+                            </h4>
+
+                            {item.source === 'computer' ? (
+                              <div className="flex items-center justify-between text-[11px] font-medium mb-1.5 bg-emerald-500/10 text-emerald-400 px-2 py-1 rounded-md border border-emerald-500/20">
+                                <span className="inline-flex items-center gap-1 truncate font-semibold">
+                                  <CheckCircle2 className="w-3 h-3 text-emerald-400 shrink-0" />
+                                  Synced
+                                </span>
+                                <span className="text-[10px] text-emerald-300 font-mono truncate">
+                                  {item.computerDevice || 'This PC'}
+                                </span>
+                              </div>
+                            ) : activeNav === 'computers' ? (
+                              <div className="flex items-center gap-1 text-[11px] text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20 font-medium mb-1">
+                                <Clock className="w-3 h-3 shrink-0" />
+                                <span>Queued for Sync</span>
+                              </div>
+                            ) : null}
+
+                            {item.type === 'video' && !item.trashed && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  openVideoPreview(item);
+                                }}
+                                className="my-2 w-full flex items-center justify-center gap-1.5 py-1.5 px-2 bg-orange-500/10 hover:bg-orange-500/20 text-orange-400 border border-orange-500/30 rounded-lg text-xs font-semibold transition-colors cursor-pointer"
+                              >
+                                <Play className="w-3 h-3 fill-orange-500" /> Watch Video
+                              </button>
+                            )}
+
+                            <p className="text-xs text-slate-400 flex items-center justify-between mt-auto pt-2 border-t border-[#1e2433]">
+                              <span suppressHydrationWarning className="truncate mr-2">{formatDateSafe(item.updatedAt)}</span>
+                              {item.type !== 'folder' && item.size !== undefined && <span className="font-mono shrink-0">{formatBytes(item.size)}</span>}
+                            </p>
+                          </motion.div>
+                        );
+                      })}
+                    </AnimatePresence>
+                  </div>
+                ) : (
+                  <div className="bg-[#141824] border border-[#252d3f] rounded-2xl overflow-hidden shadow-lg">
+                    <table className="min-w-full divide-y divide-[#1e2433] text-sm text-left">
+                      <thead className="bg-[#0f131d] text-slate-400">
+                        <tr>
+                          <th scope="col" className="px-6 py-3 font-medium">Name</th>
+                          <th scope="col" className="px-6 py-3 font-medium hidden sm:table-cell">Owner</th>
+                          <th scope="col" className="px-6 py-3 font-medium hidden md:table-cell">Last modified</th>
+                          <th scope="col" className="px-6 py-3 font-medium text-right">File size</th>
+                          <th scope="col" className="relative px-6 py-3"><span className="sr-only">Actions</span></th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-[#1e2433] bg-[#141824]">
+                        {displayedItems.map((item) => {
+                          const isSelected = selectedItems.has(item.id);
+                          return (
+                            <tr 
+                              key={item.id}
+                              onClick={(e) => {
+                                if (e.metaKey || e.ctrlKey) {
+                                  toggleSelection(item.id);
+                                } else {
+                                  setSelectedItems(new Set([item.id]));
+                                }
+                              }}
+                              onDoubleClick={() => handleItemClick(item)}
+                              className={cn(
+                                "cursor-pointer transition-colors select-none",
+                                isSelected ? "bg-[#251710] text-orange-300" : "hover:bg-[#191f2e] text-slate-200"
+                              )}
+                            >
+                              <td className="px-6 py-3.5 whitespace-nowrap">
+                                <div className="flex items-center gap-3">
+                                  {getIconForType(item.type)}
+                                  <div className="flex items-center gap-2 min-w-0">
+                                    <span className="font-medium text-white truncate max-w-xs">{item.name}</span>
+                                    {item.type === 'video' && !item.trashed && (
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          openVideoPreview(item);
+                                        }}
+                                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-orange-500/10 text-orange-400 border border-orange-500/20 hover:bg-orange-500/20 transition-colors shrink-0 cursor-pointer"
+                                        title="Watch Video"
+                                      >
+                                        <Play className="w-3 h-3 fill-orange-500" /> Watch
+                                      </button>
+                                    )}
+                                    {item.source === 'computer' && (
+                                      <span className="inline-flex items-center gap-1 text-[10px] text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full font-medium shrink-0">
+                                        <CheckCircle2 className="w-2.5 h-2.5 text-emerald-400" /> Synced ({item.computerDevice || 'This PC'})
+                                      </span>
+                                    )}
+                                  </div>
+                                  {item.starred && <Star className="w-3.5 h-3.5 text-amber-400 fill-current shrink-0" />}
+                                </div>
+                              </td>
+                              <td className="px-6 py-3.5 whitespace-nowrap text-slate-400 hidden sm:table-cell">
+                                {item.owner}
+                              </td>
+                              <td suppressHydrationWarning className="px-6 py-3.5 whitespace-nowrap text-slate-400 hidden md:table-cell">
+                                {formatDateSafe(item.updatedAt)}
+                              </td>
+                              <td className="px-6 py-3.5 whitespace-nowrap text-slate-400 font-mono text-right">
+                                {formatBytes(item.size)}
+                              </td>
+                              <td className="px-6 py-3.5 whitespace-nowrap text-right text-slate-400">
+                                <button 
+                                  onClick={(e) => handleOpenItemMenu(item, e)}
+                                  className="hover:text-white text-slate-400 p-1.5 rounded-lg hover:bg-[#1b2131] active:bg-[#252d3f] transition-colors cursor-pointer"
+                                  aria-label={`More options for ${item.name}`}
+                                  title="More actions"
+                                >
+                                  <MoreVertical className="w-4 h-4" />
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+
+              {/* DETAILS SIDEBAR */}
+              <AnimatePresence>
+                {showDetails && (
+                  <motion.div
+                    initial={{ width: 0, opacity: 0 }}
+                    animate={{ width: 320, opacity: 1 }}
+                    exit={{ width: 0, opacity: 0 }}
+                    className="border-l border-[#1e2433] bg-[#0c0e14] overflow-hidden flex flex-col shrink-0 text-white"
+                  >
+                    {selectedItemDetails ? (
+                      <div className="p-6 flex-1 overflow-y-auto">
+                        <div className="flex items-center justify-between mb-6">
+                          <h3 className="font-semibold text-white truncate" title={selectedItemDetails.name}>
+                            {selectedItemDetails.name}
+                          </h3>
+                          <button onClick={() => setShowDetails(false)} className="text-slate-400 hover:text-white p-1">
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+
+                        <div className="h-40 bg-[#141824] rounded-2xl flex items-center justify-center mb-6 border border-[#252d3f]">
+                          {getIconForType(selectedItemDetails.type, "w-16 h-16")}
+                        </div>
+
+                        {selectedItemDetails.type === 'video' && !selectedItemDetails.trashed && (
+                          <button 
+                            type="button"
+                            onClick={() => setPreviewVideoItem(selectedItemDetails)}
+                            className="w-full mb-3 flex items-center justify-center gap-2 bg-orange-600 hover:bg-orange-500 text-white py-2.5 rounded-xl text-sm font-semibold transition-all shadow-md shadow-orange-600/20 cursor-pointer"
+                          >
+                            <Play className="w-4 h-4 fill-white" /> Watch Video
                           </button>
                         )}
 
-                        <p className="text-xs text-slate-500 flex items-center justify-between mt-auto pt-2 border-t border-slate-100/80">
-                          <span suppressHydrationWarning className="truncate mr-2">{formatDateSafe(item.updatedAt)}</span>
-                          {item.type !== 'folder' && item.size !== undefined && <span className="font-mono shrink-0">{formatBytes(item.size)}</span>}
-                        </p>
-                      </motion.div>
-                    );
-                  })}
-                </AnimatePresence>
-              </div>
-            ) : (
-              <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
-                <table className="min-w-full divide-y divide-slate-200 text-sm text-left">
-                  <thead className="bg-slate-50/80 text-slate-500">
-                    <tr>
-                      <th scope="col" className="px-6 py-3 font-medium">Name</th>
-                      <th scope="col" className="px-6 py-3 font-medium hidden sm:table-cell">Owner</th>
-                      <th scope="col" className="px-6 py-3 font-medium hidden md:table-cell">Last modified</th>
-                      <th scope="col" className="px-6 py-3 font-medium text-right">File size</th>
-                      <th scope="col" className="relative px-6 py-3"><span className="sr-only">Actions</span></th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-200 bg-white">
-                    {displayedItems.map((item) => {
-                      const isSelected = selectedItems.has(item.id);
-                      return (
-                        <tr 
-                          key={item.id}
-                          onClick={(e) => {
-                            if (e.metaKey || e.ctrlKey) {
-                              toggleSelection(item.id);
-                            } else {
-                              setSelectedItems(new Set([item.id]));
-                            }
-                          }}
-                          onDoubleClick={() => handleItemClick(item)}
+                        <div className="flex gap-2 mb-3">
+                          <button 
+                            onClick={() => {
+                              setShareModalItem(selectedItemDetails);
+                              logActivity('share', 'Created public share link', selectedItemDetails.name);
+                            }}
+                            className="flex-1 flex items-center justify-center gap-2 bg-[#141824] hover:bg-[#1b2131] border border-[#252d3f] text-white py-2 rounded-xl text-sm font-medium transition-colors"
+                          >
+                            <Share2 className="w-4 h-4 text-orange-400" /> Share
+                          </button>
+                          <button 
+                            onClick={() => handleDownloadItem(selectedItemDetails)}
+                            className="flex-1 flex items-center justify-center gap-2 bg-[#141824] hover:bg-[#1b2131] border border-[#252d3f] text-white py-2 rounded-xl text-sm font-medium transition-colors"
+                          >
+                            <Download className="w-4 h-4 text-slate-400" /> Download
+                          </button>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => handleToggleComputerSync(selectedItemDetails)}
                           className={cn(
-                            "cursor-pointer transition-colors select-none",
-                            isSelected ? "bg-blue-50/80" : "hover:bg-slate-50/80"
+                            "w-full mb-6 flex items-center justify-center gap-2 py-2 px-3 rounded-xl text-xs font-semibold border transition-all cursor-pointer",
+                            selectedItemDetails.source === 'computer'
+                              ? "bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border-amber-500/30"
+                              : "bg-orange-500/10 hover:bg-orange-500/20 text-orange-400 border-orange-500/30"
                           )}
                         >
-                          <td className="px-6 py-3.5 whitespace-nowrap">
-                            <div className="flex items-center gap-3">
-                              {getIconForType(item.type)}
-                              <div className="flex items-center gap-2 min-w-0">
-                                <span className="font-medium text-slate-900 truncate max-w-xs">{item.name}</span>
-                                {item.type === 'video' && !item.trashed && (
-                                  <button
-                                    type="button"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      openVideoPreview(item);
-                                    }}
-                                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-purple-50 text-purple-700 hover:bg-purple-100 transition-colors shrink-0 cursor-pointer"
-                                    title="Watch Video"
-                                  >
-                                    <Play className="w-3 h-3 fill-purple-600" /> Watch
-                                  </button>
-                                )}
-                                {item.source === 'computer' && (
-                                  <span className="inline-flex items-center gap-1 text-[10px] text-emerald-800 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full font-medium shrink-0">
-                                    <CheckCircle2 className="w-2.5 h-2.5 text-emerald-600" /> Synced ({item.computerDevice || 'This PC'})
-                                  </span>
-                                )}
-                              </div>
-                              {item.starred && <Star className="w-3.5 h-3.5 text-amber-400 fill-current shrink-0" />}
-                            </div>
-                          </td>
-                          <td className="px-6 py-3.5 whitespace-nowrap text-slate-500 hidden sm:table-cell">
-                            {item.owner}
-                          </td>
-                          <td suppressHydrationWarning className="px-6 py-3.5 whitespace-nowrap text-slate-500 hidden md:table-cell">
-                            {formatDateSafe(item.updatedAt)}
-                          </td>
-                          <td className="px-6 py-3.5 whitespace-nowrap text-slate-500 font-mono text-right">
-                            {formatBytes(item.size)}
-                          </td>
-                          <td className="px-6 py-3.5 whitespace-nowrap text-right text-slate-400">
-                            <button 
-                              onClick={(e) => handleOpenItemMenu(item, e)}
-                              className="hover:text-slate-700 text-slate-400 p-1.5 rounded-lg hover:bg-slate-100 active:bg-slate-200 transition-colors cursor-pointer"
-                              aria-label={`More options for ${item.name}`}
-                              title="More actions"
-                            >
-                              <MoreVertical className="w-4 h-4" />
-                            </button>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
+                          <Computer className="w-4 h-4" />
+                          {selectedItemDetails.source === 'computer' 
+                            ? 'Remove from Computer Sync' 
+                            : 'Link to Computer Sync & Backup'}
+                        </button>
 
-          {/* DETAILS SIDEBAR */}
-          <AnimatePresence>
-            {showDetails && (
-              <motion.div
-                initial={{ width: 0, opacity: 0 }}
-                animate={{ width: 320, opacity: 1 }}
-                exit={{ width: 0, opacity: 0 }}
-                className="border-l border-slate-200 bg-white overflow-hidden flex flex-col shrink-0"
-              >
-                {selectedItemDetails ? (
-                  <div className="p-6 flex-1 overflow-y-auto">
-                    <div className="flex items-center justify-between mb-6">
-                      <h3 className="font-semibold text-slate-900 truncate" title={selectedItemDetails.name}>
-                        {selectedItemDetails.name}
-                      </h3>
-                      <button onClick={() => setShowDetails(false)} className="text-slate-400 hover:text-slate-600 p-1">
-                        <X className="w-4 h-4" />
-                      </button>
-                    </div>
+                        <div className="space-y-4">
+                          <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Properties</h4>
+                          
+                          <div className="grid grid-cols-3 gap-y-4 text-sm">
+                            <div className="text-slate-400">Size</div>
+                            <div className="col-span-2 text-white font-medium font-mono">{formatBytes(selectedItemDetails.size)}</div>
+                            
+                            <div className="text-slate-400">Owner</div>
+                            <div className="col-span-2 text-white font-medium capitalize">{selectedItemDetails.owner}</div>
 
-                    <div className="h-40 bg-slate-50 rounded-xl flex items-center justify-center mb-6 border border-slate-100">
-                      {getIconForType(selectedItemDetails.type, "w-16 h-16")}
-                    </div>
-
-                    {selectedItemDetails.type === 'video' && !selectedItemDetails.trashed && (
-                      <button 
-                        type="button"
-                        onClick={() => setPreviewVideoItem(selectedItemDetails)}
-                        className="w-full mb-3 flex items-center justify-center gap-2 bg-purple-600 hover:bg-purple-700 text-white py-2.5 rounded-xl text-sm font-semibold transition-all shadow-sm shadow-purple-600/20 cursor-pointer"
-                      >
-                        <Play className="w-4 h-4 fill-white" /> Watch Video
-                      </button>
-                    )}
-
-                    <div className="flex gap-2 mb-3">
-                      <button 
-                        onClick={() => showToast({ type: 'info', title: 'Share Link', message: 'Sharable link copied to clipboard.' })}
-                        className="flex-1 flex items-center justify-center gap-2 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 py-2 rounded-lg text-sm font-medium transition-colors"
-                      >
-                        <Share2 className="w-4 h-4" /> Share
-                      </button>
-                      <button 
-                        onClick={() => handleDownloadItem(selectedItemDetails)}
-                        className="flex-1 flex items-center justify-center gap-2 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 py-2 rounded-lg text-sm font-medium transition-colors"
-                      >
-                        <Download className="w-4 h-4" /> Download
-                      </button>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={() => handleToggleComputerSync(selectedItemDetails)}
-                      className={cn(
-                        "w-full mb-6 flex items-center justify-center gap-2 py-2 px-3 rounded-xl text-xs font-semibold border transition-all cursor-pointer shadow-2xs",
-                        selectedItemDetails.source === 'computer'
-                          ? "bg-amber-50 hover:bg-amber-100 text-amber-800 border-amber-200"
-                          : "bg-blue-50 hover:bg-blue-100 text-blue-700 border-blue-200"
-                      )}
-                    >
-                      <Computer className="w-4 h-4" />
-                      {selectedItemDetails.source === 'computer' 
-                        ? 'Remove from Computer Sync' 
-                        : 'Link to Computer Sync & Backup'}
-                    </button>
-
-                    <div className="space-y-4">
-                      <h4 className="text-xs font-semibold text-slate-900 uppercase tracking-wider mb-3">Properties</h4>
-                      
-                      <div className="grid grid-cols-3 gap-y-4 text-sm">
-                        <div className="text-slate-500">Size</div>
-                        <div className="col-span-2 text-slate-900 font-medium font-mono">{formatBytes(selectedItemDetails.size)}</div>
-                        
-                        <div className="text-slate-500">Owner</div>
-                        <div className="col-span-2 text-slate-900 font-medium capitalize">{selectedItemDetails.owner}</div>
-
-                        {selectedItemDetails.source === 'computer' && (
-                          <>
-                            <div className="text-slate-500">Sync Status</div>
-                            <div className="col-span-2 text-emerald-700 font-medium flex items-center gap-1.5">
-                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                              <span>Synced &amp; Up to date</span>
-                            </div>
-                            <div className="text-slate-500">Computer</div>
-                            <div className="col-span-2 text-blue-700 font-medium flex items-center gap-1.5 truncate">
-                              <Computer className="w-3.5 h-3.5 shrink-0" />
-                              <span>{selectedItemDetails.computerDevice || 'This PC'}</span>
-                            </div>
-                            {selectedItemDetails.folderPath && (
+                            {selectedItemDetails.source === 'computer' && (
                               <>
-                                <div className="text-slate-500">Sync Folder</div>
-                                <div className="col-span-2 text-slate-800 font-mono text-xs truncate">
-                                  {selectedItemDetails.folderPath}
+                                <div className="text-slate-400">Sync Status</div>
+                                <div className="col-span-2 text-emerald-400 font-medium flex items-center gap-1.5">
+                                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                                  <span>Synced &amp; Up to date</span>
                                 </div>
+                                <div className="text-slate-400">Computer</div>
+                                <div className="col-span-2 text-orange-400 font-medium flex items-center gap-1.5 truncate">
+                                  <Computer className="w-3.5 h-3.5 shrink-0" />
+                                  <span>{selectedItemDetails.computerDevice || 'This PC'}</span>
+                                </div>
+                                {selectedItemDetails.folderPath && (
+                                  <>
+                                    <div className="text-slate-400">Sync Folder</div>
+                                    <div className="col-span-2 text-slate-300 font-mono text-xs truncate">
+                                      {selectedItemDetails.folderPath}
+                                    </div>
+                                  </>
+                                )}
                               </>
                             )}
-                          </>
-                        )}
-                        
-                        <div className="text-slate-500">Modified</div>
-                        <div suppressHydrationWarning className="col-span-2 text-slate-900 font-medium">
-                          {formatDateSafe(selectedItemDetails.updatedAt)}
-                        </div>
-                        
-                        <div className="text-slate-500">Location</div>
-                        <div className="col-span-2 text-slate-900 font-medium truncate">
-                          {selectedItemDetails.source === 'computer' 
-                            ? `Computers > ${selectedItemDetails.computerDevice || 'My PC'}`
-                            : (breadcrumbs.find(c => c.id === selectedItemDetails.parentId)?.name || 'My Drive')}
+                            
+                            <div className="text-slate-400">Modified</div>
+                            <div suppressHydrationWarning className="col-span-2 text-white font-medium">
+                              {formatDateSafe(selectedItemDetails.updatedAt)}
+                            </div>
+                            
+                            <div className="text-slate-400">Location</div>
+                            <div className="col-span-2 text-white font-medium truncate">
+                              {selectedItemDetails.source === 'computer' 
+                                ? `Computers > ${selectedItemDetails.computerDevice || 'My PC'}`
+                                : (breadcrumbs.find(c => c.id === selectedItemDetails.parentId)?.name || 'My Drive')}
+                            </div>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="p-6 h-full flex flex-col items-center justify-center text-center text-slate-500">
-                    <Info className="w-12 h-12 text-slate-300 mb-4" />
-                    <p className="text-sm">Select a file or folder to view its properties.</p>
-                  </div>
+                    ) : (
+                      <div className="p-6 h-full flex flex-col items-center justify-center text-center text-slate-400">
+                        <Info className="w-12 h-12 text-slate-600 mb-4" />
+                        <p className="text-sm">Select a file or folder to view its properties.</p>
+                      </div>
+                    )}
+                  </motion.div>
                 )}
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
+              </AnimatePresence>
+            </div>
+          </>
+        )}
       </div>
 
       {/* FLOATING ACTION BUTTON */}
@@ -2401,7 +2814,7 @@ export default function AsterDriveApp() {
               initial={{ opacity: 0, y: 10, scale: 0.95 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 10, scale: 0.95 }}
-              className="mb-4 bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col min-w-[210px] divide-y divide-slate-100"
+              className="mb-4 bg-[#141824] rounded-2xl shadow-2xl border border-[#252d3f] overflow-hidden flex flex-col min-w-[220px] divide-y divide-[#1e2433] text-white"
             >
               {activeNav === 'computers' ? (
                 <>
@@ -2410,9 +2823,9 @@ export default function AsterDriveApp() {
                       setShowUploadMenu(false);
                       computerFolderInputRef.current?.click();
                     }}
-                    className="flex items-center gap-3 px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors text-left"
+                    className="flex items-center gap-3 px-4 py-3 text-sm font-medium text-slate-300 hover:bg-[#1b2131] hover:text-white transition-colors text-left cursor-pointer"
                   >
-                    <Folder className="w-4 h-4 text-amber-500" />
+                    <Folder className="w-4 h-4 text-amber-400" />
                     Sync computer folder
                   </button>
                   <button 
@@ -2420,9 +2833,9 @@ export default function AsterDriveApp() {
                       setShowUploadMenu(false);
                       computerFileInputRef.current?.click();
                     }}
-                    className="flex items-center gap-3 px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors text-left"
+                    className="flex items-center gap-3 px-4 py-3 text-sm font-medium text-slate-300 hover:bg-[#1b2131] hover:text-white transition-colors text-left cursor-pointer"
                   >
-                    <UploadCloud className="w-4 h-4 text-blue-600" />
+                    <UploadCloud className="w-4 h-4 text-orange-400" />
                     Sync computer file
                   </button>
                   <button 
@@ -2430,30 +2843,36 @@ export default function AsterDriveApp() {
                       setShowUploadMenu(false);
                       setIsSyncModalOpen(true);
                     }}
-                    className="flex items-center gap-3 px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors text-left"
+                    className="flex items-center gap-3 px-4 py-3 text-sm font-medium text-slate-300 hover:bg-[#1b2131] hover:text-white transition-colors text-left cursor-pointer"
                   >
-                    <Monitor className="w-4 h-4 text-purple-600" />
+                    <Monitor className="w-4 h-4 text-purple-400" />
                     Device presets (PC / Mac)
                   </button>
                 </>
               ) : (
                 <>
                   <button 
-                    onClick={() => fileInputRef.current?.click()}
-                    className="flex items-center gap-3 px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors text-left"
+                    onClick={() => {
+                      setShowUploadMenu(false);
+                      fileInputRef.current?.click();
+                    }}
+                    className="flex items-center gap-3 px-4 py-3 text-sm font-medium text-slate-300 hover:bg-[#1b2131] hover:text-white transition-colors text-left cursor-pointer"
                   >
-                    <File className="w-4 h-4 text-blue-600" />
+                    <File className="w-4 h-4 text-orange-400" />
                     File upload
                   </button>
                   <button 
-                    onClick={() => folderInputRef.current?.click()}
-                    className="flex items-center gap-3 px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors text-left"
+                    onClick={() => {
+                      setShowUploadMenu(false);
+                      folderInputRef.current?.click();
+                    }}
+                    className="flex items-center gap-3 px-4 py-3 text-sm font-medium text-slate-300 hover:bg-[#1b2131] hover:text-white transition-colors text-left cursor-pointer"
                   >
-                    <Folder className="w-4 h-4 text-amber-500" />
+                    <Folder className="w-4 h-4 text-amber-400" />
                     Folder upload
                   </button>
-                  <div className="px-4 py-2.5 bg-blue-50/70 border-t border-blue-100/60 text-[11px] text-blue-700 flex items-center gap-2">
-                    <UploadCloud className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                  <div className="px-4 py-2.5 bg-[#0f131d] border-t border-[#1e2433] text-[11px] text-slate-400 flex items-center gap-2">
+                    <UploadCloud className="w-3.5 h-3.5 text-orange-400 shrink-0" />
                     <span>Or drag &amp; drop files/folders anywhere</span>
                   </div>
                 </>
@@ -2463,7 +2882,7 @@ export default function AsterDriveApp() {
         </AnimatePresence>
         <button 
           onClick={() => setShowUploadMenu(!showUploadMenu)}
-          className="w-14 h-14 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl flex items-center justify-center shadow-lg shadow-blue-600/30 transition-all hover:-translate-y-1 hover:shadow-blue-600/40"
+          className="w-14 h-14 bg-orange-600 hover:bg-orange-500 text-white rounded-2xl flex items-center justify-center shadow-lg shadow-orange-600/30 transition-all hover:-translate-y-1 hover:shadow-orange-600/40 cursor-pointer active:scale-95"
           aria-label="Upload files or folders"
         >
           <Plus className={cn("w-6 h-6 transition-transform duration-200", showUploadMenu && "rotate-45")} />
@@ -2560,7 +2979,7 @@ export default function AsterDriveApp() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[80] bg-slate-900/60 flex items-center justify-center p-3 sm:p-6 backdrop-blur-sm overflow-y-auto"
+            className="fixed inset-0 z-[80] bg-black/75 flex items-center justify-center p-3 sm:p-6 backdrop-blur-sm overflow-y-auto"
             onClick={() => setIsUpgradeModalOpen(false)}
           >
             <motion.div
@@ -2568,30 +2987,30 @@ export default function AsterDriveApp() {
               animate={{ scale: 1, opacity: 1, y: 0 }}
               exit={{ scale: 0.95, opacity: 0, y: 15 }}
               onClick={(e) => e.stopPropagation()}
-              className="bg-white rounded-2xl sm:rounded-3xl shadow-2xl max-w-xl w-full flex flex-col max-h-[calc(100vh-2rem)] my-auto overflow-hidden border border-slate-100"
+              className="bg-[#141824] rounded-2xl sm:rounded-3xl shadow-2xl max-w-xl w-full flex flex-col max-h-[calc(100vh-2rem)] my-auto overflow-hidden border border-[#252d3f] text-white"
             >
-              {/* Header - completely uncropped across all screen sizes */}
-              <div className="p-5 sm:px-8 sm:pt-7 sm:pb-4 border-b border-slate-100 shrink-0 bg-white">
+              {/* Header */}
+              <div className="p-5 sm:px-8 sm:pt-7 sm:pb-4 border-b border-[#1e2433] shrink-0 bg-[#141824]">
                 <div className="flex justify-between items-start gap-4">
                   <div>
                     <div className="flex items-center gap-2 flex-wrap">
-                      <h2 className="text-xl sm:text-2xl font-bold text-slate-900">Upgrade your storage</h2>
+                      <h2 className="text-xl sm:text-2xl font-bold text-white">Upgrade your storage</h2>
                       <span className={cn(
                         "text-[11px] font-semibold px-2 py-0.5 rounded-full border",
                         currentPlan.isFree 
-                          ? "bg-emerald-50 text-emerald-700 border-emerald-200" 
-                          : "bg-blue-50 text-blue-700 border-blue-200"
+                          ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" 
+                          : "bg-orange-500/10 text-orange-400 border-orange-500/20"
                       )}>
                         Current: {currentPlan.name} ({currentPlan.storage})
                       </span>
                     </div>
-                    <p className="text-xs sm:text-sm text-slate-500 mt-1">
+                    <p className="text-xs sm:text-sm text-slate-400 mt-1">
                       Choose a plan to instantly expand your cloud storage capacity.
                     </p>
                   </div>
                   <button 
                     onClick={() => setIsUpgradeModalOpen(false)} 
-                    className="text-slate-400 hover:text-slate-600 p-2 rounded-full hover:bg-slate-100 transition-colors -mr-2 shrink-0"
+                    className="text-slate-400 hover:text-white p-2 rounded-full hover:bg-[#1a202d] transition-colors -mr-2 shrink-0 cursor-pointer"
                     aria-label="Close upgrade dialog"
                   >
                     <X className="w-5 h-5" />
@@ -2620,14 +3039,14 @@ export default function AsterDriveApp() {
                       className={cn(
                         "flex items-center justify-between p-4 rounded-2xl border transition-all cursor-pointer relative select-none",
                         isSelected 
-                          ? "border-blue-600 bg-blue-50/50 ring-1 ring-blue-600 shadow-sm" 
-                          : "border-slate-200 hover:border-slate-300 hover:bg-slate-50/70"
+                          ? "border-orange-500 bg-[#251710] ring-1 ring-orange-500 shadow-sm" 
+                          : "border-[#252d3f] hover:border-[#35405a] hover:bg-[#191f2e] bg-[#0f131d]"
                       )}
                     >
                       <div className="flex items-center gap-4 min-w-0">
                         <div className={cn(
-                          "w-20 sm:w-24 py-2 rounded-xl font-bold text-center text-sm shrink-0 transition-colors",
-                          isSelected ? "bg-blue-600 text-white shadow-sm" : "bg-slate-100 text-slate-800"
+                          "w-20 sm:w-24 py-2 rounded-xl font-bold text-center text-sm shrink-0 transition-colors font-mono",
+                          isSelected ? "bg-orange-600 text-white shadow-sm" : "bg-[#1a202d] text-slate-200"
                         )}>
                           {plan.storage}
                         </div>
@@ -2635,22 +3054,22 @@ export default function AsterDriveApp() {
                           <div className="flex items-center gap-2 flex-wrap">
                             <span className={cn(
                               "font-semibold text-sm sm:text-base transition-colors",
-                              isSelected ? "text-blue-900" : "text-slate-800"
+                              isSelected ? "text-orange-400" : "text-white"
                             )}>
                               {plan.price}
                             </span>
                             {plan.recommended && (
-                              <span className="bg-amber-100 text-amber-800 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider shrink-0 border border-amber-200">
+                              <span className="bg-amber-500/10 text-amber-400 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider shrink-0 border border-amber-500/20">
                                 Recommended
                               </span>
                             )}
                             {isCurrent && (
-                              <span className="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider shrink-0">
+                              <span className="bg-emerald-500/10 text-emerald-400 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider shrink-0 border border-emerald-500/20">
                                 Current
                               </span>
                             )}
                           </div>
-                          <span className="text-xs text-slate-500 mt-0.5">
+                          <span className="text-xs text-slate-400 mt-0.5">
                             Billed monthly · Cancel anytime
                           </span>
                         </div>
@@ -2661,8 +3080,8 @@ export default function AsterDriveApp() {
                         <div className={cn(
                           "w-6 h-6 rounded-full flex items-center justify-center transition-all border-2",
                           isSelected 
-                            ? "border-blue-600 bg-blue-600 shadow-sm" 
-                            : "border-slate-300 bg-white"
+                            ? "border-orange-500 bg-orange-600 shadow-sm" 
+                            : "border-slate-600 bg-[#1a202d]"
                         )}>
                           {isSelected && <div className="w-2.5 h-2.5 rounded-full bg-white" />}
                         </div>
@@ -2673,17 +3092,17 @@ export default function AsterDriveApp() {
               </div>
 
               {/* Fixed Footer */}
-              <div className="p-4 sm:px-8 sm:py-5 border-t border-slate-100 shrink-0 bg-slate-50/80 flex flex-col sm:flex-row items-center justify-between gap-3 rounded-b-2xl sm:rounded-b-3xl">
+              <div className="p-4 sm:px-8 sm:py-5 border-t border-[#1e2433] shrink-0 bg-[#0f131d] flex flex-col sm:flex-row items-center justify-between gap-3 rounded-b-2xl sm:rounded-b-3xl">
                 <div>
                   {!currentPlan.isFree ? (
                     <button
                       onClick={handleDowngradeToFree}
-                      className="text-xs text-slate-500 hover:text-slate-800 underline font-medium cursor-pointer"
+                      className="text-xs text-slate-400 hover:text-white underline font-medium cursor-pointer"
                     >
                       Switch back to Free Plan (1 GB)
                     </button>
                   ) : (
-                    <span className="text-xs text-slate-500">
+                    <span className="text-xs text-slate-400">
                       Simulated instant upgrade · No credit card charged
                     </span>
                   )}
@@ -2691,13 +3110,13 @@ export default function AsterDriveApp() {
                 <div className="flex items-center justify-end gap-3 w-full sm:w-auto">
                   <button 
                     onClick={() => setIsUpgradeModalOpen(false)} 
-                    className="flex-1 sm:flex-none px-5 py-2.5 rounded-xl font-medium text-slate-600 hover:bg-slate-200 transition-colors text-sm"
+                    className="flex-1 sm:flex-none px-5 py-2.5 rounded-xl font-medium text-slate-400 hover:bg-[#1a202d] hover:text-white transition-colors text-sm cursor-pointer"
                   >
                     Cancel
                   </button>
                   <button 
                     onClick={handleConfirmUpgrade} 
-                    className="flex-1 sm:flex-none px-6 py-2.5 rounded-xl font-semibold text-white bg-blue-600 hover:bg-blue-700 transition-colors shadow-sm text-sm active:scale-95"
+                    className="flex-1 sm:flex-none px-6 py-2.5 rounded-xl font-semibold text-white bg-orange-600 hover:bg-orange-500 transition-colors shadow-md shadow-orange-600/25 text-sm active:scale-95 cursor-pointer"
                   >
                     Continue
                   </button>
@@ -3991,7 +4410,7 @@ export default function AsterDriveApp() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[120] bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4"
+            className="fixed inset-0 z-[120] bg-black/75 backdrop-blur-xs flex items-center justify-center p-4"
             onClick={() => setShareModalItem(null)}
           >
             <motion.div
@@ -3999,21 +4418,21 @@ export default function AsterDriveApp() {
               animate={{ scale: 1, opacity: 1, y: 0 }}
               exit={{ scale: 0.95, opacity: 0, y: 15 }}
               onClick={(e) => e.stopPropagation()}
-              className="bg-white rounded-3xl shadow-2xl max-w-md w-full p-6 border border-slate-100 overflow-hidden"
+              className="bg-[#141824] rounded-3xl shadow-2xl max-w-md w-full p-6 border border-[#252d3f] overflow-hidden text-white"
             >
               <div className="flex items-start justify-between mb-5">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold shadow-xs">
+                  <div className="w-10 h-10 rounded-2xl bg-orange-500/10 border border-orange-500/20 text-orange-400 flex items-center justify-center font-bold shadow-xs">
                     <Share2 className="w-5 h-5" />
                   </div>
                   <div>
-                    <h3 className="text-lg font-bold text-slate-900">Share Public Link</h3>
-                    <p className="text-xs text-slate-500">Anyone with this link can view &amp; download</p>
+                    <h3 className="text-lg font-bold text-white">Share Public Link</h3>
+                    <p className="text-xs text-slate-400">Anyone with this link can view &amp; download</p>
                   </div>
                 </div>
                 <button
                   onClick={() => setShareModalItem(null)}
-                  className="p-1.5 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
+                  className="p-1.5 rounded-full text-slate-400 hover:text-white hover:bg-[#1b2131] transition-colors cursor-pointer"
                   aria-label="Close share dialog"
                 >
                   <X className="w-5 h-5" />
@@ -4021,15 +4440,15 @@ export default function AsterDriveApp() {
               </div>
 
               {/* Shared Item Card */}
-              <div className="p-3.5 bg-slate-50 border border-slate-200/80 rounded-2xl flex items-center gap-3 mb-5">
-                <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center shrink-0 border border-slate-200 shadow-2xs">
+              <div className="p-3.5 bg-[#0f131d] border border-[#22293a] rounded-2xl flex items-center gap-3 mb-5">
+                <div className="w-10 h-10 rounded-xl bg-[#1a202d] flex items-center justify-center shrink-0 border border-[#2d374d] shadow-2xs">
                   {getIconForType(shareModalItem.type, "w-6 h-6")}
                 </div>
                 <div className="min-w-0 flex-1">
-                  <h4 className="text-sm font-semibold text-slate-900 truncate" title={shareModalItem.name}>
+                  <h4 className="text-sm font-semibold text-white truncate" title={shareModalItem.name}>
                     {shareModalItem.name}
                   </h4>
-                  <p className="text-[11px] text-slate-500 font-mono">
+                  <p className="text-[11px] text-slate-400 font-mono">
                     {formatBytes(shareModalItem.size)} • {formatDateSafe(shareModalItem.updatedAt)}
                   </p>
                 </div>
@@ -4037,11 +4456,11 @@ export default function AsterDriveApp() {
 
               {/* Public Link Box */}
               <div className="mb-5">
-                <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-2">
+                <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
                   Public Share Link (Cloud Run)
                 </label>
                 <div className="flex items-center gap-2">
-                  <div className="flex-1 bg-slate-100 border border-slate-200 rounded-xl px-3 py-2 text-xs font-mono text-slate-700 truncate select-all">
+                  <div className="flex-1 bg-[#0f131d] border border-[#22293a] rounded-xl px-3 py-2 text-xs font-mono text-orange-300 truncate select-all">
                     {getPublicShareUrl(shareModalItem)}
                   </div>
                   <button
@@ -4063,7 +4482,7 @@ export default function AsterDriveApp() {
                       "px-4 py-2 rounded-xl text-xs font-semibold transition-all shrink-0 cursor-pointer flex items-center gap-1.5 shadow-xs",
                       copiedShareLink 
                         ? "bg-emerald-600 text-white" 
-                        : "bg-blue-600 hover:bg-blue-700 text-white"
+                        : "bg-orange-600 hover:bg-orange-500 text-white shadow-orange-600/20"
                     )}
                   >
                     {copiedShareLink ? (
@@ -4082,8 +4501,8 @@ export default function AsterDriveApp() {
               </div>
 
               {/* Quick Share Apps */}
-              <div className="mb-6 pt-4 border-t border-slate-100">
-                <span className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-2.5">
+              <div className="mb-6 pt-4 border-t border-[#1e2433]">
+                <span className="block text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-2.5">
                   Share Directly
                 </span>
                 <div className="grid grid-cols-3 gap-2">
@@ -4094,7 +4513,7 @@ export default function AsterDriveApp() {
                       const text = encodeURIComponent(`Lihat dan unduh file "${shareModalItem.name}" di AsterDrive:\n${url}`);
                       window.open(`https://api.whatsapp.com/send?text=${text}`, '_blank');
                     }}
-                    className="p-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200/80 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                    className="p-2 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
                   >
                     <span>WhatsApp</span>
                   </button>
@@ -4105,7 +4524,7 @@ export default function AsterDriveApp() {
                       const text = encodeURIComponent(`AsterDrive Shared File: ${shareModalItem.name}`);
                       window.open(`https://t.me/share/url?url=${encodeURIComponent(url)}&text=${text}`, '_blank');
                     }}
-                    className="p-2 bg-sky-50 hover:bg-sky-100 text-sky-800 border border-sky-200/80 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                    className="p-2 bg-sky-500/10 hover:bg-sky-500/20 text-sky-400 border border-sky-500/30 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
                   >
                     <span>Telegram</span>
                   </button>
@@ -4117,7 +4536,7 @@ export default function AsterDriveApp() {
                       const body = encodeURIComponent(`Hello,\n\nI shared "${shareModalItem.name}" with you via AsterDrive.\n\nYou can access and download it here:\n${url}\n\nAsterDrive Cloud Storage`);
                       window.location.href = `mailto:?subject=${subject}&body=${body}`;
                     }}
-                    className="p-2 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                    className="p-2 bg-[#1b2131] hover:bg-[#222a3d] text-slate-200 border border-[#2d374d] rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
                   >
                     <span>Email</span>
                   </button>
@@ -4125,15 +4544,15 @@ export default function AsterDriveApp() {
               </div>
 
               {/* Footer status */}
-              <div className="flex items-center justify-between text-xs text-slate-500">
-                <span className="inline-flex items-center gap-1 text-emerald-700 font-medium">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+              <div className="flex items-center justify-between text-xs text-slate-400">
+                <span className="inline-flex items-center gap-1 text-emerald-400 font-medium">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
                   Public Cloud Access Active
                 </span>
                 <button
                   type="button"
                   onClick={() => setShareModalItem(null)}
-                  className="font-semibold text-slate-700 hover:text-slate-900 cursor-pointer"
+                  className="font-semibold text-orange-400 hover:text-orange-300 cursor-pointer"
                 >
                   Done
                 </button>
@@ -4153,26 +4572,26 @@ export default function AsterDriveApp() {
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 10, scale: 0.95 }}
               className={cn(
-                "pointer-events-auto p-4 rounded-2xl shadow-xl border flex items-start gap-3 bg-white",
-                toast.type === 'warning' ? "border-amber-200 text-amber-900" :
-                toast.type === 'success' ? "border-emerald-200 text-emerald-900" :
-                toast.type === 'error' ? "border-rose-200 text-rose-900" :
-                "border-slate-200 text-slate-800"
+                "pointer-events-auto p-4 rounded-2xl shadow-2xl border flex items-start gap-3 bg-[#141824] text-white",
+                toast.type === 'warning' ? "border-amber-500/40 text-amber-200" :
+                toast.type === 'success' ? "border-emerald-500/40 text-emerald-200" :
+                toast.type === 'error' ? "border-rose-500/40 text-rose-200" :
+                "border-orange-500/30 text-slate-200"
               )}
             >
               <div className="shrink-0 mt-0.5">
-                {toast.type === 'warning' && <AlertTriangle className="w-5 h-5 text-amber-500" />}
-                {toast.type === 'success' && <Check className="w-5 h-5 text-emerald-500" />}
-                {toast.type === 'error' && <AlertCircle className="w-5 h-5 text-rose-500" />}
-                {toast.type === 'info' && <Info className="w-5 h-5 text-blue-500" />}
+                {toast.type === 'warning' && <AlertTriangle className="w-5 h-5 text-amber-400" />}
+                {toast.type === 'success' && <Check className="w-5 h-5 text-emerald-400" />}
+                {toast.type === 'error' && <AlertCircle className="w-5 h-5 text-rose-400" />}
+                {toast.type === 'info' && <Info className="w-5 h-5 text-orange-400" />}
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold">{toast.title}</p>
-                <p className="text-xs text-slate-600 mt-0.5 leading-relaxed">{toast.message}</p>
+                <p className="text-sm font-semibold text-white">{toast.title}</p>
+                <p className="text-xs text-slate-400 mt-0.5 leading-relaxed">{toast.message}</p>
               </div>
               <button 
                 onClick={() => setToasts(prev => prev.filter(t => t.id !== toast.id))}
-                className="text-slate-400 hover:text-slate-600 p-0.5 rounded transition-colors"
+                className="text-slate-400 hover:text-white p-0.5 rounded transition-colors"
                 aria-label="Dismiss toast"
               >
                 <X className="w-4 h-4" />

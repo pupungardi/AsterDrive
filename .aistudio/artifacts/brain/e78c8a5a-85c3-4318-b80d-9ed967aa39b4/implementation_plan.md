@@ -1,49 +1,89 @@
-# Rencana Implementasi: Perbaikan Public Share Link & Sinkronisasi Folder Komputer
+# Rencana Implementasi: Perubahan Desain Dark Theme & Aksen Oranye AsterDrive
 
-Berdasarkan jawaban Anda, kami merancang dua perbaikan utama:
-1. **Public Share Link & Modal Dialog Berbagi:** Mengganti tautan `localhost` dengan URL publik Cloud Run (`https://ais-pre-owradbeu2qux37froeiwcs-7606689415.asia-southeast1.run.app`), serta menghadirkan **Modal Dialog Share Link** lengkap dengan opsi salin tautan dan izin akses.
-2. **Sinkronisasi Folder Komputer Otomatis:** Memperbaiki sistem upload folder agar secara otomatis membuat entitas folder asli (`type: 'folder'`, `source: 'computer'`), menyusun file di dalam foldernya, dan mendukung dialog pembuatan folder sync interaktif.
+Berdasarkan screenshot referensi yang Anda berikan dan jawaban klarifikasi, kami akan memperbarui desain AsterDrive menjadi tema gelap premium (*dark mode*) dengan aksen oranye cerah (*warm orange* `#f97316` / `#ea580c`), menata ulang menu sidebar dengan bagian **WORKSPACE**, serta membuat halaman khusus untuk **Storage** dan **Activity**.
 
 ---
 
-## 1. Rincian Fitur & Modifikasi
-
-### A. Fitur Public Share Link & Modal Dialog Berbagi
-- **Deteksi URL Publik:**
-  - Menghindari penggunaan `http://localhost:3000` di dalam iframe.
-  - Menggunakan URL publik Cloud Run: `https://ais-pre-owradbeu2qux37froeiwcs-7606689415.asia-southeast1.run.app/share/[fileId]`.
-- **Modal Dialog Share Interaktif:**
-  - Saat menekan tombol **Share Link** (dari menu titik tiga, panel detail, atau pemutar video), aplikasi akan membuka popup modal yang elegan:
-    - Menampilkan preview file (nama, ikon, ukuran).
-    - Menampilkan kotak input URL publik siap salin.
-    - Tombol **"Copy Link"** dengan status feedback (*Copied!*).
-    - Tombol **"Share via Apps"** menggunakan *Web Share API* bawaan peramban (WhatsApp, Telegram, Email, dll).
-    - Status privasi: *"Anyone with this public link can view & download"*.
-
-### B. Fitur Sinkronisasi Folder Komputer Otomatis
-- **Perbaikan `handleComputerUpload`:**
-  - Saat pengguna memilih folder melalui pemilih folder (`webkitdirectory`), sistem akan:
-    1. Mengekstrak nama folder utama dan subfolder dari `webkitRelativePath`.
-    2. Membuat entitas folder nyata (`type: 'folder'`, `source: 'computer'`, `computerDevice: 'This PC'`) di dalam state `driveItems` dan menyimpannya di `localStorage`.
-    3. Menyimpan file-file di dalam folder tersebut (`parentId: folderId`).
-    4. Menyimpan data biner asli setiap file ke dalam IndexedDB.
-- **Dialog Interaktif "Sync Folder":**
-  - Memberikan opsi dialog pembuatan folder sinkronisasi:
-    - Pilih folder lokal dari komputer via folder browser picker.
-    - Opsi cepat: Buat nama folder sinkronisasi baru (misal: `Dokumen Kerja`, `Photos Backup`, `Project Files`) lalu langsung pilih berkas untuk dimasukkan ke dalamnya.
-- **Dukungan Drag-and-Drop Folder:**
-  - Menyeret folder langsung ke tab Computers akan otomatis membentuk folder dan file yang tersinkronisasi.
+## 1. Skema Warna & Tema Global (*Dark Obsidian + Orange Accent*)
+- **Background Utama**: Warna gelap elegan (`bg-[#0c0e14]` / `#11141c`) untuk nuansa modern, bersih, dan kontras tinggi.
+- **Card & Surface**: Panel gelap bertingkat (`bg-[#161a23]`, `bg-[#1c2230]`, border `#2a3245`).
+- **Aksen Oranye**:
+  - Tombol aksi utama (*Call to Action*): `bg-orange-600 hover:bg-orange-500 text-white font-medium shadow-md shadow-orange-600/20`.
+  - Status aktif menu navigasi: latar gelap dengan border oranye dan teks oranye cerah (`bg-orange-950/30 border-orange-500/30 text-orange-400`).
+  - Badge kategori: teks oranye dengan badge minimalis seperti pada screenshot referensi.
+  - Ikon dan highlight pilihan file/folder: aksen oranye dan ring fokus.
 
 ---
 
-## 2. Langkah-Langkah Verifikasi
-1. **Linter & Tipe:** Jalankan `lint_applet` untuk memastikan seluruh tipe data TypeScript valid.
-2. **Uji Kompilasi:** Jalankan `compile_applet` untuk memverifikasi proses build Next.js sukses.
-3. **Uji Fungsional Share Link:**
-   - Klik tombol **Share Link** pada file apa pun.
-   - Pastikan modal share terbuka dan tautan yang dihasilkan menggunakan URL publik Cloud Run (bukan localhost).
-   - Uji tombol **Copy Link** untuk memastikan tautan tersalin dengan benar ke clipboard.
-4. **Uji Fungsional Sync Folder:**
-   - Klik **Sync Folder** di tab Computers dan pilih folder dari PC.
-   - Verifikasi folder muncul sebagai folder asli dengan ikon folder dan badge `✓ Synced`.
-   - Buka folder tersebut dan pastikan file-file di dalamnya tersimpan dan dapat diunduh/dilihat.
+## 2. Struktur Navigasi Sidebar Baru
+Sesuai preferensi Anda untuk menggabungkan menu screenshot dan fitur Sync Computers:
+- **Header**: Logo AsterDrive dengan ikon awan/drive bernuansa oranye gelap.
+- **Menu Utama**:
+  - `My Drive` (Ikon Hard Drive / Home, aktif secara default)
+  - `Computers` (Ikon Laptop/PC untuk fitur Sync & Backup folder lokal)
+  - `Shared with me` (Ikon Users)
+  - `Recent` (Ikon Clock)
+  - `Starred` (Ikon Star)
+- **Bagian WORKSPACE** (sesuai Screenshot 1):
+  - `Storage` (Membuka tampilan ringkasan kapasitas & paket penyimpanan)
+  - `Activity` (Membuka riwayat aktivitas berkas dan sinkronisasi)
+  - `People` (Manajemen kolaborator & akses bersama)
+  - `Trash` (Tempat sampah berkas terhapus)
+  - `Security` (Keamanan akun & enkripsi)
+  - `Feedback` (Kritik & saran pengguna)
+- **Footer Sidebar**:
+  - Tautan reguler: `About us`, `Help center`, `Privacy`, `Terms`.
+  - Mini widget kuota penyimpanan oranye.
+
+---
+
+## 3. Tampilan Halaman Khusus
+
+### A. Halaman Storage (Sesuai Screenshot 2)
+- Label kategori oranye kecil: **Storage**.
+- Judul besar: **Storage** dengan subjudul *"Everything you're working on, in one place."*
+- Card utama **Storage overview**:
+  - Ikon drive/vault dengan lingkaran aksen oranye.
+  - Teks kapasitas total terpakai (contoh: `0 GB` atau ukuran dinamis file riil yang tersimpan).
+  - Keterangan status file tersimpan.
+- Sub-cards:
+  - **Used**: Menampilkan ukuran total file aktif pengguna secara akurat (format byte/MB/GB).
+  - **Free space**: Menampilkan sisa kuota penyimpanan dari paket aktif (misal 1 GB Free atau 2 TB Pro).
+- Tombol aksi utama oranye: **Buy storage** (langsung membuka modal pemilihan paket penyimpanan).
+- Grafik rincian alokasi tipe file (Video, Gambar, Dokumen, Arsip).
+
+### B. Halaman Activity (Sesuai Screenshot 3)
+- Label kategori oranye: **Activity**.
+- Judul besar: **Activity** dengan subjudul *"Everything you're working on, in one place."*
+- Card utama **Recent activity**:
+  - Ikon jam melingkar dalam lingkaran oranye.
+  - Jumlah total aktivitas (badge counter).
+  - Kontainer dashed elegan: *"Uploads and changes will appear here."*
+  - Riwayat kronologis aktivitas nyata: riwayat unggah file, sinkronisasi folder dari PC, pembuatan link publik, dan penghapusan file.
+
+### C. Halaman My Drive & Computers
+- Tampilan kartu file & folder dengan tema gelap modern.
+- Toolbar pencarian, tombol unggah, tampilan Grid/List, serta navigasi folder (breadcrumbs) bernuansa gelap dan tajam.
+- Dukungan drag-and-drop dan fitur penyimpanan lokal riil IndexedDB tetap dipertahankan 100%.
+
+---
+
+## 4. Penyesuaian Modal & Dialog Interaktif
+- **Modal Share Link Publik**: Latar gelap dengan badge link publik Cloud Run dan tombol salin oranye.
+- **Modal Sync Folder**: Pemilihan direktori browser dan daftar folder PC dengan gaya dark mode.
+- **Modal Video Player**: Pemutar video gelap dengan kontrol playback speed dan opsi download.
+- **Modal Upgrade Storage**: Pilihan paket Free, 50 GB, 200 GB, hingga 2 TB dengan kartu yang rapi dan tombol oranye.
+
+---
+
+## 5. Rencana Pengujian & Verifikasi
+1. **Verifikasi Tampilan**:
+   - Sidebar navigasi menampilkan menu utama, bagian `WORKSPACE`, dan tautan footer.
+   - Halaman `Storage` menampilkan layout persis seperti Screenshot 2.
+   - Halaman `Activity` menampilkan layout persis seperti Screenshot 3.
+2. **Verifikasi Fungsionalitas**:
+   - Upload file dan folder tetap berfungsi dengan penyimpanan riil IndexedDB.
+   - Fitur Sync Computers tetap dapat menambahkan dan memfilter folder komputer.
+   - Pembuatan tautan publik Cloud Run tetap berjalan lancar.
+3. **Kompilasi & Linting**:
+   - Menjalankan `compile_applet` dan `lint_applet` untuk memastikan kode bebas dari error TypeScript atau styling.

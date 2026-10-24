@@ -54,7 +54,7 @@ function StorageCustomTooltip({ active, payload }: any) {
     const pctOfTotal = ((data.value / totalMax) * 100).toFixed(1);
 
     return (
-      <div className="bg-slate-900/95 text-white px-3.5 py-2.5 rounded-xl shadow-xl border border-slate-700/60 text-xs backdrop-blur-md">
+      <div className="bg-[#11141d]/95 text-white px-3.5 py-2.5 rounded-xl shadow-2xl border border-slate-700/80 text-xs backdrop-blur-md">
         <div className="flex items-center gap-2 mb-1">
           <span
             className="w-2.5 h-2.5 rounded-full inline-block shrink-0"
@@ -191,7 +191,7 @@ export function StorageAnalyticsChart({ items, plan, onUpgradeClick }: StorageAn
   // Chart data: active categories with usage, plus available space
   const chartData = useMemo(() => {
     if (categories.length === 0) {
-      return [{ name: 'Free Storage', value: plan.maxBytes, color: '#e2e8f0', key: 'free', count: 0, totalMaxBytes: plan.maxBytes }];
+      return [{ name: 'Free Storage', value: plan.maxBytes, color: '#1e2433', key: 'free', count: 0, totalMaxBytes: plan.maxBytes }];
     }
     const data = categories.map(cat => ({
       name: cat.name,
@@ -206,7 +206,7 @@ export function StorageAnalyticsChart({ items, plan, onUpgradeClick }: StorageAn
       data.push({
         name: 'Available Storage',
         value: freeBytes,
-        color: '#e2e8f0',
+        color: '#1e2433',
         key: 'free',
         count: 0,
         totalMaxBytes: plan.maxBytes
@@ -217,17 +217,17 @@ export function StorageAnalyticsChart({ items, plan, onUpgradeClick }: StorageAn
   }, [categories, freeBytes, plan.maxBytes]);
 
   return (
-    <div className="bg-white rounded-3xl shadow-sm border border-slate-200 p-6 sm:p-7 relative overflow-hidden">
+    <div className="bg-[#141824] rounded-3xl shadow-lg border border-[#252d3f] p-6 sm:p-7 relative overflow-hidden">
       {/* Header */}
       <div className="flex items-start justify-between gap-4 mb-6">
         <div>
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+            <div className="w-8 h-8 rounded-lg bg-orange-500/10 text-orange-400 border border-orange-500/20 flex items-center justify-center shrink-0">
               <HardDrive className="w-4 h-4" />
             </div>
-            <h3 className="font-semibold text-slate-900 text-base">Storage Breakdown</h3>
+            <h3 className="font-semibold text-white text-base">Storage Breakdown</h3>
           </div>
-          <p className="text-xs text-slate-500 mt-1">
+          <p className="text-xs text-slate-400 mt-1">
             Visual breakdown of storage usage by file type across your AsterDrive cloud
           </p>
         </div>
@@ -235,10 +235,10 @@ export function StorageAnalyticsChart({ items, plan, onUpgradeClick }: StorageAn
         {onUpgradeClick && (
           <button
             onClick={onUpgradeClick}
-            className="px-3.5 py-1.5 rounded-full text-xs font-medium bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200/80 transition-colors flex items-center gap-1.5 shrink-0"
+            className="px-3.5 py-1.5 rounded-full text-xs font-medium bg-orange-600 hover:bg-orange-500 text-white transition-colors flex items-center gap-1.5 shrink-0 shadow-md shadow-orange-600/20 cursor-pointer"
           >
-            <Sparkles className="w-3.5 h-3.5 text-blue-600" />
-            <span>{plan.isFree ? 'Upgrade' : 'Manage Tier'}</span>
+            <Sparkles className="w-3.5 h-3.5" />
+            <span>{plan.isFree ? 'Buy storage' : 'Manage Tier'}</span>
           </button>
         )}
       </div>
@@ -279,23 +279,23 @@ export function StorageAnalyticsChart({ items, plan, onUpgradeClick }: StorageAn
 
               {/* Center Metrics in Donut */}
               <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none text-center">
-                <span className="text-2xl font-bold text-slate-900 font-mono tabular-nums leading-tight">
+                <span className="text-2xl font-bold text-white font-mono tabular-nums leading-tight">
                   {Math.round(usedPercentage)}%
                 </span>
-                <span className="text-[11px] font-medium text-slate-500 uppercase tracking-wider">
+                <span className="text-[11px] font-medium text-slate-400 uppercase tracking-wider">
                   Used
                 </span>
               </div>
             </div>
           ) : (
-            <div className="w-40 h-40 rounded-full border-8 border-slate-100 border-t-blue-500 animate-spin" />
+            <div className="w-40 h-40 rounded-full border-8 border-[#1e2433] border-t-orange-500 animate-spin" />
           )}
 
           {/* Aggregate Quota Line */}
-          <div className="mt-2 text-center text-xs text-slate-600 font-mono tabular-nums">
-            <span className="font-semibold text-slate-800">{formatBytes(totalUsedBytes)}</span>
+          <div className="mt-2 text-center text-xs text-slate-400 font-mono tabular-nums">
+            <span className="font-semibold text-white">{formatBytes(totalUsedBytes)}</span>
             {' of '}
-            <span className="font-semibold text-slate-800">{plan.storage}</span>
+            <span className="font-semibold text-white">{plan.storage}</span>
             <span className="text-slate-400"> ({formatBytes(freeBytes)} free)</span>
           </div>
         </div>
@@ -303,7 +303,7 @@ export function StorageAnalyticsChart({ items, plan, onUpgradeClick }: StorageAn
         {/* Category Breakdown Legend */}
         <div className="md:col-span-7 flex flex-col justify-center space-y-2.5">
           {categories.length === 0 ? (
-            <div className="p-4 rounded-2xl bg-slate-50 border border-dashed border-slate-200 text-center text-xs text-slate-500">
+            <div className="p-4 rounded-2xl bg-[#0f131d] border border-dashed border-[#252d3f] text-center text-xs text-slate-400">
               No files uploaded yet. Drag and drop files to populate your drive storage.
             </div>
           ) : (
@@ -319,28 +319,28 @@ export function StorageAnalyticsChart({ items, plan, onUpgradeClick }: StorageAn
                   onMouseLeave={() => setHoveredKey(null)}
                   className={`p-2.5 rounded-xl transition-all border flex items-center justify-between gap-3 ${
                     isHovered
-                      ? 'bg-slate-50 border-slate-300 shadow-xs'
-                      : 'bg-white border-slate-100 hover:border-slate-200'
+                      ? 'bg-[#1b2131] border-[#36425c] shadow-sm'
+                      : 'bg-[#0f131d] border-[#22293a] hover:border-[#2f3950]'
                   }`}
                 >
                   <div className="flex items-center gap-3 min-w-0">
                     <div
                       className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
-                      style={{ backgroundColor: `${cat.color}18`, color: cat.color }}
+                      style={{ backgroundColor: `${cat.color}22`, color: cat.color }}
                     >
                       <IconComp className="w-4 h-4" />
                     </div>
                     <div className="min-w-0">
                       <div className="flex items-center gap-2">
-                        <span className="text-xs font-semibold text-slate-800 truncate">
+                        <span className="text-xs font-semibold text-white truncate">
                           {cat.name}
                         </span>
-                        <span className="text-[11px] text-slate-600">
+                        <span className="text-[11px] text-slate-400">
                           {cat.count} {cat.count === 1 ? 'file' : 'files'}
                         </span>
                       </div>
                       {/* Sub-bar */}
-                      <div className="w-24 sm:w-32 h-1.5 bg-slate-100 rounded-full overflow-hidden mt-1">
+                      <div className="w-24 sm:w-32 h-1.5 bg-[#1e2433] rounded-full overflow-hidden mt-1">
                         <div
                           className="h-full rounded-full transition-all duration-300"
                           style={{
@@ -353,10 +353,10 @@ export function StorageAnalyticsChart({ items, plan, onUpgradeClick }: StorageAn
                   </div>
 
                   <div className="text-right shrink-0">
-                    <span className="text-xs font-semibold text-slate-900 font-mono tabular-nums block">
+                    <span className="text-xs font-semibold text-white font-mono tabular-nums block">
                       {formatBytes(cat.bytes)}
                     </span>
-                    <span className="text-[10px] text-slate-600 font-mono tabular-nums">
+                    <span className="text-[10px] text-slate-400 font-mono tabular-nums">
                       {quotaFraction}% quota
                     </span>
                   </div>
@@ -366,13 +366,13 @@ export function StorageAnalyticsChart({ items, plan, onUpgradeClick }: StorageAn
           )}
 
           {/* Free Space Indicator Row */}
-          <div className="p-2.5 rounded-xl bg-slate-50/70 border border-slate-100 flex items-center justify-between gap-3 text-xs">
+          <div className="p-2.5 rounded-xl bg-[#0f131d]/80 border border-[#22293a] flex items-center justify-between gap-3 text-xs">
             <div className="flex items-center gap-2">
-              <span className="w-2.5 h-2.5 rounded-full bg-slate-300 inline-block shrink-0" />
-              <span className="font-medium text-slate-600">Available Storage</span>
+              <span className="w-2.5 h-2.5 rounded-full bg-slate-500 inline-block shrink-0" />
+              <span className="font-medium text-slate-300">Available Storage</span>
             </div>
-            <div className="text-right font-mono tabular-nums text-slate-500">
-              <span className="font-semibold text-slate-700">{formatBytes(freeBytes)}</span>
+            <div className="text-right font-mono tabular-nums text-slate-400">
+              <span className="font-semibold text-white">{formatBytes(freeBytes)}</span>
               {' '}
               <span className="text-[10px]">({Math.max(0, 100 - Math.round(usedPercentage))}%)</span>
             </div>

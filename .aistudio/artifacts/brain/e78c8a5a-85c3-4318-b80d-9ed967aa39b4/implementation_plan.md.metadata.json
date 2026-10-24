@@ -1,6 +1,6 @@
 {
-  "summary":  "Rencana implementasi untuk (1) perbaikan share link menggunakan URL publik Cloud Run dengan modal dialog share interaktif, dan (2) perbaikan sinkronisasi folder dari komputer yang secara otomatis membuat entitas folder asli, mempertahankan hierarki direktori lokal, serta menyediakan modal pembuatan folder sync.",
-  "updatedAt":  "2026-10-24T05:19:59.321009178Z",
+  "summary":  "Rencana implementasi perubahan desain AsterDrive ke tema gelap dengan aksen oranye sesuai tangkapan layar referensi:\n1. Desain Tema Gelap Menyeluruh (Obsidian Dark & Vivid Orange #f97316)\n2. Penataan Sidebar Lengkap dengan Kategori WORKSPACE & Integrasi Fitur Sync Computers\n3. Tampilan Halaman Storage Khusus (Storage Overview, Used & Free Space Cards, Tombol Buy Storage)\n4. Tampilan Halaman Activity Khusus (Recent Activity, Activity Log, Dashed Area)\n5. Penyesuaian Komponen & Modal ke Tema Gelap Oranye (File Grid, Share Link, Sync Modal, Video Preview)",
+  "updatedAt":  "2026-10-24T05:45:24.356668420Z",
   "requestFeedback":  true,
   "userFacing":  true
 }
