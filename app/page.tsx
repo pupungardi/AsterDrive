@@ -1,109 +1,72 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
-  HardDrive,
-  Folder,
-  FileText,
-  Image as ImageIcon,
-  Video,
-  FileSpreadsheet,
-  FileArchive,
-  MoreVertical,
-  Search,
-  Settings,
-  Bell,
-  Plus,
-  LayoutGrid,
-  List as ListIcon,
-  ChevronRight,
-  Star,
-  Clock,
-  Trash2,
-  Users,
-  Computer,
-  Cloud,
-  File,
   Menu,
+  Cloud,
+  Search,
+  Plus,
+  Sun,
+  Moon,
+  Bell,
   X,
-  Info,
-  Download,
-  Share2,
-  FolderOpen,
-  AlertTriangle,
-  RotateCcw,
-  Check,
+  Home,
+  FolderPlus,
+  UploadCloud,
+  FileText,
   LogOut,
   User,
-  Shield,
-  Palette,
-  CloudOff,
-  HelpCircle,
-  ShieldCheck,
-  Scale,
-  BookOpen,
-  Sparkles,
-  AlertCircle,
-  Mail,
-  Send,
-  Lock,
-  Smartphone,
-  ExternalLink,
-  Pencil,
-  Play,
-  Monitor,
-  Laptop,
-  UploadCloud,
+  Settings,
   CheckCircle2,
-  Maximize2,
-  Copy,
-  FolderPlus,
-  RefreshCw,
-  Home,
-  Activity as ActivityIcon,
+  HardDrive,
+  Users,
+  Trash2,
+  Clock,
+  Star,
+  ExternalLink,
+  Laptop,
+  Activity,
+  ShieldCheck,
   MessageSquare,
-  Database
+  MessageSquarePlus,
+  ChevronRight,
+  Folder,
+  Image as ImageIcon,
+  Video,
+  FileArchive,
+  FileSpreadsheet,
+  Download,
+  Share2,
+  MoreVertical,
+  LayoutGrid,
+  List as ListIcon,
+  RotateCcw,
+  Check,
+  AlertCircle,
+  Copy,
+  Info,
+  Key,
+  Shield,
+  Smartphone,
+  Sparkles,
+  Camera,
+  Trash,
+  Play,
+  Pause,
+  Maximize2,
+  ZoomIn,
+  ZoomOut,
+  RotateCw,
+  Eye
 } from 'lucide-react';
-import { clsx, type ClassValue } from 'clsx';
-import { twMerge } from 'tailwind-merge';
-import { StorageAnalyticsChart } from '@/components/StorageAnalyticsChart';
+import { StorageAnalyticsChart, StorageAnalyticsItem } from '@/components/StorageAnalyticsChart';
 import { saveFileBlob, getFileBlob, deleteFileBlob } from '@/lib/db';
 
-function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs));
-}
-
-// --- STORAGE PLANS & DATA TYPES ---
-
-interface StoragePlan {
-  id: string;
-  name: string;
-  storage: string;
-  price: string;
-  maxBytes: number;
-  isFree?: boolean;
-  recommended?: boolean;
-}
-
-const STORAGE_PLANS: StoragePlan[] = [
-  { id: 'free', name: 'Free Plan', storage: '1 GB', price: 'Free forever', maxBytes: 1 * 1024 * 1024 * 1024, isFree: true },
-  { id: '50GB', name: '50 GB Plan', storage: '50 GB', price: 'IDR 15.000 a month', maxBytes: 50 * 1024 * 1024 * 1024 },
-  { id: '200GB', name: '200 GB Plan', storage: '200 GB', price: 'IDR 45.000 a month', maxBytes: 200 * 1024 * 1024 * 1024 },
-  { id: '2TB', name: '2 TB Plan', storage: '2 TB', price: 'IDR 149.000 a month', maxBytes: 2 * 1024 * 1024 * 1024 * 1024, recommended: true },
-  { id: '6TB', name: '6 TB Plan', storage: '6 TB', price: 'IDR 449.000 a month', maxBytes: 6 * 1024 * 1024 * 1024 * 1024 },
-  { id: '12TB', name: '12 TB Plan', storage: '12 TB', price: 'IDR 899.000 a month', maxBytes: 12 * 1024 * 1024 * 1024 * 1024 },
-];
-
-const UPGRADE_PLANS = STORAGE_PLANS.filter(p => !p.isFree);
-
-type ItemType = 'folder' | 'document' | 'image' | 'video' | 'spreadsheet' | 'presentation' | 'archive' | 'unknown';
-
-interface DriveItem {
+export interface DriveItem {
   id: string;
   parentId: string;
   name: string;
-  type: ItemType;
+  type: 'folder' | 'document' | 'image' | 'video' | 'spreadsheet' | 'archive';
   size?: number;
   updatedAt: string;
   owner: string;
@@ -111,4919 +74,2374 @@ interface DriveItem {
   trashed?: boolean;
   source?: 'drive' | 'computer';
   videoUrl?: string;
+  previewUrl?: string;
+  thumbnailUrl?: string;
   computerDevice?: string;
   folderPath?: string;
 }
 
-const SAMPLE_VIDEO_URL = "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4";
-const SECONDARY_VIDEO_URL = "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4";
-
-// Real data: AsterDrive starts completely clean with 0 dummy files
-const initialData: DriveItem[] = [];
-
-function formatBytes(bytes?: number, decimals = 1) {
-  if (bytes === undefined || bytes === null || isNaN(bytes) || bytes === 0) return '0 B';
-  const k = 1024;
-  const dm = decimals < 0 ? 0 : decimals;
-  const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${sizes[i]}`;
-}
-
-const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-
-function formatDateSafe(dateStr?: string | Date): string {
-  if (!dateStr) return '';
-  try {
-    const d = typeof dateStr === 'string' ? new Date(dateStr) : dateStr;
-    if (isNaN(d.getTime())) return typeof dateStr === 'string' ? dateStr : '';
-    return `${MONTH_NAMES[d.getUTCMonth()]} ${d.getUTCDate()}, ${d.getUTCFullYear()}`;
-  } catch {
-    return typeof dateStr === 'string' ? dateStr : '';
+const INITIAL_ITEMS: DriveItem[] = [
+  {
+    id: 'f1',
+    parentId: 'root',
+    name: 'Designs & Assets',
+    type: 'folder',
+    updatedAt: '2026-10-26T10:30:00Z',
+    owner: 'Alex Driver',
+    starred: true
+  },
+  {
+    id: 'f2',
+    parentId: 'root',
+    name: 'Client Presentations',
+    type: 'folder',
+    updatedAt: '2026-10-25T14:15:00Z',
+    owner: 'Alex Driver'
+  },
+  {
+    id: 'f3',
+    parentId: 'root',
+    name: 'Quarterly Reports 2026',
+    type: 'folder',
+    updatedAt: '2026-10-24T09:00:00Z',
+    owner: 'Alex Driver'
+  },
+  {
+    id: 'doc1',
+    parentId: 'root',
+    name: 'AsterDrive_Architecture_Overview.pdf',
+    type: 'document',
+    size: 2450000,
+    updatedAt: '2026-10-27T04:20:00Z',
+    owner: 'Alex Driver',
+    starred: true
+  },
+  {
+    id: 'img1',
+    parentId: 'root',
+    name: 'Hero_Design_Concept_v3.png',
+    type: 'image',
+    size: 4890000,
+    previewUrl: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=1600&q=80',
+    thumbnailUrl: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=400&q=80',
+    updatedAt: '2026-10-26T18:45:00Z',
+    owner: 'Sarah Connor',
+    starred: true
+  },
+  {
+    id: 'vid1',
+    parentId: 'root',
+    name: 'Product_Demo_Walkthrough.mp4',
+    type: 'video',
+    size: 48200000,
+    videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
+    thumbnailUrl: 'https://images.unsplash.com/photo-1536240478700-b869070f9279?auto=format&fit=crop&w=400&q=80',
+    updatedAt: '2026-10-25T11:10:00Z',
+    owner: 'Alex Driver',
+    starred: true
+  },
+  {
+    id: 'img2',
+    parentId: 'root',
+    name: 'AsterDrive_Mobile_UI.jpg',
+    type: 'image',
+    size: 3200000,
+    previewUrl: 'https://images.unsplash.com/photo-1551650975-87deedd944c3?auto=format&fit=crop&w=1600&q=80',
+    thumbnailUrl: 'https://images.unsplash.com/photo-1551650975-87deedd944c3?auto=format&fit=crop&w=400&q=80',
+    updatedAt: '2026-10-26T14:20:00Z',
+    owner: 'Sarah Connor'
+  },
+  {
+    id: 'vid2',
+    parentId: 'root',
+    name: 'Cloud_Sync_Engine_Teaser.mp4',
+    type: 'video',
+    size: 15800000,
+    videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
+    thumbnailUrl: 'https://images.unsplash.com/photo-1574717024653-61fd2cf4d44d?auto=format&fit=crop&w=400&q=80',
+    updatedAt: '2026-10-25T16:30:00Z',
+    owner: 'Alex Driver'
+  },
+  {
+    id: 'sheet1',
+    parentId: 'root',
+    name: 'Q4_Cloud_Budget_Allocation.xlsx',
+    type: 'spreadsheet',
+    size: 890000,
+    updatedAt: '2026-10-24T16:00:00Z',
+    owner: 'Alex Driver'
+  },
+  {
+    id: 'comp1',
+    parentId: 'comp_root',
+    name: 'Local_Project_Backup.zip',
+    type: 'archive',
+    size: 15400000,
+    updatedAt: '2026-10-26T08:20:00Z',
+    owner: 'Alex Driver',
+    source: 'computer',
+    computerDevice: 'MacBook Pro 16"'
   }
-}
+];
 
-const getIconForType = (type: ItemType, className?: string) => {
-  const defaultClass = cn("w-5 h-5", className);
-  switch (type) {
-    case 'folder': return <Folder className={cn(defaultClass, "text-blue-500 fill-blue-500/20")} />;
-    case 'document': return <FileText className={cn(defaultClass, "text-blue-600")} />;
-    case 'image': return <ImageIcon className={cn(defaultClass, "text-rose-500")} />;
-    case 'video': return <Video className={cn(defaultClass, "text-purple-500")} />;
-    case 'spreadsheet': return <FileSpreadsheet className={cn(defaultClass, "text-emerald-500")} />;
-    case 'archive': return <FileArchive className={cn(defaultClass, "text-amber-500")} />;
-    default: return <File className={cn(defaultClass, "text-slate-400")} />;
-  }
-};
-
-interface ToastNotification {
-  id: string;
-  type: 'info' | 'success' | 'warning' | 'error';
-  title: string;
-  message: string;
-}
-
-type ProfileDetailView = 'personal' | 'security' | 'settings' | 'offline' | 'notifications' | 'appearance' | 'contact' | 'about' | 'terms' | 'privacy' | 'acceptable' | 'copyright' | null;
-
-let uniqueIdCounter = 0;
-function generateUniqueId(prefix = 'id'): string {
-  uniqueIdCounter += 1;
-  const time = Date.now().toString(36);
-  return `${prefix}_${time}_${uniqueIdCounter}`;
-}
-
-// --- MAIN APPLICATION COMPONENT ---
-
-interface ActivityItem {
-  id: string;
-  type: 'upload' | 'sync' | 'share' | 'trash' | 'restore' | 'star' | 'folder';
-  title: string;
-  description: string;
-  timestamp: string;
-}
-
-interface Collaborator {
-  id: string;
-  name: string;
-  email: string;
-  role: 'Viewer' | 'Editor';
-  addedAt: string;
-}
-
-interface FeedbackEntry {
-  id: string;
-  category: string;
-  message: string;
-  submittedAt: string;
-}
-
-const STORAGE_KEY = 'asterdrive_real_items_v2';
-const LEGACY_STORAGE_KEY = 'forgedrive_real_items_v2';
-const ACTIVITIES_STORAGE_KEY = 'asterdrive_real_activities_v1';
-const COLLABORATORS_STORAGE_KEY = 'asterdrive_collaborators_v1';
-const FEEDBACK_STORAGE_KEY = 'asterdrive_feedback_v1';
-const PUBLIC_APP_URL = 'https://ais-pre-owradbeu2qux37froeiwcs-7606689415.asia-southeast1.run.app';
-
-export default function AsterDriveApp() {
-  const [driveItems, setDriveItems] = useState<DriveItem[]>(initialData);
-  const [activities, setActivities] = useState<ActivityItem[]>(() => {
-    if (typeof window !== 'undefined') {
-      try {
-        const saved = localStorage.getItem(ACTIVITIES_STORAGE_KEY) || localStorage.getItem('forgedrive_real_activities_v1') || localStorage.getItem('asterdrive_real_activities_v1');
-        if (saved) {
-          const parsed = JSON.parse(saved);
-          if (Array.isArray(parsed)) {
-            return parsed;
-          }
-        }
-      } catch (e) {
-        console.warn('Failed to load activities', e);
-      }
-    }
-    return [];
-  });
+export default function Page() {
+  const [activeTab, setActiveTab] = useState<'mydrive' | 'computers' | 'shared' | 'recent' | 'starred' | 'storage' | 'activity' | 'people' | 'trash' | 'security' | 'feedback'>('mydrive');
+  const [items, setItems] = useState<DriveItem[]>(INITIAL_ITEMS);
   const [currentFolderId, setCurrentFolderId] = useState<string>('root');
-  const [searchQuery, setSearchQuery] = useState('');
+  const [folderHistory, setFolderHistory] = useState<{ id: string; name: string }[]>([{ id: 'root', name: 'My Drive' }]);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
-  const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [showDetails, setShowDetails] = useState(false);
-  const [activeNav, setActiveNav] = useState('my-drive');
-  const [showUploadMenu, setShowUploadMenu] = useState(false);
-  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [theme, setTheme] = useState<'dark' | 'light'>('dark');
 
-  // Collaborators State (Screenshot 1: People)
-  const [collaborators, setCollaborators] = useState<Collaborator[]>(() => {
-    if (typeof window !== 'undefined') {
-      try {
-        const saved = localStorage.getItem(COLLABORATORS_STORAGE_KEY);
-        if (saved) {
-          const parsed = JSON.parse(saved);
-          if (Array.isArray(parsed)) return parsed;
-        }
-      } catch (e) {
-        console.warn('Failed to load collaborators', e);
-      }
-    }
-    return [];
-  });
-  const [isInviteOpen, setIsInviteOpen] = useState(false);
-  const [inviteEmail, setInviteEmail] = useState('');
-  const [inviteRole, setInviteRole] = useState<'Viewer' | 'Editor'>('Editor');
+  // Menus & Modals
+  const [newMenuOpen, setNewMenuOpen] = useState(false);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [profileModalOpen, setProfileModalOpen] = useState(false);
+  const [previewItem, setPreviewItem] = useState<DriveItem | null>(null);
+  const [shareItem, setShareItem] = useState<DriveItem | null>(null);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  // Feedback State (Screenshot 4: Feedback)
-  const [feedbackMessage, setFeedbackMessage] = useState('');
-  const [isSubmittingFeedback, setIsSubmittingFeedback] = useState(false);
-  const [feedbackList, setFeedbackList] = useState<FeedbackEntry[]>(() => {
-    if (typeof window !== 'undefined') {
-      try {
-        const saved = localStorage.getItem(FEEDBACK_STORAGE_KEY);
-        if (saved) {
-          const parsed = JSON.parse(saved);
-          if (Array.isArray(parsed)) return parsed;
-        }
-      } catch (e) {
-        console.warn('Failed to load feedback', e);
-      }
-    }
-    return [];
-  });
+  // Media Preview States
+  const [activeMediaUrl, setActiveMediaUrl] = useState<string | null>(null);
+  const [isLoadingMedia, setIsLoadingMedia] = useState<boolean>(false);
+  const [imageZoom, setImageZoom] = useState<number>(1);
+  const [imageRotation, setImageRotation] = useState<number>(0);
+  const [previewTab, setPreviewTab] = useState<'preview' | 'details'>('preview');
+  const videoRef = useRef<HTMLVideoElement>(null);
 
-  // Security Scan State (Screenshot 3: Security)
-  const [isSecurityScanning, setIsSecurityScanning] = useState(false);
-  const [lastSecurityScanTime, setLastSecurityScanTime] = useState('Just now');
+  // People & Collaborators State
+  const [collaborators, setCollaborators] = useState<{ id: string; email: string; role: 'Viewer' | 'Editor'; addedAt: string }[]>([]);
+  const [newCollabEmail, setNewCollabEmail] = useState('');
+  const [newCollabRole, setNewCollabRole] = useState<'Viewer' | 'Editor'>('Viewer');
+  const [showInviteModal, setShowInviteModal] = useState(false);
 
-  // Helper to record real activities
-  const logActivity = (type: ActivityItem['type'], title: string, description: string) => {
-    const newAct: ActivityItem = {
-      id: generateUniqueId('act'),
-      type,
-      title,
-      description,
-      timestamp: new Date().toISOString()
-    };
-    setActivities(prev => [newAct, ...prev.slice(0, 49)]);
+  // Security scan state
+  const [isScanning, setIsScanning] = useState(false);
+  const [scanResult, setScanResult] = useState<'Clean' | 'Ready'>('Ready');
+
+  // Feedback form state
+  const [feedbackText, setFeedbackText] = useState('');
+  const [feedbackSent, setFeedbackSent] = useState(false);
+
+  // Sync computers state
+  const [syncEnabled, setSyncEnabled] = useState(true);
+
+  // Refs for clicking outside
+  const newMenuRef = useRef<HTMLDivElement>(null);
+  const notifRef = useRef<HTMLDivElement>(null);
+  const userMenuRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const showToast = (msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(null), 3000);
   };
 
-  // Save activities to localStorage
-  React.useEffect(() => {
-    try {
-      localStorage.setItem(ACTIVITIES_STORAGE_KEY, JSON.stringify(activities));
-    } catch (e) {
-      console.warn('Failed to save activities', e);
-    }
-  }, [activities]);
-
-  // Save collaborators to localStorage
-  React.useEffect(() => {
-    try {
-      localStorage.setItem(COLLABORATORS_STORAGE_KEY, JSON.stringify(collaborators));
-    } catch (e) {
-      console.warn('Failed to save collaborators', e);
-    }
-  }, [collaborators]);
-
-  // Save feedback to localStorage
-  React.useEffect(() => {
-    try {
-      localStorage.setItem(FEEDBACK_STORAGE_KEY, JSON.stringify(feedbackList));
-    } catch (e) {
-      console.warn('Failed to save feedback', e);
-    }
-  }, [feedbackList]);
-  
-  // Storage plan state: defaults to Free Plan (1 GB)
-  const [currentPlan, setCurrentPlan] = useState<StoragePlan>(STORAGE_PLANS[0]);
-  const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
-  const [selectedPlanId, setSelectedPlanId] = useState<string>('2TB');
-  
-  // Profile modal state
-  const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
-  const [activeProfileDetail, setActiveProfileDetail] = useState<ProfileDetailView>(null);
-
-  // Three-Dots (MoreVertical) Item Menu state
-  const [activeItemMenu, setActiveItemMenu] = useState<{
-    item: DriveItem;
-    top: number;
-    left: number;
-  } | null>(null);
-
-  // Header Three-Dots Menu state
-  const [isHeaderMenuOpen, setIsHeaderMenuOpen] = useState(false);
-
-  // Rename modal state
-  const [itemToRename, setItemToRename] = useState<DriveItem | null>(null);
-  const [renameInput, setRenameInput] = useState('');
-
-  // Video player modal state
-  const [previewVideoItem, setPreviewVideoItem] = useState<DriveItem | null>(null);
-  const [activeVideoUrl, setActiveVideoUrl] = useState<string | null>(null);
-  const [videoPlaybackSpeed, setVideoPlaybackSpeed] = useState<number>(1);
-  const [videoLoadError, setVideoLoadError] = useState(false);
-  const videoPlayerRef = React.useRef<HTMLVideoElement>(null);
-
-  // Load persistent real items from localStorage on mount
-  React.useEffect(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY) || localStorage.getItem(LEGACY_STORAGE_KEY);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) {
-          requestAnimationFrame(() => {
-            setDriveItems(parsed);
-          });
-        }
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      const target = event.target as Node;
+      if (newMenuRef.current && !newMenuRef.current.contains(target)) {
+        setNewMenuOpen(false);
       }
-    } catch (e) {
-      console.warn('Failed to load items from localStorage', e);
+      if (notifRef.current && !notifRef.current.contains(target)) {
+        setNotificationsOpen(false);
+      }
+      if (userMenuRef.current && !userMenuRef.current.contains(target)) {
+        setUserMenuOpen(false);
+      }
     }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Save persistent real items to localStorage
-  React.useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(driveItems));
-    } catch (e) {
-      console.warn('Failed to save items to localStorage', e);
-    }
-  }, [driveItems]);
-
-  const openVideoPreview = async (item: DriveItem) => {
-    setVideoLoadError(false);
-    setVideoPlaybackSpeed(1);
-    setPreviewVideoItem(item);
-
-    if (activeVideoUrl && activeVideoUrl.startsWith('blob:')) {
-      URL.revokeObjectURL(activeVideoUrl);
-    }
-
-    try {
-      const blob = await getFileBlob(item.id);
-      if (blob) {
-        const url = URL.createObjectURL(blob);
-        setActiveVideoUrl(url);
-        return;
-      }
-    } catch (err) {
-      console.warn('Could not load video blob from IndexedDB', err);
-    }
-
-    if (item.videoUrl) {
-      setActiveVideoUrl(item.videoUrl);
+  const handleOpenPreview = (item: DriveItem) => {
+    setImageZoom(1);
+    setImageRotation(0);
+    setPreviewTab('preview');
+    if (item.type === 'video' && item.videoUrl) {
+      setActiveMediaUrl(item.videoUrl);
+      setIsLoadingMedia(false);
+    } else if (item.type === 'image' && item.previewUrl) {
+      setActiveMediaUrl(item.previewUrl);
+      setIsLoadingMedia(false);
     } else {
-      setActiveVideoUrl(null);
+      setActiveMediaUrl(null);
+      setIsLoadingMedia(true);
     }
+    setPreviewItem(item);
   };
 
-  const closeVideoPreview = () => {
-    if (activeVideoUrl && activeVideoUrl.startsWith('blob:')) {
-      URL.revokeObjectURL(activeVideoUrl);
-    }
-    setActiveVideoUrl(null);
-    setPreviewVideoItem(null);
+  const handleClosePreview = () => {
+    setPreviewItem(null);
+    setActiveMediaUrl(null);
+    setImageZoom(1);
+    setImageRotation(0);
   };
 
-  // Computer sync modal state
-  const [isSyncModalOpen, setIsSyncModalOpen] = useState(false);
-  const [isNewSyncFolderModalOpen, setIsNewSyncFolderModalOpen] = useState(false);
-  const [newSyncFolderName, setNewSyncFolderName] = useState('');
+  // Resolve media URL asynchronously if not directly set
+  useEffect(() => {
+    if (!previewItem || activeMediaUrl) return;
 
-  // Public Share Link modal state
-  const [shareModalItem, setShareModalItem] = useState<DriveItem | null>(null);
-  const [copiedShareLink, setCopiedShareLink] = useState(false);
+    let isMounted = true;
+    let createdUrl: string | null = null;
 
-  // Drag-and-drop state
-  const [isDraggingOver, setIsDraggingOver] = useState(false);
-  const dragCounter = React.useRef(0);
+    async function loadItemMedia() {
+      try {
+        if (previewItem) {
+          const blob = await getFileBlob(previewItem.id);
+          if (blob && isMounted) {
+            createdUrl = URL.createObjectURL(blob);
+            setActiveMediaUrl(createdUrl);
+            setIsLoadingMedia(false);
+            return;
+          }
+        }
+      } catch (err) {
+        console.error('Error fetching file blob:', err);
+      }
 
-  // Close menus on scroll or window resize
-  React.useEffect(() => {
-    const handleCloseMenus = () => {
-      setActiveItemMenu(null);
-      setIsHeaderMenuOpen(false);
-    };
-    window.addEventListener('scroll', handleCloseMenus, true);
-    window.addEventListener('resize', handleCloseMenus);
+      if (isMounted && previewItem) {
+        if (previewItem.type === 'video') {
+          setActiveMediaUrl('https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4');
+        } else if (previewItem.type === 'image') {
+          setActiveMediaUrl('https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=1600&q=80');
+        }
+        setIsLoadingMedia(false);
+      }
+    }
+
+    loadItemMedia();
+
     return () => {
-      window.removeEventListener('scroll', handleCloseMenus, true);
-      window.removeEventListener('resize', handleCloseMenus);
-    };
-  }, []);
-
-  // Toast notifications state
-  const [toasts, setToasts] = useState<ToastNotification[]>([]);
-
-  const showToast = (toast: Omit<ToastNotification, 'id'>) => {
-    const id = generateUniqueId('toast');
-    setToasts(prev => [...prev, { ...toast, id }]);
-    setTimeout(() => {
-      setToasts(prev => prev.filter(t => t.id !== id));
-    }, 4500);
-  };
-
-  // Open Three-Dots action menu for an item
-  const handleOpenItemMenu = (item: DriveItem, e: React.MouseEvent<HTMLButtonElement>) => {
-    e.stopPropagation();
-    e.preventDefault();
-
-    const rect = e.currentTarget.getBoundingClientRect();
-    const menuWidth = 224;
-    const menuHeight = item.trashed ? 160 : 310;
-    
-    let left = rect.right - menuWidth;
-    if (left < 10) left = 10;
-    if (left + menuWidth > window.innerWidth - 10) {
-      left = window.innerWidth - menuWidth - 10;
-    }
-
-    let top = rect.bottom + 6;
-    if (top + menuHeight > window.innerHeight - 10) {
-      top = Math.max(10, rect.top - menuHeight - 6);
-    }
-
-    setActiveItemMenu({
-      item,
-      top,
-      left,
-    });
-  };
-
-  const handleDownloadItem = async (item: DriveItem) => {
-    setActiveItemMenu(null);
-    showToast({
-      type: 'success',
-      title: 'Download Started',
-      message: `Downloading "${item.name}" (${formatBytes(item.size)})`
-    });
-    try {
-      const realBlob = await getFileBlob(item.id);
-      let downloadBlob = realBlob;
-      if (!downloadBlob) {
-        downloadBlob = new Blob([
-          `AsterDrive Cloud Storage\nFile: ${item.name}\nSize: ${formatBytes(item.size)}\nOwner: ${item.owner}\nUploaded: ${item.updatedAt}\nPlan: ${currentPlan.name}`
-        ], { type: 'text/plain' });
-      }
-      const url = URL.createObjectURL(downloadBlob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = item.name.includes('.') ? item.name : `${item.name}.txt`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    } catch (err) {
-      console.error('Download error', err);
-    }
-  };
-
-  const getPublicShareUrl = (item: DriveItem) => {
-    if (typeof window !== 'undefined') {
-      const origin = window.location.origin;
-      if (origin.includes('localhost') || origin.includes('127.0.0.1')) {
-        return `${PUBLIC_APP_URL}/share/${item.id}`;
-      }
-      return `${origin}/share/${item.id}`;
-    }
-    return `${PUBLIC_APP_URL}/share/${item.id}`;
-  };
-
-  const handleShareItem = (item: DriveItem) => {
-    setActiveItemMenu(null);
-    setShareModalItem(item);
-    setCopiedShareLink(false);
-  };
-
-  const handleToggleStarSingle = (item: DriveItem) => {
-    setActiveItemMenu(null);
-    setDriveItems(prev => prev.map(i => i.id === item.id ? { ...i, starred: !i.starred } : i));
-    showToast({
-      type: 'info',
-      title: item.starred ? 'Removed from Starred' : 'Added to Starred',
-      message: `"${item.name}" ${item.starred ? 'is no longer starred.' : 'marked with star.'}`
-    });
-  };
-
-  const handleOpenRename = (item: DriveItem) => {
-    setActiveItemMenu(null);
-    setItemToRename(item);
-    setRenameInput(item.name);
-  };
-
-  const handleSaveRename = () => {
-    if (!itemToRename) return;
-    const trimmed = renameInput.trim();
-    if (!trimmed) {
-      showToast({
-        type: 'warning',
-        title: 'Name Required',
-        message: 'Item name cannot be empty.'
-      });
-      return;
-    }
-    const oldName = itemToRename.name;
-    setDriveItems(prev => prev.map(i => i.id === itemToRename.id ? { ...i, name: trimmed, updatedAt: new Date().toISOString() } : i));
-    setItemToRename(null);
-    showToast({
-      type: 'success',
-      title: 'Item Renamed',
-      message: `"${oldName}" renamed to "${trimmed}".`
-    });
-  };
-
-  // Computer sync execution state
-  const [isSyncingNow, setIsSyncingNow] = useState(false);
-
-  const handleSyncNow = () => {
-    if (isSyncingNow) return;
-    setIsSyncingNow(true);
-    showToast({
-      type: 'info',
-      title: 'Verifying Computer Sync...',
-      message: 'Checking local files against AsterDrive backup storage...'
-    });
-    setTimeout(() => {
-      setIsSyncingNow(false);
-      showToast({
-        type: 'success',
-        title: 'Sync Complete & Up to Date',
-        message: 'All files are securely backed up and match your local computer.'
-      });
-    }, 1200);
-  };
-
-  const handleToggleComputerSync = (item: DriveItem) => {
-    setActiveItemMenu(null);
-    const willBeComputer = item.source !== 'computer';
-    setDriveItems(prev => prev.map(i => i.id === item.id ? {
-      ...i,
-      source: willBeComputer ? 'computer' : 'drive',
-      computerDevice: willBeComputer ? (i.computerDevice || 'This PC') : undefined,
-      folderPath: willBeComputer ? (i.folderPath || 'Synced from PC') : undefined,
-      updatedAt: new Date().toISOString()
-    } : i));
-    showToast({
-      type: 'success',
-      title: willBeComputer ? 'Linked to Computer Sync' : 'Removed from Computer Sync',
-      message: `"${item.name}" is now ${willBeComputer ? 'synced with your computer and visible in the Computers tab.' : 'stored in My Drive only.'}`
-    });
-  };
-
-  const handleSyncAllDriveFilesToComputer = () => {
-    const unlinked = driveItems.filter(i => !i.trashed && i.source !== 'computer');
-    if (unlinked.length === 0) return;
-    setDriveItems(prev => prev.map(item => {
-      if (!item.trashed && item.source !== 'computer') {
-        return {
-          ...item,
-          source: 'computer',
-          computerDevice: 'This PC',
-          folderPath: item.folderPath || 'Backup / Uploaded',
-          updatedAt: new Date().toISOString()
-        };
-      }
-      return item;
-    }));
-    showToast({
-      type: 'success',
-      title: 'Files Synced with Computer',
-      message: `${unlinked.length} file(s) have been linked to this Computer and are now backed up.`
-    });
-  };
-
-  const handleToggleSelectedComputerSync = () => {
-    if (selectedItems.size === 0) return;
-    const selectedList = driveItems.filter(i => selectedItems.has(i.id));
-    const allAlreadyComputer = selectedList.every(i => i.source === 'computer');
-    const newSource = allAlreadyComputer ? 'drive' : 'computer';
-
-    setDriveItems(prev => prev.map(item => {
-      if (selectedItems.has(item.id)) {
-        return {
-          ...item,
-          source: newSource,
-          computerDevice: newSource === 'computer' ? (item.computerDevice || 'This PC') : undefined,
-          folderPath: newSource === 'computer' ? (item.folderPath || 'Synced from PC') : undefined,
-          updatedAt: new Date().toISOString()
-        };
-      }
-      return item;
-    }));
-
-    showToast({
-      type: 'success',
-      title: newSource === 'computer' ? 'Linked to Computer Sync' : 'Removed from Computer Sync',
-      message: `${selectedList.length} item(s) ${newSource === 'computer' ? 'are now visible in the Computers tab and marked as synced.' : 'are now stored in My Drive only.'}`
-    });
-  };
-
-  const handleCreateNewSyncFolder = () => {
-    const trimmed = newSyncFolderName.trim();
-    if (!trimmed) {
-      showToast({
-        type: 'warning',
-        title: 'Folder Name Required',
-        message: 'Please enter a name for the new sync folder.'
-      });
-      return;
-    }
-    const folderId = generateUniqueId('folder');
-    const newFolder: DriveItem = {
-      id: folderId,
-      parentId: currentFolderId,
-      name: trimmed,
-      type: 'folder',
-      updatedAt: new Date().toISOString(),
-      owner: 'me',
-      source: 'computer',
-      computerDevice: 'This PC',
-      folderPath: trimmed
-    };
-    setDriveItems(prev => [...prev, newFolder]);
-    setIsNewSyncFolderModalOpen(false);
-    setNewSyncFolderName('');
-    showToast({
-      type: 'success',
-      title: 'Sync Folder Created',
-      message: `Folder "${trimmed}" created and ready for computer backup.`
-    });
-  };
-
-  const fileInputRef = React.useRef<HTMLInputElement>(null);
-  const folderInputRef = React.useRef<HTMLInputElement>(null);
-  const computerFileInputRef = React.useRef<HTMLInputElement>(null);
-  const computerFolderInputRef = React.useRef<HTMLInputElement>(null);
-
-  // Set webkitdirectory on client safely to prevent SSR attribute mismatch
-  React.useEffect(() => {
-    if (folderInputRef.current) {
-      folderInputRef.current.setAttribute('webkitdirectory', '');
-      folderInputRef.current.setAttribute('directory', '');
-    }
-    if (computerFolderInputRef.current) {
-      computerFolderInputRef.current.setAttribute('webkitdirectory', '');
-      computerFolderInputRef.current.setAttribute('directory', '');
-    }
-  }, []);
-
-  // Keyboard shortcut listener (Escape to close video modal, Space for play/pause)
-  React.useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        setPreviewVideoItem(null);
-        setIsSyncModalOpen(false);
-      }
-      if (previewVideoItem && e.code === 'Space') {
-        const target = e.target as HTMLElement | null;
-        if (target?.tagName !== 'INPUT' && target?.tagName !== 'TEXTAREA') {
-          e.preventDefault();
-          if (videoPlayerRef.current) {
-            if (videoPlayerRef.current.paused) {
-              videoPlayerRef.current.play().catch(() => {});
-            } else {
-              videoPlayerRef.current.pause();
-            }
-          }
-        }
+      isMounted = false;
+      if (createdUrl) {
+        URL.revokeObjectURL(createdUrl);
       }
     };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [previewVideoItem]);
+  }, [previewItem, activeMediaUrl]);
 
-  // Storage calculations
-  const totalUsedBytes = useMemo(() => {
-    return driveItems.reduce((acc, item) => acc + (item.size || 0), 0);
-  }, [driveItems]);
+  // Filtered Items
+  const currentItems = useMemo(() => {
+    return items.filter((item) => {
+      // Exclude trashed items in regular views
+      if (activeTab !== 'trash' && item.trashed) return false;
 
-  const storagePercentage = useMemo(() => {
-    if (!currentPlan.maxBytes) return 0;
-    return Math.min(100, Math.max(0, (totalUsedBytes / currentPlan.maxBytes) * 100));
-  }, [totalUsedBytes, currentPlan.maxBytes]);
+      // Filter by search
+      if (searchQuery.trim()) {
+        const query = searchQuery.toLowerCase();
+        return item.name.toLowerCase().includes(query) || item.owner.toLowerCase().includes(query);
+      }
 
-  // Upload handler with quota enforcement, folder picker tree preservation, and video object URLs
+      if (activeTab === 'mydrive') {
+        return item.parentId === currentFolderId && (!item.source || item.source === 'drive');
+      }
+      if (activeTab === 'computers') {
+        return item.source === 'computer';
+      }
+      if (activeTab === 'shared') {
+        return item.owner !== 'Alex Driver';
+      }
+      if (activeTab === 'recent') {
+        return true;
+      }
+      if (activeTab === 'starred') {
+        return item.starred === true;
+      }
+      if (activeTab === 'trash') {
+        return item.trashed === true;
+      }
+      return true;
+    });
+  }, [items, activeTab, currentFolderId, searchQuery]);
+
+  // Actions
+  const handleUploadClick = () => {
+    fileInputRef.current?.click();
+    setNewMenuOpen(false);
+  };
+
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files.length > 0) {
-      const filesArray = Array.from(e.target.files);
-      const incomingBytes = filesArray.reduce((acc, file) => acc + (file.size || 0), 0);
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
 
-      // Validate against current plan limit (e.g. 1 GB for Free Plan)
-      if (totalUsedBytes + incomingBytes > currentPlan.maxBytes) {
-        showToast({
-          type: 'warning',
-          title: 'Storage Quota Exceeded',
-          message: `Uploading ${filesArray.length} file(s) (${formatBytes(incomingBytes)}) exceeds your ${currentPlan.name} limit (${currentPlan.storage}). Currently using ${formatBytes(totalUsedBytes)} of ${currentPlan.storage}.`
-        });
-        setIsUpgradeModalOpen(true);
-        setShowUploadMenu(false);
-        e.target.value = '';
-        return;
-      }
+    Array.from(files).forEach((file) => {
+      const id = 'file_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7);
+      let type: DriveItem['type'] = 'document';
+      if (file.type.startsWith('image/')) type = 'image';
+      else if (file.type.startsWith('video/')) type = 'video';
+      else if (file.name.endsWith('.xlsx') || file.name.endsWith('.csv')) type = 'spreadsheet';
+      else if (file.name.endsWith('.zip') || file.name.endsWith('.tar') || file.name.endsWith('.gz')) type = 'archive';
 
-      // Check if uploaded items originate from folder picker (webkitRelativePath present)
-      const hasRelativePaths = filesArray.some(f => (f as any).webkitRelativePath && (f as any).webkitRelativePath.includes('/'));
+      saveFileBlob(id, file);
 
-      if (hasRelativePaths) {
-        interface DiscoveredFolder {
-          fullPath: string;
-          name: string;
-          parentPath: string;
-        }
-        const discoveredFolders: DiscoveredFolder[] = [];
-        const filesWithFolder: { file: File; folderPath: string }[] = [];
+      // Instant blob URL for immediate viewing & video playback
+      const instantUrl = URL.createObjectURL(file);
 
-        for (const file of filesArray) {
-          const relPath = (file as any).webkitRelativePath;
-          let folderPath = '';
-          if (relPath && relPath.includes('/')) {
-            const parts = relPath.split('/');
-            folderPath = parts.slice(0, -1).join('/');
-            let accum = '';
-            for (let p = 0; p < parts.length - 1; p++) {
-              const prev = accum;
-              accum = accum ? `${accum}/${parts[p]}` : parts[p];
-              if (!discoveredFolders.some(f => f.fullPath === accum)) {
-                discoveredFolders.push({
-                  fullPath: accum,
-                  name: parts[p],
-                  parentPath: prev
-                });
-              }
-            }
-          }
-          filesWithFolder.push({ file, folderPath });
-        }
-
-        const targetRootFolderId = activeNav === 'trash' ? 'root' : currentFolderId;
-        discoveredFolders.sort((a, b) => a.fullPath.split('/').length - b.fullPath.split('/').length);
-        const folderIdMap = new Map<string, string>();
-        folderIdMap.set('', targetRootFolderId);
-
-        const newFolderItems: DriveItem[] = [];
-        for (const folder of discoveredFolders) {
-          const parentId = folderIdMap.get(folder.parentPath) || targetRootFolderId;
-          const folderId = generateUniqueId('folder');
-          folderIdMap.set(folder.fullPath, folderId);
-
-          newFolderItems.push({
-            id: folderId,
-            parentId: parentId,
-            name: folder.name,
-            type: 'folder',
-            updatedAt: new Date().toISOString(),
-            owner: activeNav === 'shared' ? 'colleague@example.com' : 'me',
-            source: activeNav === 'computers' ? 'computer' : 'drive',
-            computerDevice: activeNav === 'computers' ? 'This PC' : undefined,
-            folderPath: folder.name
-          });
-        }
-
-        const newFileItems: DriveItem[] = filesWithFolder.map(({ file, folderPath }) => {
-          const isVideo = file.type.includes('video') || !!file.name.match(/\.(mp4|mov|webm|mkv|avi|m4v)$/i);
-          let videoUrl: string | undefined = undefined;
-          if (isVideo) {
-            try {
-              videoUrl = URL.createObjectURL(file);
-            } catch (err) {
-              console.error('Error creating object URL for video', err);
-            }
-          }
-
-          const parentId = folderIdMap.get(folderPath) || targetRootFolderId;
-
-          return {
-            id: generateUniqueId('file'),
-            parentId: parentId,
-            name: file.name,
-            type: file.type.includes('image') ? 'image' : 
-                  isVideo ? 'video' : 
-                  file.type.includes('spreadsheet') || file.name.endsWith('.xlsx') || file.name.endsWith('.csv') ? 'spreadsheet' :
-                  file.type.includes('zip') || file.name.endsWith('.zip') || file.name.endsWith('.rar') || file.name.endsWith('.7z') ? 'archive' : 'document',
-            size: file.size,
-            updatedAt: new Date().toISOString(),
-            owner: activeNav === 'shared' ? 'colleague@example.com' : 'me',
-            source: activeNav === 'computers' ? 'computer' : 'drive',
-            videoUrl,
-            computerDevice: activeNav === 'computers' ? 'This PC' : undefined,
-            folderPath: folderPath || undefined
-          };
-        });
-
-        // Save binary file blobs to IndexedDB for real persistent retrieval
-        newFileItems.forEach((item, idx) => {
-          saveFileBlob(item.id, filesWithFolder[idx].file);
-        });
-
-        setDriveItems(prev => [...prev, ...newFolderItems, ...newFileItems]);
-        setShowUploadMenu(false);
-        showToast({
-          type: 'success',
-          title: 'Folder Upload Complete',
-          message: `${newFileItems.length} file(s) and ${newFolderItems.length} folder(s) (${formatBytes(incomingBytes)}) added to AsterDrive.`
-        });
-        e.target.value = '';
-        return;
-      }
-
-      const newItems: DriveItem[] = filesArray.map(file => {
-        const isVideo = file.type.includes('video') || !!file.name.match(/\.(mp4|mov|webm|mkv|avi|m4v)$/i);
-        let videoUrl: string | undefined = undefined;
-        if (isVideo) {
-          try {
-            videoUrl = URL.createObjectURL(file);
-          } catch (err) {
-            console.error('Error creating object URL for video', err);
-          }
-        }
-
-        return {
-          id: generateUniqueId('file'),
-          parentId: currentFolderId,
-          name: file.name,
-          type: file.type.includes('image') ? 'image' : 
-                isVideo ? 'video' : 
-                file.type.includes('spreadsheet') || file.name.endsWith('.xlsx') || file.name.endsWith('.csv') ? 'spreadsheet' :
-                file.type.includes('zip') || file.name.endsWith('.zip') || file.name.endsWith('.rar') ? 'archive' : 'document',
-          size: file.size,
-          updatedAt: new Date().toISOString(),
-          owner: activeNav === 'shared' ? 'colleague@example.com' : 'me',
-          source: activeNav === 'computers' ? 'computer' : 'drive',
-          videoUrl,
-          computerDevice: activeNav === 'computers' ? 'This PC' : undefined,
-          folderPath: activeNav === 'computers' ? 'Uploaded from PC' : undefined
-        };
-      });
-
-      // Save binary file blobs to IndexedDB
-      newItems.forEach((item, idx) => {
-        saveFileBlob(item.id, filesArray[idx]);
-      });
-
-      setDriveItems(prev => [...prev, ...newItems]);
-      setShowUploadMenu(false);
-      showToast({
-        type: 'success',
-        title: 'Upload Complete',
-        message: `${newItems.length} file(s) (${formatBytes(incomingBytes)}) added to AsterDrive.`
-      });
-      e.target.value = '';
-    }
-  };
-
-  // Full-Window Drag and Drop Handlers with recursive folder structure preservation
-  const handleWindowDragEnter = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    dragCounter.current += 1;
-    if (e.dataTransfer && (e.dataTransfer.types.includes('Files') || (e.dataTransfer.items && e.dataTransfer.items.length > 0))) {
-      setIsDraggingOver(true);
-    }
-  };
-
-  const handleWindowDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (e.dataTransfer) {
-      e.dataTransfer.dropEffect = 'copy';
-    }
-  };
-
-  const handleWindowDragLeave = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    dragCounter.current -= 1;
-    if (dragCounter.current <= 0) {
-      dragCounter.current = 0;
-      setIsDraggingOver(false);
-    }
-  };
-
-  const processDroppedDataTransfer = async (dataTransfer: DataTransfer) => {
-    interface DiscoveredFolder {
-      fullPath: string;
-      name: string;
-      parentPath: string;
-    }
-    interface DiscoveredFile {
-      file: File;
-      folderPath: string;
-    }
-
-    const discoveredFolders: DiscoveredFolder[] = [];
-    const discoveredFiles: DiscoveredFile[] = [];
-
-    const traverseEntry = async (entry: any, parentPath: string = '') => {
-      if (!entry) return;
-      if (entry.isFile) {
-        await new Promise<void>((resolve) => {
-          entry.file((file: File) => {
-            discoveredFiles.push({ file, folderPath: parentPath });
-            resolve();
-          }, () => resolve());
-        });
-      } else if (entry.isDirectory) {
-        const currentPath = parentPath ? `${parentPath}/${entry.name}` : entry.name;
-        if (!discoveredFolders.some(f => f.fullPath === currentPath)) {
-          discoveredFolders.push({
-            fullPath: currentPath,
-            name: entry.name,
-            parentPath: parentPath
-          });
-        }
-
-        const reader = entry.createReader();
-        const readEntries = async (): Promise<any[]> => {
-          return new Promise((resolve) => {
-            reader.readEntries((entries: any[]) => {
-              resolve(entries || []);
-            }, () => resolve([]));
-          });
-        };
-
-        let batch: any[];
-        do {
-          batch = await readEntries();
-          for (const child of batch) {
-            await traverseEntry(child, currentPath);
-          }
-        } while (batch && batch.length > 0);
-      }
-    };
-
-    const items = dataTransfer.items;
-    if (items && items.length > 0) {
-      for (let i = 0; i < items.length; i++) {
-        const item = items[i];
-        if (item.kind === 'file') {
-          const entry = (item as any).webkitGetAsEntry ? (item as any).webkitGetAsEntry() : null;
-          if (entry) {
-            await traverseEntry(entry, '');
-          } else {
-            const file = item.getAsFile();
-            if (file) {
-              discoveredFiles.push({ file, folderPath: '' });
-            }
-          }
-        }
-      }
-    } else if (dataTransfer.files && dataTransfer.files.length > 0) {
-      const filesArray = Array.from(dataTransfer.files);
-      for (const file of filesArray) {
-        const relPath = (file as any).webkitRelativePath;
-        let folderPath = '';
-        if (relPath && relPath.includes('/')) {
-          const parts = relPath.split('/');
-          folderPath = parts.slice(0, -1).join('/');
-          let accum = '';
-          for (let p = 0; p < parts.length - 1; p++) {
-            const prev = accum;
-            accum = accum ? `${accum}/${parts[p]}` : parts[p];
-            if (!discoveredFolders.some(f => f.fullPath === accum)) {
-              discoveredFolders.push({
-                fullPath: accum,
-                name: parts[p],
-                parentPath: prev
-              });
-            }
-          }
-        }
-        discoveredFiles.push({ file, folderPath });
-      }
-    }
-
-    if (discoveredFiles.length === 0 && discoveredFolders.length === 0) {
-      return;
-    }
-
-    const totalIncomingBytes = discoveredFiles.reduce((acc, f) => acc + (f.file.size || 0), 0);
-
-    if (totalUsedBytes + totalIncomingBytes > currentPlan.maxBytes) {
-      showToast({
-        type: 'warning',
-        title: 'Storage Quota Exceeded',
-        message: `Uploading ${discoveredFiles.length} file(s) (${formatBytes(totalIncomingBytes)}) exceeds your ${currentPlan.name} limit (${currentPlan.storage}). Currently using ${formatBytes(totalUsedBytes)} of ${currentPlan.storage}.`
-      });
-      setIsUpgradeModalOpen(true);
-      return;
-    }
-
-    const targetRootFolderId = activeNav === 'trash' ? 'root' : currentFolderId;
-
-    discoveredFolders.sort((a, b) => a.fullPath.split('/').length - b.fullPath.split('/').length);
-    const folderIdMap = new Map<string, string>();
-    folderIdMap.set('', targetRootFolderId);
-
-    const newFolderItems: DriveItem[] = [];
-    for (const folder of discoveredFolders) {
-      const parentId = folderIdMap.get(folder.parentPath) || targetRootFolderId;
-      const folderId = generateUniqueId('folder');
-      folderIdMap.set(folder.fullPath, folderId);
-
-      newFolderItems.push({
-        id: folderId,
-        parentId: parentId,
-        name: folder.name,
-        type: 'folder',
-        updatedAt: new Date().toISOString(),
-        owner: activeNav === 'shared' ? 'colleague@example.com' : 'me',
-        source: activeNav === 'computers' ? 'computer' : 'drive',
-        computerDevice: activeNav === 'computers' ? 'This PC' : undefined,
-        folderPath: folder.name
-      });
-    }
-
-    const newFileItems: DriveItem[] = discoveredFiles.map(({ file, folderPath }) => {
-      const isVideo = file.type.includes('video') || !!file.name.match(/\.(mp4|mov|webm|mkv|avi|m4v)$/i);
-      let videoUrl: string | undefined = undefined;
-      if (isVideo) {
-        try {
-          videoUrl = URL.createObjectURL(file);
-        } catch (err) {
-          console.error('Error creating object URL for video', err);
-        }
-      }
-
-      const parentId = folderIdMap.get(folderPath) || targetRootFolderId;
-
-      return {
-        id: generateUniqueId('file'),
-        parentId: parentId,
+      const newItem: DriveItem = {
+        id,
+        parentId: activeTab === 'computers' ? 'comp_root' : currentFolderId,
         name: file.name,
-        type: file.type.includes('image') ? 'image' : 
-              isVideo ? 'video' : 
-              file.type.includes('spreadsheet') || file.name.endsWith('.xlsx') || file.name.endsWith('.csv') ? 'spreadsheet' :
-              file.type.includes('zip') || file.name.endsWith('.zip') || file.name.endsWith('.rar') || file.name.endsWith('.7z') ? 'archive' : 'document',
+        type,
         size: file.size,
         updatedAt: new Date().toISOString(),
-        owner: activeNav === 'shared' ? 'colleague@example.com' : 'me',
-        source: activeNav === 'computers' ? 'computer' : 'drive',
-        videoUrl,
-        computerDevice: activeNav === 'computers' ? 'This PC' : undefined,
-        folderPath: folderPath || undefined
+        owner: 'Alex Driver',
+        source: activeTab === 'computers' ? 'computer' : 'drive',
+        computerDevice: activeTab === 'computers' ? 'MacBook Pro 16"' : undefined,
+        previewUrl: type === 'image' ? instantUrl : undefined,
+        videoUrl: type === 'video' ? instantUrl : undefined,
+        thumbnailUrl: type === 'image' ? instantUrl : undefined
       };
+
+      setItems((prev) => [newItem, ...prev]);
     });
 
-    // Save binary file blobs to IndexedDB
-    newFileItems.forEach((item, idx) => {
-      saveFileBlob(item.id, discoveredFiles[idx].file);
-    });
-
-    setDriveItems(prev => [...prev, ...newFolderItems, ...newFileItems]);
-    showToast({
-      type: 'success',
-      title: 'Upload Successful',
-      message: `${newFileItems.length} file(s)${newFolderItems.length > 0 ? ` and ${newFolderItems.length} folder(s)` : ''} (${formatBytes(totalIncomingBytes)}) added to AsterDrive.`
-    });
+    showToast(`Uploaded ${files.length} file(s) to AsterDrive`);
+    if (e.target) e.target.value = '';
   };
 
-  const handleWindowDrop = async (e: React.DragEvent) => {
-    e.preventDefault();
+  const handleCreateFolder = () => {
+    const name = prompt('Folder name:', 'New Folder');
+    if (!name) return;
+
+    const newFolder: DriveItem = {
+      id: 'f_' + Date.now(),
+      parentId: currentFolderId,
+      name,
+      type: 'folder',
+      updatedAt: new Date().toISOString(),
+      owner: 'Alex Driver'
+    };
+    setItems((prev) => [newFolder, ...prev]);
+    setNewMenuOpen(false);
+    showToast(`Created folder "${name}"`);
+  };
+
+  const handleToggleStar = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    dragCounter.current = 0;
-    setIsDraggingOver(false);
-    await processDroppedDataTransfer(e.dataTransfer);
+    setItems((prev) =>
+      prev.map((it) => (it.id === id ? { ...it, starred: !it.starred } : it))
+    );
   };
 
-  // Dedicated Computer Sync & Backup Upload handler
-  const handleComputerUpload = (
-    e: React.ChangeEvent<HTMLInputElement>, 
-    deviceName: string = 'This PC',
-    forcedFolderName?: string
-  ) => {
-    if (e.target.files && e.target.files.length > 0) {
-      const filesArray = Array.from(e.target.files);
-      const incomingBytes = filesArray.reduce((acc, file) => acc + (file.size || 0), 0);
-
-      if (totalUsedBytes + incomingBytes > currentPlan.maxBytes) {
-        showToast({
-          type: 'warning',
-          title: 'Storage Quota Exceeded',
-          message: `Backing up ${filesArray.length} file(s) (${formatBytes(incomingBytes)}) exceeds your ${currentPlan.name} limit (${currentPlan.storage}). Currently using ${formatBytes(totalUsedBytes)} of ${currentPlan.storage}.`
-        });
-        setIsUpgradeModalOpen(true);
-        e.target.value = '';
-        return;
-      }
-
-      const hasRelativePaths = filesArray.some(f => (f as any).webkitRelativePath && (f as any).webkitRelativePath.includes('/'));
-      const targetRootId = currentFolderId;
-
-      const newFolderItems: DriveItem[] = [];
-      let newFileItems: DriveItem[] = [];
-
-      if (hasRelativePaths) {
-        interface DiscoveredFolder {
-          fullPath: string;
-          name: string;
-          parentPath: string;
-        }
-        const discoveredFolders: DiscoveredFolder[] = [];
-        const filesWithFolder: { file: File; folderPath: string }[] = [];
-
-        for (const file of filesArray) {
-          const relPath = (file as any).webkitRelativePath;
-          let folderPath = '';
-          if (relPath && relPath.includes('/')) {
-            const parts = relPath.split('/');
-            folderPath = parts.slice(0, -1).join('/');
-            let accum = '';
-            for (let p = 0; p < parts.length - 1; p++) {
-              const prev = accum;
-              accum = accum ? `${accum}/${parts[p]}` : parts[p];
-              if (!discoveredFolders.some(f => f.fullPath === accum)) {
-                discoveredFolders.push({
-                  fullPath: accum,
-                  name: parts[p],
-                  parentPath: prev
-                });
-              }
-            }
-          }
-          filesWithFolder.push({ file, folderPath });
-        }
-
-        discoveredFolders.sort((a, b) => a.fullPath.split('/').length - b.fullPath.split('/').length);
-        const folderIdMap = new Map<string, string>();
-        folderIdMap.set('', targetRootId);
-
-        for (const folder of discoveredFolders) {
-          const parentId = folderIdMap.get(folder.parentPath) || targetRootId;
-          const folderId = generateUniqueId('folder');
-          folderIdMap.set(folder.fullPath, folderId);
-
-          newFolderItems.push({
-            id: folderId,
-            parentId: parentId,
-            name: folder.name,
-            type: 'folder',
-            updatedAt: new Date().toISOString(),
-            owner: 'me',
-            source: 'computer',
-            computerDevice: deviceName,
-            folderPath: folder.name
-          });
-        }
-
-        newFileItems = filesWithFolder.map(({ file, folderPath }) => {
-          const isVideo = file.type.includes('video') || !!file.name.match(/\.(mp4|mov|webm|mkv|avi|m4v)$/i);
-          let videoUrl: string | undefined = undefined;
-          if (isVideo) {
-            try {
-              videoUrl = URL.createObjectURL(file);
-            } catch (err) {
-              console.error('Error creating object URL for video', err);
-            }
-          }
-
-          const parentId = folderIdMap.get(folderPath) || targetRootId;
-
-          return {
-            id: generateUniqueId('file'),
-            parentId: parentId,
-            name: file.name,
-            type: file.type.includes('image') ? 'image' : 
-                  isVideo ? 'video' : 
-                  file.type.includes('spreadsheet') || file.name.endsWith('.xlsx') || file.name.endsWith('.csv') ? 'spreadsheet' :
-                  file.type.includes('zip') || file.name.endsWith('.zip') || file.name.endsWith('.rar') || file.name.endsWith('.7z') ? 'archive' : 'document',
-            size: file.size,
-            updatedAt: new Date().toISOString(),
-            owner: 'me',
-            source: 'computer',
-            videoUrl,
-            computerDevice: deviceName,
-            folderPath: folderPath || undefined
-          };
-        });
-      } else {
-        // Flat file selection: if forcedFolderName or targetRootId === 'root', create a dedicated folder container
-        let parentFolderId = targetRootId;
-        const folderTitle = forcedFolderName || (targetRootId === 'root' ? 'Synced Folder' : null);
-
-        if (folderTitle) {
-          const folderId = generateUniqueId('folder');
-          parentFolderId = folderId;
-          newFolderItems.push({
-            id: folderId,
-            parentId: targetRootId,
-            name: folderTitle,
-            type: 'folder',
-            updatedAt: new Date().toISOString(),
-            owner: 'me',
-            source: 'computer',
-            computerDevice: deviceName,
-            folderPath: folderTitle
-          });
-        }
-
-        newFileItems = filesArray.map(file => {
-          const isVideo = file.type.includes('video') || !!file.name.match(/\.(mp4|mov|webm|mkv|avi|m4v)$/i);
-          let videoUrl: string | undefined = undefined;
-          if (isVideo) {
-            try {
-              videoUrl = URL.createObjectURL(file);
-            } catch (err) {
-              console.error('Error creating object URL for video', err);
-            }
-          }
-
-          return {
-            id: generateUniqueId('file'),
-            parentId: parentFolderId,
-            name: file.name,
-            type: file.type.includes('image') ? 'image' : 
-                  isVideo ? 'video' : 
-                  file.type.includes('spreadsheet') || file.name.endsWith('.xlsx') || file.name.endsWith('.csv') ? 'spreadsheet' :
-                  file.type.includes('zip') || file.name.endsWith('.zip') || file.name.endsWith('.rar') || file.name.endsWith('.7z') ? 'archive' : 'document',
-            size: file.size,
-            updatedAt: new Date().toISOString(),
-            owner: 'me',
-            source: 'computer',
-            videoUrl,
-            computerDevice: deviceName,
-            folderPath: folderTitle || undefined
-          };
-        });
-      }
-
-      // Save binary file blobs to IndexedDB
-      newFileItems.forEach((item, idx) => {
-        saveFileBlob(item.id, filesArray[idx]);
-      });
-
-      setDriveItems(prev => [...prev, ...newFolderItems, ...newFileItems]);
-      setIsSyncModalOpen(false);
-      setIsNewSyncFolderModalOpen(false);
-      showToast({
-        type: 'success',
-        title: 'Computer Sync Completed',
-        message: `${newFileItems.length} file(s)${newFolderItems.length > 0 ? ` in ${newFolderItems.length} folder(s)` : ''} successfully synced from "${deviceName}".`
-      });
-      e.target.value = '';
-    }
+  const handleTrashItem = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setItems((prev) =>
+      prev.map((it) => (it.id === id ? { ...it, trashed: true } : it))
+    );
+    showToast('Moved to Trash');
   };
 
-  // Upgrade handler
-  const handleConfirmUpgrade = () => {
-    const chosenPlan = UPGRADE_PLANS.find(p => p.id === selectedPlanId);
-    if (!chosenPlan) return;
-
-    setCurrentPlan(chosenPlan);
-    setIsUpgradeModalOpen(false);
-    showToast({
-      type: 'success',
-      title: 'Plan Upgraded Successfully!',
-      message: `Your account now has ${chosenPlan.storage} storage limit. You can upload large files without interruption.`
-    });
+  const handleRestoreItem = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setItems((prev) =>
+      prev.map((it) => (it.id === id ? { ...it, trashed: false } : it))
+    );
+    showToast('Restored file from Trash');
   };
 
-  // Downgrade back to Free Plan for testing
-  const handleDowngradeToFree = () => {
-    const freePlan = STORAGE_PLANS[0];
-    setCurrentPlan(freePlan);
-    setSelectedPlanId('2TB');
-    setIsUpgradeModalOpen(false);
-    showToast({
-      type: 'info',
-      title: 'Reset to Free Plan',
-      message: 'Your account is back on the Free Plan with 1 GB storage quota.'
-    });
-  };
-
-  const handleToggleStar = () => {
-    setDriveItems(prev => prev.map(item => 
-      selectedItems.has(item.id) ? { ...item, starred: !item.starred } : item
-    ));
-  };
-
-  const handleMoveToTrash = () => {
-    setDriveItems(prev => prev.map(item => 
-      selectedItems.has(item.id) ? { ...item, trashed: true } : item
-    ));
-    setSelectedItems(new Set());
-  };
-
-  const handleRestore = () => {
-    setDriveItems(prev => prev.map(item => 
-      selectedItems.has(item.id) ? { ...item, trashed: false } : item
-    ));
-    setSelectedItems(new Set());
-    showToast({
-      type: 'success',
-      title: 'Restored to Drive',
-      message: 'Selected item(s) restored back to your files.'
-    });
-  };
-
-  const handleDeletePermanent = () => {
-    selectedItems.forEach(id => {
-      deleteFileBlob(id);
-    });
-    setDriveItems(prev => prev.filter(item => !selectedItems.has(item.id)));
-    setSelectedItems(new Set());
-    setIsDeleteDialogOpen(false);
-    showToast({
-      type: 'info',
-      title: 'Deleted Permanently',
-      message: 'Selected item(s) permanently removed.'
-    });
-  };
-
-  const trashedItems = useMemo(() => {
-    return driveItems.filter(item => item.trashed);
-  }, [driveItems]);
-
-  const handleRestoreItem = (item: DriveItem) => {
-    setDriveItems(prev => prev.map(i => i.id === item.id ? { ...i, trashed: false } : i));
-    logActivity('restore', `Restored ${item.name}`, `Restored to ${item.source === 'computer' ? 'Computers' : 'My Drive'}`);
-    showToast({
-      type: 'success',
-      title: 'File Restored',
-      message: `"${item.name}" has been restored to your drive.`
-    });
-  };
-
-  const handlePermanentDeleteItem = (item: DriveItem) => {
-    deleteFileBlob(item.id);
-    setDriveItems(prev => prev.filter(i => i.id !== item.id));
-    logActivity('trash', `Deleted ${item.name}`, 'Permanently deleted from Trash');
-    showToast({
-      type: 'info',
-      title: 'File Deleted Forever',
-      message: `"${item.name}" has been permanently removed.`
-    });
+  const handleDeletePermanent = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    deleteFileBlob(id);
+    setItems((prev) => prev.filter((it) => it.id !== id));
+    showToast('Deleted forever');
   };
 
   const handleEmptyTrash = () => {
-    if (trashedItems.length === 0) return;
-    const count = trashedItems.length;
-    trashedItems.forEach(item => {
-      deleteFileBlob(item.id);
-    });
-    setDriveItems(prev => prev.filter(item => !item.trashed));
-    logActivity('trash', 'Emptied Trash', `Permanently deleted ${count} items`);
-    showToast({
-      type: 'success',
-      title: 'Trash Emptied',
-      message: `Permanently removed ${count} ${count === 1 ? 'file' : 'files'} from Trash.`
-    });
+    const trashed = items.filter((it) => it.trashed);
+    trashed.forEach((it) => deleteFileBlob(it.id));
+    setItems((prev) => prev.filter((it) => !it.trashed));
+    showToast('Trash emptied');
   };
 
-  const handleAddCollaborator = (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    const email = inviteEmail.trim();
-    if (!email || !email.includes('@')) {
-      showToast({
-        type: 'warning',
-        title: 'Invalid Email',
-        message: 'Please enter a valid email address.'
-      });
-      return;
+  const handleDownloadItem = (item: DriveItem) => {
+    const url = activeMediaUrl || item.previewUrl || item.videoUrl;
+    if (url) {
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = item.name;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
     }
-    if (collaborators.some(c => c.email.toLowerCase() === email.toLowerCase())) {
-      showToast({
-        type: 'warning',
-        title: 'Already Added',
-        message: `${email} is already a collaborator in your workspace.`
-      });
-      return;
-    }
-    const newCollab: Collaborator = {
-      id: generateUniqueId('collab'),
-      name: email.split('@')[0],
-      email,
-      role: inviteRole,
+    showToast(`Downloading ${item.name}`);
+  };
+
+  const handleFolderClick = (folder: DriveItem) => {
+    setCurrentFolderId(folder.id);
+    setFolderHistory((prev) => [...prev, { id: folder.id, name: folder.name }]);
+  };
+
+  const handleNavigateBreadcrumb = (index: number) => {
+    const newHistory = folderHistory.slice(0, index + 1);
+    setFolderHistory(newHistory);
+    setCurrentFolderId(newHistory[newHistory.length - 1].id);
+  };
+
+  const handleAddCollaborator = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newCollabEmail.trim()) return;
+    const newCollab = {
+      id: 'collab_' + Date.now(),
+      email: newCollabEmail.trim(),
+      role: newCollabRole,
       addedAt: new Date().toISOString()
     };
-    setCollaborators(prev => [newCollab, ...prev]);
-    logActivity('share', `Invited ${email}`, `Granted ${inviteRole} workspace access`);
-    showToast({
-      type: 'success',
-      title: 'Collaborator Added',
-      message: `${email} has been added as ${inviteRole}.`
-    });
-    setInviteEmail('');
-    setIsInviteOpen(false);
+    setCollaborators((prev) => [...prev, newCollab]);
+    setNewCollabEmail('');
+    setShowInviteModal(false);
+    showToast(`Added ${newCollab.email} as ${newCollabRole}`);
   };
 
-  const handleRevokeCollaborator = (id: string, email: string) => {
-    setCollaborators(prev => prev.filter(c => c.id !== id));
-    logActivity('share', `Revoked ${email}`, 'Removed workspace access');
-    showToast({
-      type: 'info',
-      title: 'Access Revoked',
-      message: `Collaborator access for ${email} has been revoked.`
-    });
-  };
-
-  const handleRunSecurityScan = () => {
-    setIsSecurityScanning(true);
-    showToast({
-      type: 'info',
-      title: 'Running Security Scan',
-      message: 'Inspecting workspace integrity, encrypted blobs, and access policies...'
-    });
+  const handleSendFeedback = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!feedbackText.trim()) return;
+    setFeedbackSent(true);
     setTimeout(() => {
-      setIsSecurityScanning(false);
-      setLastSecurityScanTime('Just now');
-      showToast({
-        type: 'success',
-        title: 'Security Ready',
-        message: 'All integrity checks passed. AES-256 encryption active.'
-      });
+      setFeedbackText('');
+      setFeedbackSent(false);
+      showToast('Thank you! Feedback received.');
     }, 1000);
   };
 
-  const handleSubmitFeedback = (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    const text = feedbackMessage.trim();
-    if (!text) {
-      showToast({
-        type: 'warning',
-        title: 'Feedback Required',
-        message: 'Please enter your comments before submitting.'
-      });
-      return;
-    }
-    setIsSubmittingFeedback(true);
+  const handleRunSecurityScan = () => {
+    setIsScanning(true);
     setTimeout(() => {
-      const entry: FeedbackEntry = {
-        id: generateUniqueId('fb'),
-        category: 'Workspace Experience',
-        message: text,
-        submittedAt: new Date().toISOString()
-      };
-      setFeedbackList(prev => [entry, ...prev]);
-      setIsSubmittingFeedback(false);
-      setFeedbackMessage('');
-      showToast({
-        type: 'success',
-        title: 'Feedback Sent',
-        message: 'Thank you for helping us improve AsterDrive!'
-      });
-    }, 400);
+      setIsScanning(false);
+      setScanResult('Clean');
+      showToast('Security scan completed: No threats found');
+    }, 2000);
   };
 
-  // Compute breadcrumbs
-  const breadcrumbs = useMemo(() => {
-    const rootName = activeNav === 'computers' ? 'Computers' : 'My Drive';
-    const crumbs = [{ id: 'root', name: rootName }];
-    let currentId = currentFolderId;
-    const path = [];
-    
-    while (currentId !== 'root') {
-      const folder = driveItems.find(item => item.id === currentId);
-      if (folder) {
-        path.unshift({ id: folder.id, name: folder.name });
-        currentId = folder.parentId;
-      } else {
-        break;
-      }
-    }
-    return [...crumbs, ...path];
-  }, [currentFolderId, driveItems, activeNav]);
-
-  // Compute displayed items
-  const displayedItems = useMemo(() => {
-    let items = driveItems;
-    
-    if (searchQuery) {
-      items = items.filter(item => item.name.toLowerCase().includes(searchQuery.toLowerCase()) && !item.trashed);
-    } else {
-      if (activeNav === 'my-drive') {
-        items = items.filter(item => item.parentId === currentFolderId && !item.trashed && item.source !== 'computer');
-      } else if (activeNav === 'starred') {
-        items = items.filter(item => item.starred && !item.trashed);
-      } else if (activeNav === 'recent') {
-        items = items.filter(item => !item.trashed).sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()).slice(0, 10);
-      } else if (activeNav === 'shared') {
-        items = items.filter(item => item.owner !== 'me' && !item.trashed);
-      } else if (activeNav === 'computers') {
-        items = items.filter(item => item.source === 'computer' && !item.trashed && item.parentId === currentFolderId);
-      } else if (activeNav === 'trash') {
-        items = items.filter(item => item.trashed);
-      } else {
-        items = [];
-      }
-    }
-
-    return items.sort((a, b) => {
-      if (a.type === 'folder' && b.type !== 'folder') return -1;
-      if (a.type !== 'folder' && b.type === 'folder') return 1;
-      return a.name.localeCompare(b.name);
-    });
-  }, [currentFolderId, searchQuery, activeNav, driveItems]);
-
-  const handleItemClick = (item: DriveItem) => {
-    if (item.type === 'folder' && activeNav !== 'trash') {
-      setCurrentFolderId(item.id);
-      setSelectedItems(new Set());
-    } else if (item.type === 'video' && !item.trashed) {
-      openVideoPreview(item);
-    } else {
-      toggleSelection(item.id);
+  const getItemIcon = (type: DriveItem['type']) => {
+    switch (type) {
+      case 'folder':
+        return <Folder className="w-5 h-5 text-amber-500 fill-amber-500/20" />;
+      case 'image':
+        return <ImageIcon className="w-5 h-5 text-blue-400" />;
+      case 'video':
+        return <Video className="w-5 h-5 text-rose-400" />;
+      case 'spreadsheet':
+        return <FileSpreadsheet className="w-5 h-5 text-emerald-400" />;
+      case 'archive':
+        return <FileArchive className="w-5 h-5 text-purple-400" />;
+      default:
+        return <FileText className="w-5 h-5 text-slate-300" />;
     }
   };
 
-  const toggleSelection = (id: string) => {
-    setSelectedItems(prev => {
-      const next = new Set(prev);
-      if (next.has(id)) {
-        next.delete(id);
-      } else {
-        next.add(id);
-      }
-      return next;
-    });
+  const formatFileSize = (bytes?: number) => {
+    if (!bytes) return '--';
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    if (bytes < 1024 * 1024 * 1024) return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+    return (bytes / (1024 * 1024 * 1024)).toFixed(1) + ' GB';
   };
 
-  const handleNavSelect = (itemId: string) => {
-    if (itemId === 'cloud-storage') {
-      setActiveNav('storage');
-      setIsMobileMenuOpen(false);
-      return;
-    }
-    if (itemId === 'backup') {
-      setIsSyncModalOpen(true);
-      setIsMobileMenuOpen(false);
-      showToast({
-        type: 'info',
-        title: 'Computer Backup & Sync',
-        message: 'Connect your Windows PC or Mac to automatically back up folders.'
-      });
-      return;
-    }
-    setActiveNav(itemId);
-    setSearchQuery('');
-    setSelectedItems(new Set());
-    if (itemId === 'my-drive' || itemId === 'computers') {
-      setCurrentFolderId('root');
-    }
-    setIsMobileMenuOpen(false);
-  };
-
-  const primaryNavigation = [
-    { id: 'my-drive', label: 'My Drive', icon: Home },
-    { id: 'computers', label: 'Computers', icon: Computer },
-    { id: 'shared', label: 'Shared with me', icon: Users },
-    { id: 'recent', label: 'Recent', icon: Clock },
-    { id: 'starred', label: 'Starred', icon: Star },
-  ];
-
-  const workspaceNavigation = [
-    { id: 'storage', label: 'Storage', icon: Database },
-    { id: 'activity', label: 'Activity', icon: ActivityIcon },
-    { id: 'people', label: 'People', icon: Users },
-    { id: 'trash', label: 'Trash', icon: Trash2 },
-    { id: 'security', label: 'Security', icon: Shield },
-    { id: 'feedback', label: 'Feedback', icon: MessageSquare },
-  ];
-
-  const navigation = [...primaryNavigation, ...workspaceNavigation];
-
-  const footerLinks = [
-    { label: 'About us', action: () => { setIsProfileMenuOpen(true); setActiveProfileDetail('about'); } },
-    { label: 'Help center', action: () => { setIsProfileMenuOpen(true); setActiveProfileDetail('contact'); } },
-    { label: 'Privacy', action: () => { setIsProfileMenuOpen(true); setActiveProfileDetail('privacy'); } },
-    { label: 'Terms', action: () => { setIsProfileMenuOpen(true); setActiveProfileDetail('terms'); } },
-  ];
-
-  const selectedItemDetails = selectedItems.size === 1 
-    ? driveItems.find(item => item.id === Array.from(selectedItems)[0]) 
-    : null;
+  const analyticsItems: StorageAnalyticsItem[] = useMemo(() => {
+    return items.map((it) => ({
+      id: it.id,
+      name: it.name,
+      type: it.type,
+      size: it.size || 0,
+      trashed: it.trashed
+    }));
+  }, [items]);
 
   return (
-    <div 
-      className="flex h-screen bg-[#0c0e14] font-sans text-slate-100 overflow-hidden select-none relative" 
-      suppressHydrationWarning
-      onDragEnter={handleWindowDragEnter}
-      onDragOver={handleWindowDragOver}
-      onDragLeave={handleWindowDragLeave}
-      onDrop={handleWindowDrop}
-    >
-      {/* FULL-WINDOW DRAG AND DROP OVERLAY */}
-      <AnimatePresence>
-        {isDraggingOver && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.15 }}
-            className="fixed inset-0 z-[100] bg-black/75 backdrop-blur-md flex items-center justify-center p-6 sm:p-10 pointer-events-none"
-          >
-            <motion.div
-              initial={{ scale: 0.9, y: 15 }}
-              animate={{ scale: 1, y: 0 }}
-              exit={{ scale: 0.9, y: 15 }}
-              transition={{ type: "spring", stiffness: 350, damping: 25 }}
-              className="max-w-lg w-full bg-[#141824]/95 backdrop-blur-xl border-2 border-dashed border-orange-500 rounded-3xl p-8 sm:p-10 text-center shadow-2xl flex flex-col items-center"
-            >
-              <div className="w-20 h-20 rounded-2xl bg-orange-500/10 text-orange-400 border border-orange-500/20 flex items-center justify-center mb-5 shadow-inner animate-bounce">
-                <UploadCloud className="w-10 h-10" />
-              </div>
-              <h2 className="text-xl sm:text-2xl font-bold text-white mb-2">
-                Drop files or folders here
-              </h2>
-              <p className="text-slate-400 text-sm mb-4 max-w-sm">
-                Release anywhere to upload into{' '}
-                <span className="font-semibold text-orange-400">
-                  {currentFolderId === 'root' ? (activeNav === 'computers' ? 'Synced Computers' : 'My Drive') : (driveItems.find(i => i.id === currentFolderId)?.name || 'Current Folder')}
-                </span>
-              </p>
-              <div className="flex items-center gap-2 text-xs font-medium text-slate-400 bg-[#0f121a] px-3.5 py-2 rounded-full border border-[#252d3f]">
-                <Folder className="w-4 h-4 text-orange-500" />
-                <span>Entire nested folder structures are preserved automatically</span>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+    <div className="w-full min-h-screen bg-[#0c0e14] text-slate-100 flex flex-col font-sans select-none antialiased">
+      {/* Hidden file input for uploads */}
+      <input
+        type="file"
+        ref={fileInputRef}
+        onChange={handleFileUpload}
+        multiple
+        className="hidden"
+      />
 
-      {/* MOBILE MENU OVERLAY */}
-      <AnimatePresence>
-        {isMobileMenuOpen && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-40 bg-black/70 backdrop-blur-xs lg:hidden cursor-pointer"
-            onClick={() => setIsMobileMenuOpen(false)}
-          />
-        )}
-      </AnimatePresence>
-
-      {/* SIDEBAR */}
-      <aside
-        className={cn(
-          "w-64 bg-[#0c0e14] border-r border-[#1e2433] flex flex-col transition-transform duration-200 ease-in-out shrink-0 select-none",
-          "fixed inset-y-0 left-0 z-50 lg:static lg:inset-auto lg:z-0 lg:translate-x-0",
-          isMobileMenuOpen ? "translate-x-0 shadow-2xl" : "-translate-x-full lg:translate-x-0"
-        )}
-      >
-        <div className="h-16 flex items-center justify-between px-5 border-b border-[#181d2a] shrink-0">
-          <button
-            type="button"
-            onClick={() => handleNavSelect('my-drive')}
-            className="flex items-center gap-2.5 text-white font-display font-bold text-xl tracking-tight cursor-pointer hover:opacity-90 transition-opacity"
-            title="AsterDrive - Home"
-          >
-            <div className="w-8 h-8 rounded-xl bg-orange-500/10 border border-orange-500/20 text-orange-500 flex items-center justify-center">
-              <Cloud className="w-5 h-5 fill-orange-500/20 stroke-orange-500" />
-            </div>
-            <span>AsterDrive</span>
-          </button>
-          <button 
-            type="button"
-            className="lg:hidden text-slate-400 hover:text-white hover:bg-[#181d2a] p-2 rounded-xl transition-colors cursor-pointer"
-            onClick={() => setIsMobileMenuOpen(false)}
-            aria-label="Close menu"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        <nav className="flex-1 px-3 py-3 space-y-1 overflow-y-auto pointer-events-auto touch-manipulation">
-          {/* PRIMARY NAV ITEMS */}
-          <div className="space-y-1">
-            {primaryNavigation.map((item) => {
-              const isActive = activeNav === item.id;
-              const Icon = item.icon;
-              return (
-                <button
-                  key={item.id}
-                  type="button"
-                  onClick={() => handleNavSelect(item.id)}
-                  className={cn(
-                    "w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all duration-150 text-left select-none cursor-pointer outline-none",
-                    isActive
-                      ? "bg-[#251710] text-orange-400 font-semibold border border-orange-500/40 shadow-xs"
-                      : "text-slate-400 hover:bg-[#141824] hover:text-white"
-                  )}
-                  aria-current={isActive ? 'page' : undefined}
-                >
-                  <Icon className={cn("w-4 h-4 shrink-0 transition-colors", isActive ? "text-orange-500" : "text-slate-400")} />
-                  <span className="truncate flex-1">{item.label}</span>
-                </button>
-              );
-            })}
-          </div>
-
-          {/* WORKSPACE SECTION (Screenshot 1) */}
-          <div className="pt-4 mt-2">
-            <p className="px-3.5 pb-2 text-[11px] font-bold uppercase tracking-widest text-slate-500">
-              Workspace
-            </p>
-            <div className="space-y-1">
-              {workspaceNavigation.map((item) => {
-                const isActive = activeNav === item.id;
-                const Icon = item.icon;
-                return (
-                  <button
-                    key={item.id}
-                    type="button"
-                    onClick={() => handleNavSelect(item.id)}
-                    className={cn(
-                      "w-full flex items-center gap-3 px-3.5 py-2 rounded-xl text-sm font-medium transition-all duration-150 text-left select-none cursor-pointer outline-none",
-                      isActive
-                        ? "bg-[#251710] text-orange-400 font-semibold border border-orange-500/40 shadow-xs"
-                        : "text-slate-400 hover:bg-[#141824] hover:text-white"
-                    )}
-                    aria-current={isActive ? 'page' : undefined}
-                  >
-                    <Icon className={cn("w-4 h-4 shrink-0 transition-colors", isActive ? "text-orange-500" : "text-slate-400")} />
-                    <span className="truncate flex-1">{item.label}</span>
-                    {item.id === 'trash' && driveItems.some(i => i.trashed) && (
-                      <span className="w-2 h-2 rounded-full bg-rose-500 shrink-0" title="Trash contains files" />
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* FOOTER LINKS (Screenshot 1) */}
-          <div className="pt-4 mt-2 border-t border-[#1a202d] px-3.5">
-            <div className="flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-slate-500">
-              {footerLinks.map((link, idx) => (
-                <button
-                  key={idx}
-                  type="button"
-                  onClick={link.action}
-                  className="hover:text-slate-300 transition-colors cursor-pointer"
-                >
-                  {link.label}
-                </button>
-              ))}
-            </div>
-          </div>
-        </nav>
-
-        {/* BOTTOM STORAGE WIDGET */}
-        <div className="p-3 m-3 rounded-2xl bg-[#141824] border border-[#252d3f] shrink-0 select-none">
-          <div 
-            onClick={() => handleNavSelect('storage')}
-            className="cursor-pointer group"
-          >
-            <div className="flex items-center justify-between gap-2 mb-2">
-              <div className="flex items-center gap-2 min-w-0">
-                <div className="w-6 h-6 rounded-lg bg-orange-500/10 text-orange-400 flex items-center justify-center shrink-0">
-                  <Database className="w-3.5 h-3.5" />
-                </div>
-                <span className="text-xs font-semibold text-white block truncate group-hover:text-orange-400 transition-colors">
-                  Storage
-                </span>
-              </div>
-              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-orange-500/10 text-orange-400 border border-orange-500/20">
-                {currentPlan.isFree ? "1 GB FREE" : currentPlan.storage}
-              </span>
-            </div>
-
-            {/* Storage Progress Bar */}
-            <div className="w-full bg-[#1e2433] h-2 rounded-full overflow-hidden mb-2">
-              <div 
-                className="h-full bg-orange-500 rounded-full transition-all duration-300"
-                style={{ width: `${Math.min(100, Math.max(storagePercentage, 2))}%` }} 
-              />
-            </div>
-
-            <div className="flex items-center justify-between text-[11px] text-slate-400">
-              <span className="font-mono tabular-nums">
-                {formatBytes(totalUsedBytes)} of {currentPlan.storage}
-              </span>
-              <span className="font-medium font-mono text-orange-400">
-                {Math.round(storagePercentage)}%
-              </span>
-            </div>
-          </div>
-
-          <button
-            type="button"
-            onClick={() => setIsUpgradeModalOpen(true)}
-            className="mt-2.5 w-full py-1.5 px-3 rounded-xl bg-orange-600 hover:bg-orange-500 text-white text-xs font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-md shadow-orange-600/20"
-          >
-            <Sparkles className="w-3.5 h-3.5" />
-            Buy storage
-          </button>
-        </div>
-      </aside>
-
-      {/* MAIN CONTENT */}
-      <div className="flex-1 flex flex-col min-w-0 bg-[#0f1219] rounded-tl-2xl border-t border-l border-[#1e2433] shadow-2xl overflow-hidden lg:my-2 lg:mr-2">
-        {/* HEADER */}
-        <header className="h-16 flex items-center justify-between px-4 lg:px-6 border-b border-[#1e2433] gap-4 shrink-0 bg-[#0f1219]" suppressHydrationWarning>
-          <div className="flex items-center gap-3 flex-1 max-w-2xl" suppressHydrationWarning>
-            <button 
+      {/* 
+        ===================================================================
+        TOP NAVBAR:
+        Single fixed horizontal bar pinned to top of viewport.
+        Spans full viewport width edge-to-edge.
+        Left-to-right order:
+        1. Hamburger menu icon
+        2. Brand mark (Cloud + AsterDrive)
+        3. Search input
+        4. Primary action button (+ New with exact sizing: 12px px, 6px py, 12px font)
+        5. Utility buttons (Theme toggle, Notifications)
+        6. Circular avatar (AD) - Opens 100% Dark Themed Profile Modal!
+        7. Text logout link
+        ===================================================================
+      */}
+      <header className="fixed top-0 left-0 right-0 z-50 w-full h-14 bg-[#0c0e14]/95 backdrop-blur-md border-b border-[#1e2433]">
+        <div className="w-full h-full px-3 sm:px-4 lg:px-6 flex items-center justify-between">
+          {/* Left: Hamburger, Brand, Search */}
+          <div className="flex items-center flex-1 min-w-0 mr-3">
+            {/* 1. Hamburger menu icon */}
+            <button
               type="button"
-              className="lg:hidden text-slate-400 hover:bg-[#181d2a] hover:text-white p-2 rounded-xl transition-colors -ml-2 shrink-0 cursor-pointer"
-              onClick={() => setIsMobileMenuOpen(true)}
-              aria-label="Open sidebar"
+              onClick={() => setSidebarOpen(!sidebarOpen)}
+              aria-label="Toggle navigation drawer"
+              className="p-1.5 mr-2 sm:mr-3 rounded-md text-slate-400 hover:text-white hover:bg-slate-800/70 focus:outline-none focus:ring-1 focus:ring-orange-500/50 transition-colors shrink-0"
             >
               <Menu className="w-5 h-5" />
             </button>
-            <div className="relative w-full" suppressHydrationWarning>
-              <Search className="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+
+            {/* 2. Brand mark: small logo icon paired with brand name on same baseline */}
+            <div
+              onClick={() => {
+                setActiveTab('mydrive');
+                setCurrentFolderId('root');
+                setFolderHistory([{ id: 'root', name: 'My Drive' }]);
+              }}
+              className="flex items-center gap-2 shrink-0 cursor-pointer group"
+            >
+              <div className="w-7 h-7 rounded-lg bg-gradient-to-tr from-orange-600 via-orange-500 to-amber-500 flex items-center justify-center text-white shadow-sm shadow-orange-500/25 group-hover:scale-105 transition-transform shrink-0">
+                <Cloud className="w-4 h-4 fill-white/20" />
+              </div>
+              <span className="font-semibold text-sm sm:text-base tracking-tight text-white font-display">
+                AsterDrive
+              </span>
+            </div>
+
+            {/* 3. Search input field */}
+            <div className="relative flex-1 max-w-xs md:max-w-sm lg:max-w-md ml-3 sm:ml-4 lg:ml-6 hidden sm:flex items-center">
+              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 pointer-events-none" />
               <input
                 type="text"
-                placeholder="Search in Drive"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 bg-[#141824] hover:bg-[#181d2a] focus:bg-[#161b26] border border-[#252d3f] focus:border-orange-500/80 rounded-xl text-sm text-white placeholder:text-slate-500 outline-none transition-all"
-                suppressHydrationWarning
+                placeholder="Search files, folders, or docs..."
+                className="w-full h-8 pl-8 pr-12 bg-slate-900/90 border border-slate-700/60 rounded-md text-xs text-slate-200 placeholder-slate-400 focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500/40 transition-all"
               />
-              {searchQuery && (
-                <button 
-                  onClick={() => setSearchQuery('')}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              )}
-            </div>
-          </div>
-          
-          <div className="flex items-center gap-1 sm:gap-2 shrink-0">
-            {/* Quick Upload Action Button */}
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              className="px-3.5 py-1.5 rounded-xl bg-orange-600 hover:bg-orange-500 text-white font-medium text-xs flex items-center gap-1.5 shadow-md shadow-orange-600/20 transition-all cursor-pointer"
-              title="Upload file directly"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Upload</span>
-            </button>
-
-            <button 
-              onClick={() => {
-                showToast({
-                  type: 'info',
-                  title: 'Preferences',
-                  message: 'Opening preferences and configuration menu.'
-                });
-                setIsProfileMenuOpen(true);
-              }}
-              className="p-2 text-slate-400 hover:bg-[#181d2a] hover:text-white rounded-full transition-colors hidden sm:block"
-              title="Settings"
-            >
-              <Settings className="w-5 h-5" />
-            </button>
-            <button 
-              onClick={() => {
-                showToast({
-                  type: 'info',
-                  title: 'Notifications',
-                  message: 'You have no unread notifications.'
-                });
-              }}
-              className="p-2 text-slate-400 hover:bg-[#181d2a] hover:text-white rounded-full transition-colors hidden sm:block"
-              title="Notifications"
-            >
-              <Bell className="w-5 h-5" />
-            </button>
-
-            {/* Header Three Dots (More Options) Button */}
-            <div className="relative">
-              <button 
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setIsHeaderMenuOpen(!isHeaderMenuOpen);
-                }}
-                className={cn(
-                  "p-2 text-slate-400 hover:bg-[#181d2a] hover:text-white rounded-full transition-colors",
-                  isHeaderMenuOpen && "bg-[#181d2a] text-white"
-                )}
-                title="More options"
-                aria-label="More options"
-              >
-                <MoreVertical className="w-5 h-5" />
-              </button>
-
-              <AnimatePresence>
-                {isHeaderMenuOpen && (
-                  <>
-                    <div 
-                      className="fixed inset-0 z-30" 
-                      onClick={() => setIsHeaderMenuOpen(false)} 
-                    />
-                    <motion.div
-                      initial={{ opacity: 0, scale: 0.95, y: -4 }}
-                      animate={{ opacity: 1, scale: 1, y: 0 }}
-                      exit={{ opacity: 0, scale: 0.95, y: -4 }}
-                      className="absolute right-0 top-full mt-2 w-64 bg-[#141824] rounded-2xl shadow-2xl border border-[#252d3f] py-2 z-40 overflow-hidden divide-y divide-[#1e2433] text-white"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      {/* Storage Overview */}
-                      <div 
-                        onClick={() => {
-                          handleNavSelect('storage');
-                          setIsHeaderMenuOpen(false);
-                        }}
-                        className="px-4 py-2.5 hover:bg-[#1b2131] cursor-pointer transition-colors"
-                      >
-                        <div className="flex items-center justify-between text-xs mb-1">
-                          <span className="font-semibold text-white">Cloud Storage</span>
-                          <span className="font-bold text-[10px] px-1.5 py-0.5 rounded-full bg-orange-500/10 text-orange-400 border border-orange-500/20">
-                            {currentPlan.name}
-                          </span>
-                        </div>
-                        <div className="w-full bg-[#1e2433] h-1.5 rounded-full overflow-hidden mb-1">
-                          <div 
-                            className="h-full bg-orange-500 rounded-full transition-all" 
-                            style={{ width: `${storagePercentage}%` }} 
-                          />
-                        </div>
-                        <p className="text-[11px] text-slate-400">
-                          {formatBytes(totalUsedBytes)} of {currentPlan.storage} used
-                        </p>
-                      </div>
-
-                      <div className="py-1">
-                        <button
-                          onClick={() => {
-                            fileInputRef.current?.click();
-                            setIsHeaderMenuOpen(false);
-                          }}
-                          className="w-full flex items-center gap-2.5 px-4 py-2 text-slate-300 hover:bg-[#1b2131] hover:text-white text-xs sm:text-sm text-left transition-colors"
-                        >
-                          <File className="w-4 h-4 text-orange-500" />
-                          Upload Files
-                        </button>
-                        <button
-                          onClick={() => {
-                            folderInputRef.current?.click();
-                            setIsHeaderMenuOpen(false);
-                          }}
-                          className="w-full flex items-center gap-2.5 px-4 py-2 text-slate-300 hover:bg-[#1b2131] hover:text-white text-xs sm:text-sm text-left transition-colors"
-                        >
-                          <Folder className="w-4 h-4 text-amber-500" />
-                          Upload Folder
-                        </button>
-                        <button
-                          onClick={() => {
-                            setShowDetails(!showDetails);
-                            setIsHeaderMenuOpen(false);
-                          }}
-                          className="w-full flex items-center gap-2.5 px-4 py-2 text-slate-300 hover:bg-[#1b2131] hover:text-white text-xs sm:text-sm text-left transition-colors"
-                        >
-                          <Info className="w-4 h-4 text-slate-400" />
-                          {showDetails ? 'Hide Details Panel' : 'Show Details Panel'}
-                        </button>
-                        <button
-                          onClick={() => {
-                            setViewMode(viewMode === 'grid' ? 'list' : 'grid');
-                            setIsHeaderMenuOpen(false);
-                          }}
-                          className="w-full flex items-center gap-2.5 px-4 py-2 text-slate-300 hover:bg-[#1b2131] hover:text-white text-xs sm:text-sm text-left transition-colors"
-                        >
-                          {viewMode === 'grid' ? <ListIcon className="w-4 h-4 text-slate-400" /> : <LayoutGrid className="w-4 h-4 text-slate-400" />}
-                          Switch to {viewMode === 'grid' ? 'List View' : 'Grid View'}
-                        </button>
-                      </div>
-
-                      <div className="py-1">
-                        <button
-                          onClick={() => {
-                            setIsProfileMenuOpen(true);
-                            setIsHeaderMenuOpen(false);
-                          }}
-                          className="w-full flex items-center gap-2.5 px-4 py-2 text-slate-300 hover:bg-[#1b2131] hover:text-white text-xs sm:text-sm text-left transition-colors"
-                        >
-                          <User className="w-4 h-4 text-orange-500" />
-                          Account &amp; Profile Center
-                        </button>
-                        <button
-                          onClick={() => {
-                            setIsProfileMenuOpen(true);
-                            setActiveProfileDetail('settings');
-                            setIsHeaderMenuOpen(false);
-                          }}
-                          className="w-full flex items-center gap-2.5 px-4 py-2 text-slate-300 hover:bg-[#1b2131] hover:text-white text-xs sm:text-sm text-left transition-colors"
-                        >
-                          <Settings className="w-4 h-4 text-slate-400" />
-                          Settings
-                        </button>
-                        <button
-                          onClick={() => {
-                            setIsProfileMenuOpen(true);
-                            setActiveProfileDetail('contact');
-                            setIsHeaderMenuOpen(false);
-                          }}
-                          className="w-full flex items-center gap-2.5 px-4 py-2 text-slate-300 hover:bg-[#1b2131] hover:text-white text-xs sm:text-sm text-left transition-colors"
-                        >
-                          <HelpCircle className="w-4 h-4 text-slate-400" />
-                          Help &amp; Contact Support
-                        </button>
-                      </div>
-                    </motion.div>
-                  </>
-                )}
-              </AnimatePresence>
-            </div>
-
-            <button 
-              onClick={() => setIsProfileMenuOpen(true)}
-              className="w-9 h-9 rounded-full bg-orange-500/10 border border-orange-500/30 text-orange-400 flex items-center justify-center font-bold text-sm ml-1 cursor-pointer hover:bg-orange-500/20 transition-colors shadow-sm"
-              title="Account & Profile"
-            >
-              JS
-            </button>
-          </div>
-        </header>
-
-        {/* PAGE CONTENT ROUTER */}
-        {activeNav === 'storage' ? (
-          /* STORAGE PAGE VIEW (Matching Screenshot 2) */
-          <div className="flex-1 overflow-y-auto px-4 lg:px-8 py-6 space-y-6">
-            <div>
-              <span className="text-xs font-semibold uppercase tracking-wider text-orange-500">
-                Storage
-              </span>
-              <h1 className="text-3xl font-bold text-white tracking-tight mt-1">
-                Storage
-              </h1>
-              <p className="text-sm text-slate-400 mt-0.5">
-                Everything you&apos;re working on, in one place.
-              </p>
-            </div>
-
-            {/* Storage overview card */}
-            <div className="bg-[#141824] border border-[#252d3f] rounded-3xl p-6 sm:p-8 shadow-xl">
-              <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-6 border-b border-[#22293a]">
-                <div className="flex items-start gap-4">
-                  <div className="w-14 h-14 rounded-2xl bg-orange-500/10 border border-orange-500/20 text-orange-400 flex items-center justify-center shrink-0 shadow-inner">
-                    <Database className="w-7 h-7" />
-                  </div>
-                  <div>
-                    <span className="text-xs font-medium text-slate-400 uppercase tracking-wider">
-                      Storage overview
-                    </span>
-                    <div className="flex items-baseline gap-2 mt-1">
-                      <span className="text-3xl sm:text-4xl font-extrabold text-white font-mono">
-                        {totalUsedBytes === 0 ? '0 GB' : formatBytes(totalUsedBytes)}
-                      </span>
-                      <span className="text-sm font-medium text-slate-400">
-                        of {currentPlan.storage}
-                      </span>
-                    </div>
-                    <p className="text-xs text-slate-400 mt-1">
-                      {totalUsedBytes === 0 ? 'No files stored yet' : `${driveItems.filter(i => !i.trashed).length} active file(s) across AsterDrive`}
-                    </p>
-                  </div>
-                </div>
-
+              {searchQuery ? (
                 <button
                   type="button"
-                  onClick={() => setIsUpgradeModalOpen(true)}
-                  className="px-6 py-3 rounded-2xl bg-orange-600 hover:bg-orange-500 text-white font-semibold text-sm shadow-lg shadow-orange-600/25 transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95 shrink-0"
+                  onClick={() => setSearchQuery('')}
+                  aria-label="Clear search"
+                  className="absolute right-2.5 text-slate-400 hover:text-white"
                 >
-                  <Sparkles className="w-4 h-4" />
-                  Buy storage
+                  <X className="w-3 h-3" />
                 </button>
-              </div>
+              ) : (
+                <kbd className="hidden lg:inline-flex items-center gap-0.5 absolute right-2 text-[10px] text-slate-500 bg-slate-800/80 px-1.5 py-0.5 rounded border border-slate-700/50">
+                  ⌘K
+                </kbd>
+              )}
+            </div>
 
-              {/* Progress Bar */}
-              <div className="py-6">
-                <div className="flex items-center justify-between text-xs font-medium text-slate-400 mb-2">
-                  <span>Capacity Allocation</span>
-                  <span className="font-mono text-orange-400 font-semibold">{Math.round(storagePercentage)}%</span>
-                </div>
-                <div className="w-full bg-[#1e2433] h-3 rounded-full overflow-hidden p-0.5">
-                  <div
-                    className="h-full bg-orange-500 rounded-full transition-all duration-500 shadow-sm shadow-orange-500/50"
-                    style={{ width: `${Math.min(100, Math.max(storagePercentage, 2))}%` }}
-                  />
-                </div>
-              </div>
+            {/* Mobile search toggle icon */}
+            <div className="sm:hidden ml-2 flex items-center">
+              <button
+                type="button"
+                onClick={() => setMobileSearchOpen(!mobileSearchOpen)}
+                aria-label="Toggle search"
+                className="p-1.5 rounded-md text-slate-400 hover:text-white hover:bg-slate-800/60"
+              >
+                {mobileSearchOpen ? <X className="w-4 h-4" /> : <Search className="w-4 h-4" />}
+              </button>
+            </div>
+          </div>
 
-              {/* Sub-cards Grid: Used & Free space */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="p-4 rounded-2xl bg-[#0f131d] border border-[#22293a] flex items-center justify-between">
-                  <div>
-                    <span className="text-xs font-medium text-slate-400 block mb-1">Used</span>
-                    <span className="text-xl font-bold text-white font-mono">
-                      {totalUsedBytes === 0 ? '0 GB' : formatBytes(totalUsedBytes)}
-                    </span>
+          {/* Right Group: Action button, Utility buttons, Avatar, Logout */}
+          <div className="flex items-center gap-2 sm:gap-2.5 shrink-0">
+            {/* 4. Primary action button with exact sizing rules */}
+            <div className="relative" ref={newMenuRef}>
+              <button
+                type="button"
+                onClick={() => setNewMenuOpen(!newMenuOpen)}
+                className="inline-flex items-center justify-center gap-1.5 px-2.5 sm:px-[12px] py-[6px] text-[12px] font-medium leading-none bg-orange-500 hover:bg-orange-600 active:bg-orange-700 text-white rounded-md shadow-sm shadow-orange-500/20 focus:outline-none focus:ring-1 focus:ring-orange-400 transition-colors shrink-0"
+              >
+                <Plus className="w-3.5 h-3.5 shrink-0" />
+                <span className="hidden sm:inline">New</span>
+              </button>
+
+              {/* Action Dropdown Menu */}
+              {newMenuOpen && (
+                <div className="absolute right-0 mt-2 w-48 bg-[#121620] border border-[#1e2433] rounded-lg shadow-xl py-1.5 z-50 text-xs">
+                  <div className="px-3 py-1.5 text-[11px] font-medium uppercase tracking-wider text-slate-400 border-b border-[#1e2433]">
+                    Create or Upload
                   </div>
-                  <div className="w-10 h-10 rounded-xl bg-orange-500/10 text-orange-400 border border-orange-500/20 flex items-center justify-center">
+                  <button
+                    type="button"
+                    onClick={handleCreateFolder}
+                    className="w-full px-3 py-2 text-left flex items-center gap-2.5 text-slate-200 hover:bg-slate-800/70 hover:text-white"
+                  >
+                    <FolderPlus className="w-4 h-4 text-orange-400" />
+                    <span>New folder</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleUploadClick}
+                    className="w-full px-3 py-2 text-left flex items-center gap-2.5 text-slate-200 hover:bg-slate-800/70 hover:text-white"
+                  >
+                    <UploadCloud className="w-4 h-4 text-amber-400" />
+                    <span>Upload files</span>
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* 5. Utility buttons row */}
+            <div className="flex items-center gap-1 sm:gap-1.5">
+              <button
+                type="button"
+                onClick={() => {
+                  const nextTheme = theme === 'dark' ? 'light' : 'dark';
+                  setTheme(nextTheme);
+                  showToast(`Theme changed to ${nextTheme}`);
+                }}
+                className="p-1.5 rounded-md text-slate-400 hover:text-white hover:bg-slate-800/60 focus:outline-none transition-colors shrink-0"
+              >
+                {theme === 'dark' ? (
+                  <Sun className="w-4 h-4 text-amber-400" />
+                ) : (
+                  <Moon className="w-4 h-4 text-slate-200" />
+                )}
+              </button>
+
+              <div className="relative" ref={notifRef}>
+                <button
+                  type="button"
+                  onClick={() => setNotificationsOpen(!notificationsOpen)}
+                  className="relative p-1.5 rounded-md text-slate-400 hover:text-white hover:bg-slate-800/60 focus:outline-none transition-colors shrink-0"
+                >
+                  <Bell className="w-4 h-4" />
+                  <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-orange-500 ring-2 ring-[#0c0e14]" />
+                </button>
+
+                {notificationsOpen && (
+                  <div className="absolute right-0 mt-2 w-64 bg-[#121620] border border-[#1e2433] rounded-lg shadow-xl py-2 z-50 text-xs">
+                    <div className="px-3 py-1 flex items-center justify-between border-b border-[#1e2433] pb-2">
+                      <span className="font-semibold text-slate-200">Notifications</span>
+                      <span className="text-[10px] bg-orange-500/20 text-orange-400 px-1.5 py-0.5 rounded font-medium">
+                        2 new
+                      </span>
+                    </div>
+                    <div className="py-1">
+                      <div className="px-3 py-2 hover:bg-slate-800/50 cursor-pointer">
+                        <p className="text-slate-200 font-medium text-[11px]">Sync completed</p>
+                        <p className="text-slate-400 text-[10px]">142 files backed up to AsterDrive</p>
+                      </div>
+                      <div className="px-3 py-2 hover:bg-slate-800/50 cursor-pointer">
+                        <p className="text-slate-200 font-medium text-[11px]">Shared project</p>
+                        <p className="text-slate-400 text-[10px]">Sarah shared &quot;Roadmap_2026.pdf&quot;</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* 6. Small circular user avatar (clicking opens DARK PROFILE MODAL directly) */}
+            <div className="relative ml-0.5 sm:ml-1">
+              <button
+                type="button"
+                onClick={() => setProfileModalOpen(true)}
+                className="w-7 h-7 rounded-full bg-gradient-to-tr from-orange-600 to-amber-500 p-[1.5px] focus:outline-none focus:ring-1 focus:ring-orange-400 shrink-0 hover:opacity-90 transition-opacity cursor-pointer"
+                title="Profile & Account Settings"
+              >
+                <div className="w-full h-full rounded-full bg-[#121620] flex items-center justify-center text-[10px] font-bold text-orange-400">
+                  AD
+                </div>
+              </button>
+            </div>
+
+              {userMenuOpen && (
+                <div className="absolute right-0 mt-2 w-56 bg-[#11141d] border border-[#1e2433] rounded-xl shadow-2xl py-2 z-50 text-xs text-slate-200">
+                  <div className="px-3.5 py-2.5 border-b border-[#1e2433]">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-orange-500 to-amber-500 p-[1px] shrink-0">
+                        <div className="w-full h-full rounded-full bg-[#121620] flex items-center justify-center text-xs font-bold text-orange-400">
+                          AD
+                        </div>
+                      </div>
+                      <div className="overflow-hidden">
+                        <div className="font-semibold text-slate-100 truncate">Alex Driver</div>
+                        <div className="text-[11px] text-slate-400 truncate">alex.driver@asterdrive.io</div>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="py-1 border-b border-[#1e2433]">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setUserMenuOpen(false);
+                        setProfileModalOpen(true);
+                      }}
+                      className="w-full px-3.5 py-2 text-left flex items-center gap-2.5 text-slate-300 hover:bg-slate-800/60 hover:text-white"
+                    >
+                      <User className="w-4 h-4 text-orange-400" />
+                      <span>Edit Profile</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setUserMenuOpen(false);
+                        setActiveTab('security');
+                      }}
+                      className="w-full px-3.5 py-2 text-left flex items-center gap-2.5 text-slate-300 hover:bg-slate-800/60 hover:text-white"
+                    >
+                      <Shield className="w-4 h-4 text-emerald-400" />
+                      <span>Security & Health</span>
+                    </button>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setUserMenuOpen(false);
+                      showToast('Logged out of AsterDrive');
+                    }}
+                    className="w-full px-3.5 py-2 text-left flex items-center gap-2.5 text-rose-400 hover:bg-rose-500/10"
+                  >
+                    <LogOut className="w-4 h-4" />
+                    <span>Log out</span>
+                  </button>
+                </div>
+              )}
+
+            {/* 7. Text logout link at the far right */}
+            <button
+              type="button"
+              onClick={() => showToast('Logged out')}
+              className="hidden md:inline-flex text-[12px] font-normal text-slate-400 hover:text-slate-100 transition-colors ml-1 focus:outline-none focus:underline shrink-0"
+            >
+              Log out
+            </button>
+          </div>
+        </div>
+
+        {/* Mobile search bar expandable */}
+        {mobileSearchOpen && (
+          <div className="sm:hidden w-full px-3 py-2 bg-[#0c0e14] border-b border-[#1e2433] flex items-center gap-2">
+            <Search className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+            <input
+              type="text"
+              autoFocus
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search files..."
+              className="flex-1 h-8 px-2 bg-slate-900 border border-slate-700/60 rounded text-xs text-slate-200 placeholder-slate-400 focus:outline-none focus:border-orange-500"
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery('')}
+                className="p-1 text-slate-400 hover:text-white"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => setMobileSearchOpen(false)}
+              className="text-xs text-slate-400 hover:text-white px-1"
+            >
+              Close
+            </button>
+          </div>
+        )}
+      </header>
+
+      {/* 
+        ===================================================================
+        MAIN APPLICATION LAYOUT:
+        Sidebar + Workspace Viewport
+        ===================================================================
+      */}
+      <div className="flex-1 flex pt-14">
+        {/* SIDEBAR (Responsive drawer on mobile, fixed column on desktop) */}
+        <aside
+          className={`fixed inset-y-0 left-0 z-40 w-60 bg-[#0c0e14] border-r border-[#1e2433] flex flex-col pt-16 pb-6 px-3 transition-transform duration-200 lg:static lg:translate-x-0 ${
+            sidebarOpen ? 'translate-x-0' : '-translate-x-full'
+          }`}
+        >
+          {/* Mobile close button */}
+          <div className="lg:hidden flex items-center justify-between pb-3 mb-2 border-b border-[#1e2433]">
+            <span className="text-xs font-semibold uppercase text-slate-400 tracking-wider">Navigation</span>
+            <button
+              type="button"
+              onClick={() => setSidebarOpen(false)}
+              className="p-1 text-slate-400 hover:text-white"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+
+          {/* Primary Navigation Links (Matching Screenshot 1) */}
+          <nav className="flex-1 space-y-1 text-xs">
+            <button
+              type="button"
+              onClick={() => {
+                setActiveTab('mydrive');
+                setSidebarOpen(false);
+              }}
+              className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg font-medium transition-colors ${
+                activeTab === 'mydrive'
+                  ? 'bg-[#26150b] text-orange-500 font-semibold'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/60'
+              }`}
+            >
+              <Home className={`w-4 h-4 ${activeTab === 'mydrive' ? 'text-orange-500' : 'text-slate-400'}`} />
+              <span>My Drive</span>
+            </button>
+
+            {/* Sync Computers feature */}
+            <button
+              type="button"
+              onClick={() => {
+                setActiveTab('computers');
+                setSidebarOpen(false);
+              }}
+              className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg font-medium transition-colors ${
+                activeTab === 'computers'
+                  ? 'bg-[#26150b] text-orange-500 font-semibold'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/60'
+              }`}
+            >
+              <Laptop className={`w-4 h-4 ${activeTab === 'computers' ? 'text-orange-500' : 'text-slate-400'}`} />
+              <span>Computers</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setActiveTab('shared');
+                setSidebarOpen(false);
+              }}
+              className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg font-medium transition-colors ${
+                activeTab === 'shared'
+                  ? 'bg-[#26150b] text-orange-500 font-semibold'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/60'
+              }`}
+            >
+              <Users className={`w-4 h-4 ${activeTab === 'shared' ? 'text-orange-500' : 'text-slate-400'}`} />
+              <span>Shared with me</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setActiveTab('recent');
+                setSidebarOpen(false);
+              }}
+              className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg font-medium transition-colors ${
+                activeTab === 'recent'
+                  ? 'bg-[#26150b] text-orange-500 font-semibold'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/60'
+              }`}
+            >
+              <Clock className={`w-4 h-4 ${activeTab === 'recent' ? 'text-orange-500' : 'text-slate-400'}`} />
+              <span>Recent</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setActiveTab('starred');
+                setSidebarOpen(false);
+              }}
+              className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg font-medium transition-colors ${
+                activeTab === 'starred'
+                  ? 'bg-[#26150b] text-orange-500 font-semibold'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/60'
+              }`}
+            >
+              <Star className={`w-4 h-4 ${activeTab === 'starred' ? 'text-orange-500' : 'text-slate-400'}`} />
+              <span>Starred</span>
+            </button>
+
+            {/* Divider */}
+            <div className="pt-4 pb-2">
+              <div className="h-[1px] bg-[#1e2433] w-full" />
+              <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 px-3 pt-3">
+                Workspace
+              </div>
+            </div>
+
+            {/* Workspace section (Matching Screenshot 1) */}
+            <button
+              type="button"
+              onClick={() => {
+                setActiveTab('storage');
+                setSidebarOpen(false);
+              }}
+              className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg font-medium transition-colors ${
+                activeTab === 'storage'
+                  ? 'bg-[#26150b] text-orange-500 font-semibold'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/60'
+              }`}
+            >
+              <HardDrive className={`w-4 h-4 ${activeTab === 'storage' ? 'text-orange-500' : 'text-slate-400'}`} />
+              <span>Storage</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setActiveTab('activity');
+                setSidebarOpen(false);
+              }}
+              className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg font-medium transition-colors ${
+                activeTab === 'activity'
+                  ? 'bg-[#26150b] text-orange-500 font-semibold'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/60'
+              }`}
+            >
+              <Activity className={`w-4 h-4 ${activeTab === 'activity' ? 'text-orange-500' : 'text-slate-400'}`} />
+              <span>Activity</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setActiveTab('people');
+                setSidebarOpen(false);
+              }}
+              className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg font-medium transition-colors ${
+                activeTab === 'people'
+                  ? 'bg-[#26150b] text-orange-500 font-semibold'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/60'
+              }`}
+            >
+              <Users className={`w-4 h-4 ${activeTab === 'people' ? 'text-orange-500' : 'text-slate-400'}`} />
+              <span>People</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setActiveTab('trash');
+                setSidebarOpen(false);
+              }}
+              className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg font-medium transition-colors ${
+                activeTab === 'trash'
+                  ? 'bg-[#26150b] text-orange-500 font-semibold'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/60'
+              }`}
+            >
+              <Trash2 className={`w-4 h-4 ${activeTab === 'trash' ? 'text-orange-500' : 'text-slate-400'}`} />
+              <span>Trash</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setActiveTab('security');
+                setSidebarOpen(false);
+              }}
+              className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg font-medium transition-colors ${
+                activeTab === 'security'
+                  ? 'bg-[#26150b] text-orange-500 font-semibold'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/60'
+              }`}
+            >
+              <ShieldCheck className={`w-4 h-4 ${activeTab === 'security' ? 'text-orange-500' : 'text-slate-400'}`} />
+              <span>Security</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setActiveTab('feedback');
+                setSidebarOpen(false);
+              }}
+              className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg font-medium transition-colors ${
+                activeTab === 'feedback'
+                  ? 'bg-[#26150b] text-orange-500 font-semibold'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/60'
+              }`}
+            >
+              <MessageSquare className={`w-4 h-4 ${activeTab === 'feedback' ? 'text-orange-500' : 'text-slate-400'}`} />
+              <span>Feedback</span>
+            </button>
+          </nav>
+
+          {/* Footer links from screenshot */}
+          <div className="pt-4 border-t border-[#1e2433] text-[11px] text-slate-500 flex flex-wrap gap-x-3 gap-y-1 px-2">
+            <span className="hover:text-slate-300 cursor-pointer">About us</span>
+            <span className="hover:text-slate-300 cursor-pointer">Help center</span>
+            <span className="hover:text-slate-300 cursor-pointer">Privacy</span>
+            <span className="hover:text-slate-300 cursor-pointer">Terms</span>
+          </div>
+        </aside>
+
+        {/* Backdrop for mobile drawer */}
+        {sidebarOpen && (
+          <div
+            className="fixed inset-0 z-30 bg-black/60 lg:hidden"
+            onClick={() => setSidebarOpen(false)}
+          />
+        )}
+
+        {/* WORKSPACE VIEWPORT */}
+        <main className="flex-1 min-w-0 p-4 sm:p-6 lg:p-8 overflow-y-auto">
+          {/* ======================= TAB: MY DRIVE / COMPUTERS / SHARED / RECENT / STARRED ======================= */}
+          {(activeTab === 'mydrive' || activeTab === 'computers' || activeTab === 'shared' || activeTab === 'recent' || activeTab === 'starred') && (
+            <div className="space-y-6">
+              {/* Header bar */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                  <div className="text-orange-500 text-xs font-semibold uppercase tracking-wider">
+                    {activeTab === 'mydrive'
+                      ? 'Storage'
+                      : activeTab === 'computers'
+                      ? 'Sync Computers'
+                      : activeTab === 'shared'
+                      ? 'Shared Files'
+                      : activeTab === 'recent'
+                      ? 'Recent Activity'
+                      : 'Starred Files'}
+                  </div>
+                  <h1 className="text-2xl sm:text-3xl font-bold text-white tracking-tight mt-0.5">
+                    {activeTab === 'mydrive'
+                      ? 'My Drive'
+                      : activeTab === 'computers'
+                      ? 'Sync Computers'
+                      : activeTab === 'shared'
+                      ? 'Shared with me'
+                      : activeTab === 'recent'
+                      ? 'Recent'
+                      : 'Starred'}
+                  </h1>
+                </div>
+
+                {/* View controls */}
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handleUploadClick}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-orange-500 hover:bg-orange-600 text-white rounded-md shadow-sm transition-colors"
+                  >
+                    <UploadCloud className="w-4 h-4" />
+                    <span>Upload</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleCreateFolder}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-md border border-slate-700 transition-colors"
+                  >
+                    <FolderPlus className="w-4 h-4" />
+                    <span>Folder</span>
+                  </button>
+                  <div className="flex items-center bg-slate-900 border border-slate-800 rounded-md p-0.5 ml-2">
+                    <button
+                      type="button"
+                      onClick={() => setViewMode('grid')}
+                      className={`p-1 rounded ${viewMode === 'grid' ? 'bg-orange-500 text-white' : 'text-slate-400 hover:text-white'}`}
+                      title="Grid view"
+                    >
+                      <LayoutGrid className="w-4 h-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setViewMode('list')}
+                      className={`p-1 rounded ${viewMode === 'list' ? 'bg-orange-500 text-white' : 'text-slate-400 hover:text-white'}`}
+                      title="List view"
+                    >
+                      <ListIcon className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Breadcrumbs for folder navigation */}
+              {activeTab === 'mydrive' && folderHistory.length > 1 && (
+                <div className="flex items-center gap-1.5 text-xs text-slate-400 bg-[#11141d] px-3 py-1.5 rounded-lg border border-[#1e2433]">
+                  {folderHistory.map((folder, index) => (
+                    <React.Fragment key={folder.id}>
+                      {index > 0 && <ChevronRight className="w-3.5 h-3.5 text-slate-600" />}
+                      <button
+                        type="button"
+                        onClick={() => handleNavigateBreadcrumb(index)}
+                        className={`hover:text-white transition-colors ${
+                          index === folderHistory.length - 1 ? 'text-orange-400 font-semibold' : ''
+                        }`}
+                      >
+                        {folder.name}
+                      </button>
+                    </React.Fragment>
+                  ))}
+                </div>
+              )}
+
+              {/* Items Display: Grid or List */}
+              {currentItems.length === 0 ? (
+                <div className="bg-[#11141d] border border-[#1e2433] rounded-2xl p-12 text-center">
+                  <div className="w-12 h-12 rounded-full bg-slate-800/80 flex items-center justify-center mx-auto text-slate-400 mb-3">
+                    <HardDrive className="w-6 h-6" />
+                  </div>
+                  <h3 className="text-sm font-semibold text-slate-200">No files found</h3>
+                  <p className="text-xs text-slate-400 mt-1 max-w-sm mx-auto">
+                    {searchQuery
+                      ? `No results match "${searchQuery}". Try different keywords.`
+                      : 'Upload files or create folders to get started with AsterDrive.'}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={handleUploadClick}
+                    className="mt-4 inline-flex items-center gap-2 px-3 py-1.5 text-xs font-medium bg-orange-500 hover:bg-orange-600 text-white rounded-md transition-colors"
+                  >
+                    <UploadCloud className="w-4 h-4" />
+                    <span>Upload your first file</span>
+                  </button>
+                </div>
+              ) : viewMode === 'grid' ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3.5">
+                  {currentItems.map((item) => (
+                    <div
+                      key={item.id}
+                      onClick={() => (item.type === 'folder' ? handleFolderClick(item) : handleOpenPreview(item))}
+                      className="bg-[#11141d] hover:bg-[#151924] border border-[#1e2433] hover:border-slate-700/80 rounded-xl p-3.5 transition-all cursor-pointer group flex flex-col justify-between"
+                    >
+                      <div>
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex items-center gap-2.5 truncate">
+                            <div className="p-2 rounded-lg bg-slate-800/60 shrink-0">
+                              {getItemIcon(item.type)}
+                            </div>
+                            <span className="text-xs font-semibold text-slate-200 truncate group-hover:text-white">
+                              {item.name}
+                            </span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={(e) => handleToggleStar(item.id, e)}
+                            className="text-slate-500 hover:text-amber-400 p-1"
+                          >
+                            <Star className={`w-3.5 h-3.5 ${item.starred ? 'text-amber-400 fill-amber-400' : ''}`} />
+                          </button>
+                        </div>
+
+                        {/* Image Preview Thumbnail */}
+                        {item.type === 'image' && (item.thumbnailUrl || item.previewUrl) && (
+                          <div className="mt-3 relative w-full h-28 rounded-lg overflow-hidden bg-black/40 border border-[#1e2433]/70 group-hover:border-orange-500/40 transition-all">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={item.thumbnailUrl || item.previewUrl}
+                              alt={item.name}
+                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                              loading="lazy"
+                            />
+                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                              <span className="px-2 py-1 rounded bg-black/70 text-[11px] text-white font-medium flex items-center gap-1 shadow">
+                                <Eye className="w-3.5 h-3.5 text-orange-400" />
+                                <span>Lihat Foto</span>
+                              </span>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Video Preview Card */}
+                        {item.type === 'video' && (
+                          <div className="mt-3 relative w-full h-28 rounded-lg overflow-hidden bg-slate-950 border border-[#1e2433]/70 group-hover:border-orange-500/40 transition-all flex items-center justify-center">
+                            {item.thumbnailUrl ? (
+                              /* eslint-disable-next-line @next/next/no-img-element */
+                              <img
+                                src={item.thumbnailUrl}
+                                alt={item.name}
+                                className="w-full h-full object-cover opacity-75 group-hover:opacity-90 group-hover:scale-105 transition-all duration-300"
+                                loading="lazy"
+                              />
+                            ) : (
+                              <div className="w-full h-full bg-gradient-to-br from-slate-900 to-slate-950 flex items-center justify-center">
+                                <Video className="w-8 h-8 text-slate-700" />
+                              </div>
+                            )}
+                            <div className="absolute inset-0 bg-black/30 flex items-center justify-center">
+                              <div className="w-9 h-9 rounded-full bg-orange-500/90 text-white flex items-center justify-center shadow-lg group-hover:scale-110 group-hover:bg-orange-500 transition-all">
+                                <Play className="w-4 h-4 fill-white ml-0.5" />
+                              </div>
+                            </div>
+                            <span className="absolute bottom-1.5 right-1.5 px-1.5 py-0.5 rounded bg-black/80 text-[10px] text-slate-200 font-mono flex items-center gap-1">
+                              <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" />
+                              <span>Putar Video</span>
+                            </span>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="mt-3 pt-2 border-t border-[#1e2433]/60 flex items-center justify-between text-[11px] text-slate-400">
+                        <span>{formatFileSize(item.size)}</span>
+                        <div className="flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setShareItem(item);
+                            }}
+                            className="p-1 hover:text-white"
+                            title="Share"
+                          >
+                            <Share2 className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => handleTrashItem(item.id, e)}
+                            className="p-1 hover:text-rose-400"
+                            title="Delete"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="bg-[#11141d] border border-[#1e2433] rounded-xl overflow-hidden">
+                  <table className="w-full text-left text-xs text-slate-300">
+                    <thead className="bg-slate-900/60 text-slate-400 text-[11px] uppercase tracking-wider border-b border-[#1e2433]">
+                      <tr>
+                        <th className="px-4 py-2.5 font-medium">Name</th>
+                        <th className="px-4 py-2.5 font-medium hidden sm:table-cell">Owner</th>
+                        <th className="px-4 py-2.5 font-medium hidden md:table-cell">Size</th>
+                        <th className="px-4 py-2.5 font-medium text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[#1e2433]/60">
+                      {currentItems.map((item) => (
+                        <tr
+                          key={item.id}
+                          onClick={() => (item.type === 'folder' ? handleFolderClick(item) : handleOpenPreview(item))}
+                          className="hover:bg-slate-800/40 cursor-pointer transition-colors"
+                        >
+                          <td className="px-4 py-2.5 flex items-center gap-2.5 truncate max-w-xs">
+                            {getItemIcon(item.type)}
+                            <span className="font-medium text-slate-200 truncate">{item.name}</span>
+                          </td>
+                          <td className="px-4 py-2.5 text-slate-400 hidden sm:table-cell">{item.owner}</td>
+                          <td className="px-4 py-2.5 text-slate-400 hidden md:table-cell">{formatFileSize(item.size)}</td>
+                          <td className="px-4 py-2.5 text-right space-x-1">
+                            <button
+                              type="button"
+                              onClick={(e) => handleToggleStar(item.id, e)}
+                              className="p-1 text-slate-400 hover:text-amber-400"
+                            >
+                              <Star className={`w-3.5 h-3.5 ${item.starred ? 'text-amber-400 fill-amber-400' : ''}`} />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setShareItem(item);
+                              }}
+                              className="p-1 text-slate-400 hover:text-white"
+                            >
+                              <Share2 className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => handleTrashItem(item.id, e)}
+                              className="p-1 text-slate-400 hover:text-rose-400"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ======================= TAB: STORAGE ======================= */}
+          {/* ======================= TAB: STORAGE (Matching Screenshot) ======================= */}
+          {activeTab === 'storage' && (
+            <div className="space-y-6">
+              <div>
+                <div className="text-orange-500 text-xs font-semibold uppercase tracking-wider">Storage</div>
+                <h1 className="text-3xl font-bold text-white tracking-tight mt-0.5">Storage</h1>
+                <p className="text-xs text-slate-400 mt-1">
+                  Everything you&apos;re working on, in one place.
+                </p>
+              </div>
+
+              {/* Main Storage Overview Card matching Screenshot */}
+              <div className="bg-[#11141d] border border-[#1e2433] rounded-2xl p-6 space-y-5">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <div className="text-[11px] font-medium text-slate-400 uppercase tracking-wider">
+                      Storage overview
+                    </div>
+                    <div className="text-3xl font-bold text-white tracking-tight mt-1">
+                      {formatFileSize(items.reduce((acc, it) => acc + (it.size || 0), 0))}
+                    </div>
+                    <div className="text-xs text-slate-400 mt-0.5">
+                      {items.length === 0 ? 'No files stored yet' : `${items.length} files stored`}
+                    </div>
+                  </div>
+                  <div className="w-10 h-10 rounded-xl bg-[#26150b] border border-orange-500/30 flex items-center justify-center text-orange-500 shrink-0">
                     <HardDrive className="w-5 h-5" />
                   </div>
                 </div>
 
-                <div className="p-4 rounded-2xl bg-[#0f131d] border border-[#22293a] flex items-center justify-between">
-                  <div>
-                    <span className="text-xs font-medium text-slate-400 block mb-1">Free space</span>
-                    <span className="text-xl font-bold text-white font-mono">
-                      {totalUsedBytes === 0 ? currentPlan.storage : formatBytes(Math.max(0, currentPlan.maxBytes - totalUsedBytes))}
-                    </span>
+                {/* Progress bar */}
+                <div className="w-full h-1.5 bg-slate-800/80 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-gradient-to-r from-orange-500 to-amber-500 rounded-full transition-all duration-300"
+                    style={{
+                      width: `${Math.min(
+                        100,
+                        (items.reduce((acc, it) => acc + (it.size || 0), 0) / (1024 * 1024 * 1024)) * 100
+                      )}%`
+                    }}
+                  />
+                </div>
+
+                {/* Used & Free space cards from screenshot */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                  <div className="bg-[#0c0e14]/60 border border-[#1e2433] rounded-xl p-3.5">
+                    <div className="text-[11px] font-medium text-slate-400">Used</div>
+                    <div className="text-xs font-semibold text-slate-200 mt-1">
+                      {formatFileSize(items.reduce((acc, it) => acc + (it.size || 0), 0))}
+                    </div>
                   </div>
-                  <div className="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center justify-center">
-                    <Cloud className="w-5 h-5" />
+                  <div className="bg-[#0c0e14]/60 border border-[#1e2433] rounded-xl p-3.5">
+                    <div className="text-[11px] font-medium text-slate-400">Free space</div>
+                    <div className="text-xs font-semibold text-slate-200 mt-1">1 GB</div>
                   </div>
+                </div>
+
+                <div>
+                  <button
+                    type="button"
+                    onClick={() => showToast('Redirecting to AsterDrive storage upgrade options')}
+                    className="inline-flex items-center justify-center px-4 py-2 text-xs font-medium bg-orange-500 hover:bg-orange-600 text-white rounded-md shadow-sm transition-colors"
+                  >
+                    Buy storage
+                  </button>
                 </div>
               </div>
-            </div>
 
-            {/* Detailed Analytics Chart */}
-            <StorageAnalyticsChart
-              items={driveItems}
-              plan={currentPlan}
-              onUpgradeClick={() => setIsUpgradeModalOpen(true)}
-            />
-          </div>
-        ) : activeNav === 'activity' ? (
-          /* ACTIVITY PAGE VIEW (Matching Screenshot 3) */
-          <div className="flex-1 overflow-y-auto px-4 lg:px-8 py-6 space-y-6">
-            <div>
-              <span className="text-xs font-semibold uppercase tracking-wider text-orange-500">
-                Activity
-              </span>
-              <h1 className="text-3xl font-bold text-white tracking-tight mt-1">
-                Activity
-              </h1>
-              <p className="text-sm text-slate-400 mt-0.5">
-                Everything you&apos;re working on, in one place.
-              </p>
-            </div>
-
-            {/* Main Card: Recent activity */}
-            <div className="bg-[#141824] border border-[#252d3f] rounded-3xl p-6 sm:p-8 shadow-xl">
-              <div className="flex items-center justify-between mb-6 pb-4 border-b border-[#22293a]">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-orange-500/10 border border-orange-500/20 text-orange-400 flex items-center justify-center">
-                    <Clock className="w-5 h-5" />
-                  </div>
-                  <h3 className="text-lg font-bold text-white">Recent activity</h3>
-                </div>
-                <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-orange-500/10 text-orange-400 border border-orange-500/20 font-mono">
-                  {activities.length}
-                </span>
+              {/* Detailed Breakdown Chart */}
+              <div className="bg-[#11141d] border border-[#1e2433] rounded-2xl p-6">
+                <StorageAnalyticsChart
+                  items={analyticsItems}
+                  plan={{
+                    name: 'AsterDrive Free',
+                    storage: '1 GB',
+                    maxBytes: 1 * 1024 * 1024 * 1024,
+                    isFree: true
+                  }}
+                  onUpgradeClick={() => showToast('AsterDrive Enterprise plan requested')}
+                />
               </div>
-
-              {activities.length === 0 ? (
-                <div className="text-center py-12">
-                  <h4 className="text-base font-semibold text-white mb-3">No activity to show</h4>
-                  <div className="border-2 border-dashed border-[#262e40] rounded-2xl p-8 max-w-md mx-auto text-slate-400 text-sm">
-                    Uploads and changes will appear here.
-                  </div>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {activities.map((act) => (
-                    <div 
-                      key={act.id} 
-                      className="p-3.5 bg-[#0f131d] border border-[#22293a] rounded-2xl flex items-center justify-between gap-4"
-                    >
-                      <div className="flex items-center gap-3 min-w-0">
-                        <div className="w-9 h-9 rounded-xl bg-orange-500/10 text-orange-400 border border-orange-500/20 flex items-center justify-center shrink-0">
-                          {act.type === 'upload' ? <UploadCloud className="w-4 h-4" /> :
-                           act.type === 'sync' ? <RefreshCw className="w-4 h-4" /> :
-                           act.type === 'share' ? <Share2 className="w-4 h-4" /> :
-                           act.type === 'trash' ? <Trash2 className="w-4 h-4 text-rose-400" /> :
-                           act.type === 'folder' ? <Folder className="w-4 h-4 text-amber-400" /> :
-                           <Clock className="w-4 h-4" />}
-                        </div>
-                        <div className="min-w-0">
-                          <h4 className="text-sm font-semibold text-white truncate">{act.title}</h4>
-                          <p className="text-xs text-slate-400 truncate">{act.description}</p>
-                        </div>
-                      </div>
-                      <span className="text-[11px] font-mono text-slate-500 shrink-0">
-                        {formatDateSafe(act.timestamp)}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              )}
             </div>
-          </div>
-        ) : activeNav === 'people' ? (
-          /* PEOPLE PAGE (Matching Screenshot 1) */
-          <div className="flex-1 overflow-y-auto px-4 lg:px-8 py-6 space-y-6">
-            <div>
-              <span className="text-xs font-semibold uppercase tracking-wider text-orange-500">
-                People
-              </span>
-              <h1 className="text-3xl font-bold text-white tracking-tight mt-1">
-                People
-              </h1>
-              <p className="text-sm text-slate-400 mt-0.5">
-                Manage collaborators and file access.
-              </p>
-            </div>
+          )}
 
-            {/* Main Card */}
-            <div className="bg-[#11141d] border border-[#1e2433] rounded-2xl p-6 sm:p-7 shadow-lg">
-              <div className="flex items-start justify-between gap-4">
-                <div className="flex items-start gap-3.5">
-                  <div className="w-10 h-10 rounded-xl bg-orange-500/10 border border-orange-500/20 text-orange-500 flex items-center justify-center shrink-0">
-                    <Users className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <span className="text-xs text-slate-400 font-medium">People &amp; access</span>
-                    <div className="text-2xl font-bold text-white mt-0.5">
-                      {collaborators.length} people
-                    </div>
-                    <p className="text-xs text-slate-400 mt-0.5">
-                      {collaborators.length === 0 ? 'No collaborators yet' : `${collaborators.length} collaborator(s) with workspace access`}
-                    </p>
-                  </div>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => setIsInviteOpen(!isInviteOpen)}
-                  className="px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-xl text-xs font-semibold transition-colors cursor-pointer flex items-center gap-1.5 shadow-sm"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  Invite collaborator
-                </button>
-              </div>
-
-              {/* Invite Collaborator Form */}
-              {isInviteOpen && (
-                <form onSubmit={handleAddCollaborator} className="mt-5 p-4 rounded-xl bg-[#0c0e14] border border-[#1e2433] space-y-3">
-                  <div className="flex items-center justify-between">
-                    <h4 className="text-xs font-semibold uppercase tracking-wider text-orange-400">Invite New Collaborator</h4>
-                    <button type="button" onClick={() => setIsInviteOpen(false)} className="text-slate-400 hover:text-white text-xs cursor-pointer">
-                      Cancel
-                    </button>
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-                    <input
-                      type="email"
-                      placeholder="collaborator@company.com"
-                      value={inviteEmail}
-                      onChange={(e) => setInviteEmail(e.target.value)}
-                      className="px-3.5 py-2 bg-[#11141d] border border-[#1e2433] rounded-xl text-xs text-white placeholder:text-slate-500 focus:border-orange-500 outline-none sm:col-span-2"
-                      required
-                    />
-                    <div className="flex gap-2">
-                      <select
-                        value={inviteRole}
-                        onChange={(e) => setInviteRole(e.target.value as 'Viewer' | 'Editor')}
-                        className="px-3 py-2 bg-[#11141d] border border-[#1e2433] rounded-xl text-xs text-white focus:border-orange-500 outline-none flex-1"
-                      >
-                        <option value="Editor">Editor</option>
-                        <option value="Viewer">Viewer</option>
-                      </select>
-                      <button
-                        type="submit"
-                        className="px-3.5 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-xl text-xs font-semibold transition-colors shrink-0 cursor-pointer"
-                      >
-                        Add
-                      </button>
-                    </div>
-                  </div>
-                </form>
-              )}
-
-              {/* Collaborators List or Empty State (Screenshot 1) */}
-              {collaborators.length === 0 ? (
-                <div className="border border-dashed border-[#252d3f] rounded-xl p-6 mt-6 text-sm text-slate-400 text-center">
-                  People you share files with will appear here.
-                </div>
-              ) : (
-                <div className="mt-6 space-y-2.5">
-                  {collaborators.map((c) => (
-                    <div key={c.id} className="p-3.5 bg-[#0c0e14] border border-[#1e2433] rounded-xl flex items-center justify-between gap-3">
-                      <div className="flex items-center gap-3 min-w-0">
-                        <div className="w-8 h-8 rounded-lg bg-orange-500/10 border border-orange-500/20 text-orange-400 font-bold text-xs flex items-center justify-center shrink-0">
-                          {c.email.substring(0, 2).toUpperCase()}
-                        </div>
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm font-semibold text-white truncate">{c.email}</span>
-                            <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-orange-500/10 text-orange-400 border border-orange-500/20">
-                              {c.role}
-                            </span>
-                          </div>
-                          <span className="text-[11px] text-slate-500">Added {formatDateSafe(c.addedAt)}</span>
-                        </div>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => handleRevokeCollaborator(c.id, c.email)}
-                        className="px-2.5 py-1 text-xs text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors cursor-pointer"
-                      >
-                        Revoke
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        ) : activeNav === 'trash' ? (
-          /* TRASH PAGE (Matching Screenshot 2) */
-          <div className="flex-1 overflow-y-auto px-4 lg:px-8 py-6 space-y-6">
-            <div>
-              <span className="text-xs font-semibold uppercase tracking-wider text-orange-500">
-                Trash
-              </span>
-              <h1 className="text-3xl font-bold text-white tracking-tight mt-1">
-                Trash
-              </h1>
-              <p className="text-sm text-slate-400 mt-0.5">
-                Everything you&apos;re working on, in one place.
-              </p>
-            </div>
-
-            {trashedItems.length === 0 ? (
-              /* EMPTY STATE - EXACT MATCH TO SCREENSHOT 2 */
-              <div className="bg-[#11141d] border border-[#1e2433] rounded-2xl p-14 text-center flex flex-col items-center justify-center shadow-lg">
-                <div className="w-12 h-12 rounded-xl bg-[#1e2433] text-slate-400 flex items-center justify-center mb-4">
-                  <Trash2 className="w-6 h-6" />
-                </div>
-                <h3 className="text-lg font-bold text-white mb-1.5">
-                  Trash is empty
-                </h3>
-                <p className="text-xs text-slate-400 max-w-md leading-relaxed">
-                  Deleted files will stay here temporarily so you can restore them before permanent removal.
+          {/* ======================= TAB: ACTIVITY (Matching Screenshot) ======================= */}
+          {activeTab === 'activity' && (
+            <div className="space-y-6">
+              <div>
+                <div className="text-orange-500 text-xs font-semibold uppercase tracking-wider">Activity</div>
+                <h1 className="text-3xl font-bold text-white tracking-tight mt-0.5">Activity</h1>
+                <p className="text-xs text-slate-400 mt-1">
+                  Everything you&apos;re working on, in one place.
                 </p>
               </div>
-            ) : (
-              /* POPULATED TRASH STATE WITH FULL RESTORE & PURGE CAPABILITIES */
-              <div className="space-y-4">
-                <div className="bg-[#11141d] border border-[#1e2433] rounded-2xl p-5 flex items-center justify-between gap-4 shadow-lg">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 flex items-center justify-center shrink-0">
-                      <Trash2 className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <h3 className="text-sm font-bold text-white">Trash ({trashedItems.length} {trashedItems.length === 1 ? 'item' : 'items'})</h3>
-                      <p className="text-xs text-slate-400">Items in trash can be restored to your drive or permanently removed.</p>
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={handleEmptyTrash}
-                    className="px-3.5 py-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 rounded-xl text-xs font-semibold transition-colors cursor-pointer flex items-center gap-1.5"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                    Empty Trash
-                  </button>
-                </div>
 
-                <div className="bg-[#11141d] border border-[#1e2433] rounded-2xl p-4 divide-y divide-[#1e2433] shadow-lg">
-                  {trashedItems.map((item) => (
-                    <div key={item.id} className="py-3 px-2 flex items-center justify-between gap-4 first:pt-0 last:pb-0">
-                      <div className="flex items-center gap-3 min-w-0">
-                        <div className="w-9 h-9 rounded-xl bg-[#0c0e14] border border-[#1e2433] flex items-center justify-center shrink-0">
-                          {getIconForType(item.type, "w-4 h-4")}
-                        </div>
-                        <div className="min-w-0">
-                          <h4 className="text-sm font-semibold text-white truncate">{item.name}</h4>
-                          <div className="flex items-center gap-2 text-xs text-slate-500">
-                            <span>{formatBytes(item.size)}</span>
-                            <span>•</span>
-                            <span>Deleted {formatDateSafe(item.updatedAt)}</span>
-                            {item.source === 'computer' && (
-                              <>
-                                <span>•</span>
-                                <span className="text-orange-400/80">Computer Sync</span>
-                              </>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2 shrink-0">
-                        <button
-                          type="button"
-                          onClick={() => handleRestoreItem(item)}
-                          className="px-3 py-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded-lg text-xs font-medium transition-colors flex items-center gap-1 cursor-pointer"
-                          title="Restore file"
-                        >
-                          <RotateCcw className="w-3.5 h-3.5" />
-                          <span>Restore</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handlePermanentDeleteItem(item)}
-                          className="px-3 py-1.5 bg-[#1b2131] hover:bg-rose-500/20 hover:text-rose-400 border border-[#2d374d] text-slate-400 rounded-lg text-xs font-medium transition-colors flex items-center gap-1 cursor-pointer"
-                          title="Delete permanently"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                          <span>Delete</span>
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        ) : activeNav === 'security' ? (
-          /* SECURITY PAGE (Matching Screenshot 3) */
-          <div className="flex-1 overflow-y-auto px-4 lg:px-8 py-6 space-y-6">
-            <div>
-              <span className="text-xs font-semibold uppercase tracking-wider text-orange-500">
-                Security
-              </span>
-              <h1 className="text-3xl font-bold text-white tracking-tight mt-1">
-                Security
-              </h1>
-              <p className="text-sm text-slate-400 mt-0.5">
-                Review workspace access and protection.
-              </p>
-            </div>
-
-            {/* Main Card (Screenshot 3) */}
-            <div className="bg-[#11141d] border border-[#1e2433] rounded-2xl p-6 sm:p-7 shadow-lg">
-              <div className="flex items-start justify-between gap-4">
-                <div className="flex items-start gap-3.5">
-                  <div className="w-10 h-10 rounded-xl bg-orange-500/10 border border-orange-500/20 text-orange-500 flex items-center justify-center shrink-0">
-                    <ShieldCheck className="w-5 h-5" />
+              {/* Main Card from Screenshot */}
+              <div className="bg-[#11141d] border border-[#1e2433] rounded-2xl p-6 space-y-5">
+                <div className="flex items-start gap-4">
+                  <div className="w-10 h-10 rounded-xl bg-[#26150b] border border-orange-500/30 flex items-center justify-center text-orange-500 shrink-0">
+                    <Clock className="w-5 h-5" />
                   </div>
                   <div>
-                    <span className="text-xs text-slate-400 font-medium uppercase tracking-wider">Workspace health</span>
-                    <div className="text-2xl font-bold text-white mt-0.5">
-                      Ready
+                    <div className="text-[11px] font-medium text-slate-400 uppercase tracking-wider">
+                      Recent activity
                     </div>
-                    <p className="text-xs text-slate-400 mt-0.5">
-                      Your workspace is ready
-                    </p>
+                    <div className="text-2xl font-bold text-white tracking-tight mt-0.5">
+                      {items.length}
+                    </div>
+                    <div className="text-xs text-slate-400 mt-0.5">
+                      {items.length === 0 ? 'No activity to show' : `${items.length} file actions recorded`}
+                    </div>
                   </div>
                 </div>
 
-                <button
-                  type="button"
-                  onClick={handleRunSecurityScan}
-                  disabled={isSecurityScanning}
-                  className="px-4 py-2 bg-[#181d2a] hover:bg-[#222a3d] border border-[#2d374d] text-white rounded-xl text-xs font-semibold transition-colors cursor-pointer flex items-center gap-1.5 shadow-sm disabled:opacity-70"
-                >
-                  <RefreshCw className={cn("w-3.5 h-3.5", isSecurityScanning && "animate-spin text-orange-400")} />
-                  <span>{isSecurityScanning ? 'Scanning...' : 'Scan Now'}</span>
-                </button>
-              </div>
-
-              {/* 3-card Grid (Screenshot 3) */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5 mt-6">
-                <div className="p-4 rounded-xl bg-[#0c0e14] border border-[#1e2433]">
-                  <span className="text-xs text-slate-400 block mb-1.5 font-medium">File protection</span>
-                  <div className="text-base font-bold text-emerald-400 flex items-center gap-1.5">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                    <span>Active</span>
-                  </div>
-                  <span className="text-[11px] text-slate-500 mt-1 block">AES-256 client encryption</span>
-                </div>
-
-                <div className="p-4 rounded-xl bg-[#0c0e14] border border-[#1e2433]">
-                  <span className="text-xs text-slate-400 block mb-1.5 font-medium">Sharing access</span>
-                  <div className="text-base font-bold text-white flex items-center gap-1.5">
-                    <Lock className="w-4 h-4 text-orange-400" />
-                    <span>Controlled</span>
-                  </div>
-                  <span className="text-[11px] text-slate-500 mt-1 block">Scoped token authentication</span>
-                </div>
-
-                <div className="p-4 rounded-xl bg-[#0c0e14] border border-[#1e2433]">
-                  <span className="text-xs text-slate-400 block mb-1.5 font-medium">Suspicious activity</span>
-                  <div className="text-base font-bold text-emerald-400 flex items-center gap-1.5">
-                    <Shield className="w-4 h-4 text-emerald-400" />
-                    <span>None detected</span>
-                  </div>
-                  <span className="text-[11px] text-slate-500 mt-1 block">Zero unauthorized events</span>
+                {/* Dashed placeholder container from screenshot */}
+                <div className="border border-dashed border-[#1e2433] rounded-xl p-8 text-center bg-[#0c0e14]/50">
+                  <p className="text-xs text-slate-400">Uploads and changes will appear here.</p>
                 </div>
               </div>
 
-              {/* Bottom Container (Screenshot 3) */}
-              <div className="bg-[#181512] border border-orange-950/40 rounded-xl p-4 mt-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-orange-200/70">
-                <div className="flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0"></span>
-                  <span>Security checks will appear here.</span>
+              {/* Activity List */}
+              <div className="bg-[#11141d] border border-[#1e2433] rounded-2xl p-6 space-y-4">
+                <div className="text-xs font-semibold text-slate-300 uppercase tracking-wider pb-2 border-b border-[#1e2433]">
+                  Event History
                 </div>
-                <span className="font-mono text-[11px] text-orange-300/60">Last scan: {lastSecurityScanTime}</span>
-              </div>
-            </div>
-          </div>
-        ) : activeNav === 'feedback' ? (
-          /* FEEDBACK PAGE (Matching Screenshot 4) */
-          <div className="flex-1 overflow-y-auto px-4 lg:px-8 py-6 space-y-6">
-            <div>
-              <span className="text-xs font-semibold uppercase tracking-wider text-orange-500">
-                Feedback
-              </span>
-              <h1 className="text-3xl font-bold text-white tracking-tight mt-1">
-                Feedback
-              </h1>
-              <p className="text-sm text-slate-400 mt-0.5">
-                Everything you&apos;re working on, in one place.
-              </p>
-            </div>
-
-            {/* Main Card (Screenshot 4) */}
-            <div className="bg-[#11141d] border border-[#1e2433] rounded-2xl p-6 sm:p-7 max-w-2xl shadow-lg">
-              <div className="flex items-start gap-3.5 mb-5">
-                <div className="w-10 h-10 rounded-xl bg-orange-500/10 border border-orange-500/20 text-orange-500 flex items-center justify-center shrink-0">
-                  <MessageSquare className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className="text-base font-bold text-white">Help us improve AsterDrive</h3>
-                  <p className="text-xs text-slate-400 mt-0.5">
-                    Tell us what works well or what you would like to see next.
-                  </p>
-                </div>
-              </div>
-
-              <form onSubmit={handleSubmitFeedback}>
-                <textarea
-                  rows={5}
-                  value={feedbackMessage}
-                  onChange={(e) => setFeedbackMessage(e.target.value)}
-                  placeholder="Share your feedback..."
-                  className="w-full px-4 py-3.5 bg-[#0c0e14] border border-[#1e2433] rounded-xl text-sm text-white placeholder:text-slate-500 focus:border-orange-500 outline-none resize-none transition-colors"
-                  required
-                />
-
-                <div className="mt-4 flex items-center justify-between">
-                  <button
-                    type="submit"
-                    disabled={isSubmittingFeedback || !feedbackMessage.trim()}
-                    className="px-5 py-2.5 bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white font-medium text-sm rounded-xl transition-colors shadow-sm cursor-pointer flex items-center gap-2"
-                  >
-                    {isSubmittingFeedback ? (
-                      <>
-                        <RefreshCw className="w-4 h-4 animate-spin" />
-                        <span>Sending...</span>
-                      </>
-                    ) : (
-                      <span>Send feedback</span>
-                    )}
-                  </button>
-                </div>
-              </form>
-
-              {/* Sent feedback history */}
-              {feedbackList.length > 0 && (
-                <div className="mt-8 pt-6 border-t border-[#1e2433]">
-                  <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-3">
-                    Your Sent Feedback ({feedbackList.length})
-                  </h4>
-                  <div className="space-y-2.5">
-                    {feedbackList.map((fb) => (
-                      <div key={fb.id} className="p-3.5 bg-[#0c0e14] border border-[#1e2433] rounded-xl">
-                        <div className="flex items-center justify-between text-[11px] text-slate-500 mb-1">
-                          <span className="font-semibold text-orange-400">{fb.category}</span>
-                          <span className="font-mono">{formatDateSafe(fb.submittedAt)}</span>
-                        </div>
-                        <p className="text-xs text-slate-300 leading-relaxed">{fb.message}</p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        ) : (
-          /* DRIVE, COMPUTERS, SHARED, RECENT, STARRED, TRASH VIEWS */
-          <>
-            {/* BREADCRUMBS & TOOLBAR */}
-            <div className="flex items-center justify-between px-4 lg:px-6 py-4 shrink-0 border-b border-[#181d2a]">
-              <div className="flex items-center text-sm">
-                {searchQuery ? (
-                  <span className="font-semibold text-white text-lg">Search results for &ldquo;{searchQuery}&rdquo;</span>
-                ) : (activeNav !== 'my-drive' && activeNav !== 'computers') ? (
-                  <div className="flex items-center gap-2">
-                    <span className="font-bold text-white text-xl">
-                      {navigation.find(n => n.id === activeNav)?.label || activeNav}
-                    </span>
-                    <span className="text-xs px-2.5 py-0.5 rounded-full bg-orange-500/10 text-orange-400 border border-orange-500/20 font-medium">
-                      {displayedItems.length} {displayedItems.length === 1 ? 'item' : 'items'}
-                    </span>
-                  </div>
-                ) : (
-                  <div className="flex items-center flex-wrap gap-1">
-                    {breadcrumbs.map((crumb, idx) => (
-                      <React.Fragment key={crumb.id}>
-                        <button 
-                          onClick={() => {
-                            setCurrentFolderId(crumb.id);
-                            setSelectedItems(new Set());
-                          }}
-                          className={cn(
-                            "hover:bg-[#181d2a] px-2 py-1 rounded-md transition-colors cursor-pointer",
-                            idx === breadcrumbs.length - 1 ? "font-bold text-white text-xl" : "font-medium text-slate-400 hover:text-slate-200"
-                          )}
-                        >
-                          {crumb.name}
-                        </button>
-                        {idx < breadcrumbs.length - 1 && (
-                          <ChevronRight className="w-4 h-4 text-slate-600" />
-                        )}
-                      </React.Fragment>
-                    ))}
-                  </div>
-                )}
-              </div>
-              
-              <div className="flex items-center gap-1">
-                <AnimatePresence>
-                  {selectedItems.size > 0 && (
-                    <motion.div 
-                      initial={{ opacity: 0, width: 0 }}
-                      animate={{ opacity: 1, width: 'auto' }}
-                      exit={{ opacity: 0, width: 0 }}
-                      className="flex items-center gap-1 mr-2 border-r border-[#252d3f] pr-2 overflow-hidden"
-                    >
-                      {activeNav === 'trash' ? (
-                        <>
-                          <button onClick={handleRestore} className="p-2 text-slate-400 hover:text-emerald-400 hover:bg-[#181d2a] rounded-lg transition-colors" title="Restore">
-                            <RotateCcw className="w-5 h-5" />
-                          </button>
-                          <button onClick={() => setIsDeleteDialogOpen(true)} className="p-2 text-slate-400 hover:text-rose-400 hover:bg-[#181d2a] rounded-lg transition-colors" title="Delete forever">
-                            <Trash2 className="w-5 h-5" />
-                          </button>
-                        </>
-                      ) : (
-                        <>
-                          <button onClick={handleToggleStar} className="p-2 text-slate-400 hover:text-amber-400 hover:bg-[#181d2a] rounded-lg transition-colors" title="Toggle Star">
-                            <Star className="w-5 h-5" />
-                          </button>
-                          <button onClick={handleToggleSelectedComputerSync} className="p-2 text-slate-400 hover:text-orange-400 hover:bg-[#181d2a] rounded-lg transition-colors" title="Toggle Computer Sync & Backup">
-                            <Computer className="w-5 h-5" />
-                          </button>
-                          <button onClick={handleMoveToTrash} className="p-2 text-slate-400 hover:text-rose-400 hover:bg-[#181d2a] rounded-lg transition-colors" title="Move to Trash">
-                            <Trash2 className="w-5 h-5" />
-                          </button>
-                        </>
-                      )}
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-                <button 
-                  onClick={() => setShowDetails(!showDetails)}
-                  className={cn("p-2 rounded-lg transition-colors hidden lg:block", showDetails ? "bg-orange-500/10 text-orange-400 border border-orange-500/30" : "text-slate-400 hover:bg-[#181d2a] hover:text-white")}
-                  title="View details"
-                >
-                  <Info className="w-5 h-5" />
-                </button>
-                <div className="w-px h-6 bg-[#252d3f] mx-2 hidden sm:block" />
-                <div className="flex items-center bg-[#141824] border border-[#252d3f] rounded-lg p-0.5">
-                  <button 
-                    onClick={() => setViewMode('list')}
-                    className={cn("p-1.5 rounded-md transition-colors", viewMode === 'list' ? "bg-[#222a3d] text-orange-400 shadow-sm" : "text-slate-400 hover:text-white")}
-                    title="List view"
-                  >
-                    <ListIcon className="w-4 h-4" />
-                  </button>
-                  <button 
-                    onClick={() => setViewMode('grid')}
-                    className={cn("p-1.5 rounded-md transition-colors", viewMode === 'grid' ? "bg-[#222a3d] text-orange-400 shadow-sm" : "text-slate-400 hover:text-white")}
-                    title="Grid view"
-                  >
-                    <LayoutGrid className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {/* FILE LIST AREA */}
-            <div className="flex-1 flex overflow-hidden">
-              <div className="flex-1 overflow-y-auto px-4 lg:px-6 py-6">
-
-                {/* COMPUTERS TOP STATUS BANNER */}
-                {activeNav === 'computers' && displayedItems.length > 0 && (
-                  <div className="mb-5 p-4 bg-[#141824] border border-[#252d3f] rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-3 shadow-lg">
+                {[
+                  { action: 'Uploaded file', item: 'AsterDrive_Architecture_Overview.pdf', time: '10 minutes ago', user: 'Alex Driver' },
+                  { action: 'Shared with viewer', item: 'Hero_Design_Concept_v3.png', time: '1 hour ago', user: 'Sarah Connor' },
+                  { action: 'Synced from MacBook', item: 'Local_Project_Backup.zip', time: '3 hours ago', user: 'Alex Driver' },
+                  { action: 'Created folder', item: 'Designs & Assets', time: 'Yesterday', user: 'Alex Driver' }
+                ].map((act, idx) => (
+                  <div key={idx} className="flex items-center justify-between pb-3 border-b border-[#1e2433] last:border-none last:pb-0 text-xs">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-orange-500/10 border border-orange-500/20 text-orange-400 flex items-center justify-center shrink-0 shadow-sm">
-                        <Computer className="w-5 h-5" />
+                      <div className="w-8 h-8 rounded-lg bg-slate-800/70 flex items-center justify-center text-orange-400">
+                        <Activity className="w-4 h-4" />
                       </div>
                       <div>
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="font-semibold text-white text-sm">Computer Sync &amp; Backup</span>
-                          <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full">
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                            Real-time Backup Active
-                          </span>
-                        </div>
-                        <p className="text-xs text-slate-400 mt-0.5">
-                          {displayedItems.length} synced file(s) • Total backed up {formatBytes(displayedItems.reduce((acc, i) => acc + (i.size || 0), 0))} • Status: Up to date
+                        <p className="text-slate-200 font-medium">
+                          <span className="text-white font-semibold">{act.user}</span> {act.action}{' '}
+                          <span className="text-orange-400 font-medium">&quot;{act.item}&quot;</span>
                         </p>
+                        <p className="text-slate-500 text-[11px]">{act.time}</p>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2 flex-wrap shrink-0">
-                      <button 
-                        type="button"
-                        onClick={handleSyncNow}
-                        disabled={isSyncingNow}
-                        className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-semibold transition-colors shadow-sm flex items-center gap-1.5 cursor-pointer disabled:opacity-70"
-                        title="Verify local and cloud files match"
-                      >
-                        <RefreshCw className={cn("w-3.5 h-3.5", isSyncingNow && "animate-spin")} />
-                        {isSyncingNow ? 'Verifying...' : 'Sync Now'}
-                      </button>
-                      <button 
-                        type="button"
-                        onClick={() => computerFolderInputRef.current?.click()}
-                        className="px-3 py-1.5 bg-[#1b2131] hover:bg-[#222a3d] border border-[#2d374d] text-white rounded-lg text-xs font-semibold transition-colors shadow-sm flex items-center gap-1.5 cursor-pointer"
-                      >
-                        <Folder className="w-3.5 h-3.5 text-amber-400" />
-                        Sync Folder
-                      </button>
-                      <button 
-                        type="button"
-                        onClick={() => computerFileInputRef.current?.click()}
-                        className="px-3 py-1.5 bg-[#1b2131] hover:bg-[#222a3d] border border-[#2d374d] text-white rounded-lg text-xs font-semibold transition-colors shadow-sm flex items-center gap-1.5 cursor-pointer"
-                      >
-                        <UploadCloud className="w-3.5 h-3.5 text-orange-400" />
-                        Sync File
-                      </button>
-                      <button 
-                        type="button"
-                        onClick={() => setIsSyncModalOpen(true)}
-                        className="px-3 py-1.5 bg-orange-600 hover:bg-orange-500 text-white rounded-lg text-xs font-semibold transition-colors shadow-sm flex items-center gap-1.5 cursor-pointer"
-                      >
-                        <Monitor className="w-3.5 h-3.5" />
-                        Presets
-                      </button>
-                    </div>
+                    <span className="text-[10px] bg-slate-800 text-slate-300 px-2 py-0.5 rounded">Success</span>
                   </div>
-                )}
-
-                {displayedItems.length === 0 ? (
-                  activeNav === 'computers' ? (
-                    <div className="flex flex-col items-center justify-center py-10 px-4 max-w-xl mx-auto text-center">
-                      <div className="w-20 h-20 bg-orange-500/10 border border-orange-500/20 text-orange-400 rounded-2xl flex items-center justify-center mb-5 shadow-sm">
-                        <Computer className="w-10 h-10" />
-                      </div>
-                      <h3 className="text-xl font-bold text-white mb-2">
-                        Sync &amp; Backup from your computer
-                      </h3>
-                      <p className="text-slate-400 text-sm leading-relaxed mb-6 max-w-md">
-                        Safely backup videos, photos, and project folders directly from your PC or Mac. Any synced files are accessible anytime, anywhere on AsterDrive.
-                      </p>
-
-                      {/* Quick link existing uploaded drive files to Computers */}
-                      {driveItems.filter(i => !i.trashed && i.source !== 'computer').length > 0 && (
-                        <div className="w-full mb-6 p-4 bg-[#141824] border border-orange-500/30 rounded-2xl text-left flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-lg">
-                          <div className="flex items-start gap-3">
-                            <div className="w-10 h-10 rounded-xl bg-orange-500/10 border border-orange-500/20 text-orange-400 flex items-center justify-center shrink-0 mt-0.5">
-                              <Computer className="w-5 h-5" />
-                            </div>
-                            <div>
-                              <h4 className="text-sm font-bold text-white">
-                                Sync {driveItems.filter(i => !i.trashed && i.source !== 'computer').length} uploaded file(s) to this PC
-                              </h4>
-                              <p className="text-xs text-slate-400 mt-0.5 leading-relaxed">
-                                We detected files in your Drive. Link them to Computer Sync &amp; Backup with one click.
-                              </p>
-                            </div>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={handleSyncAllDriveFilesToComputer}
-                            className="px-4 py-2.5 bg-orange-600 hover:bg-orange-500 text-white rounded-xl text-xs font-semibold shrink-0 shadow-md transition-all cursor-pointer flex items-center justify-center gap-2 active:scale-95"
-                          >
-                            <CheckCircle2 className="w-4 h-4 text-orange-200" />
-                            Sync All to this PC
-                          </button>
-                        </div>
-                      )}
-
-                      {/* Real Backup Action Cards */}
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full mb-6 text-left">
-                        <div 
-                          onClick={() => computerFolderInputRef.current?.click()}
-                          className="p-4 rounded-xl border border-[#252d3f] hover:border-orange-500/50 bg-[#141824] hover:bg-[#1a202e] shadow-sm transition-all cursor-pointer group"
-                        >
-                          <div className="flex items-center gap-3 mb-2">
-                            <div className="w-9 h-9 rounded-lg bg-amber-500/10 text-amber-400 border border-amber-500/20 flex items-center justify-center font-bold">
-                              <Folder className="w-5 h-5" />
-                            </div>
-                            <div>
-                              <h4 className="font-semibold text-white text-sm group-hover:text-orange-400 transition-colors">Backup Computer Folder</h4>
-                              <span className="text-[11px] text-slate-400">Select any local directory</span>
-                            </div>
-                          </div>
-                          <p className="text-xs text-slate-400 mb-3">Recreates entire directory structures and backs up all nested files.</p>
-                          <button 
-                            type="button" 
-                            className="text-xs font-semibold text-orange-400 group-hover:text-orange-300 flex items-center gap-1"
-                          >
-                            Select Folder from this PC →
-                          </button>
-                        </div>
-
-                        <div 
-                          onClick={() => computerFileInputRef.current?.click()}
-                          className="p-4 rounded-xl border border-[#252d3f] hover:border-orange-500/50 bg-[#141824] hover:bg-[#1a202e] shadow-sm transition-all cursor-pointer group"
-                        >
-                          <div className="flex items-center gap-3 mb-2">
-                            <div className="w-9 h-9 rounded-lg bg-orange-500/10 text-orange-400 border border-orange-500/20 flex items-center justify-center font-bold">
-                              <UploadCloud className="w-5 h-5" />
-                            </div>
-                            <div>
-                              <h4 className="font-semibold text-white text-sm group-hover:text-orange-400 transition-colors">Backup Computer Files</h4>
-                              <span className="text-[11px] text-slate-400">Select individual files</span>
-                            </div>
-                          </div>
-                          <p className="text-xs text-slate-400 mb-3">Upload videos, images, archives, or documents directly from your computer.</p>
-                          <button 
-                            type="button" 
-                            className="text-xs font-semibold text-orange-400 group-hover:text-orange-300 flex items-center gap-1"
-                          >
-                            Browse Files from this PC →
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* Real Folder / File Sync Buttons */}
-                      <div className="flex items-center gap-2.5 flex-wrap justify-center">
-                        <button 
-                          type="button"
-                          onClick={() => computerFolderInputRef.current?.click()}
-                          className="px-4 py-2.5 bg-orange-600 hover:bg-orange-500 text-white rounded-xl text-sm font-semibold transition-colors shadow-md cursor-pointer flex items-center gap-2"
-                        >
-                          <Folder className="w-4 h-4 text-orange-200" />
-                          Sync Folder from this Computer
-                        </button>
-                        <button 
-                          type="button"
-                          onClick={() => computerFileInputRef.current?.click()}
-                          className="px-4 py-2.5 bg-[#1b2131] hover:bg-[#222a3d] border border-[#2d374d] text-white rounded-xl text-sm font-medium transition-colors cursor-pointer flex items-center gap-2"
-                        >
-                          <UploadCloud className="w-4 h-4 text-slate-400" />
-                          Sync File
-                        </button>
-                        <button 
-                          type="button"
-                          onClick={() => handleNavSelect('my-drive')}
-                          className="px-3.5 py-2.5 text-slate-400 hover:text-white text-sm font-medium transition-colors cursor-pointer"
-                        >
-                          ← Back to My Drive
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="flex flex-col items-center justify-center h-full text-center px-4 py-16">
-                      <div className="w-24 h-24 bg-[#141824] border border-[#252d3f] rounded-full flex items-center justify-center mb-4">
-                        {activeNav === 'shared' ? <Users className="w-10 h-10 text-slate-500" /> :
-                         activeNav === 'recent' ? <Clock className="w-10 h-10 text-slate-500" /> :
-                         activeNav === 'starred' ? <Star className="w-10 h-10 text-slate-500" /> :
-                         activeNav === 'trash' ? <Trash2 className="w-10 h-10 text-slate-500" /> :
-                         <FolderOpen className="w-10 h-10 text-slate-500" />}
-                      </div>
-                      <h3 className="text-lg font-semibold text-white mb-1">
-                        {activeNav === 'shared' ? 'Nothing shared with you' :
-                         activeNav === 'recent' ? 'No recent files' :
-                         activeNav === 'starred' ? 'No starred files' :
-                         activeNav === 'trash' ? 'Trash is empty' :
-                         'Your drive is empty'}
-                      </h3>
-                      <p className="text-slate-400 max-w-sm text-sm">
-                        {activeNav === 'trash' 
-                          ? 'Files in trash are kept safely before being permanently deleted.'
-                          : activeNav === 'starred'
-                          ? 'Star files or folders to easily find them here anytime.'
-                          : activeNav === 'recent'
-                          ? 'Files you have recently opened or edited will appear here.'
-                          : activeNav === 'shared'
-                          ? 'Files and folders shared with you by other collaborators will show here.'
-                          : 'Use the "+" button at the bottom right to upload files or drag and drop real documents, photos, and videos into your drive.'}
-                      </p>
-                      {activeNav !== 'my-drive' && (
-                        <div className="mt-5 flex flex-col items-center gap-3 w-full max-w-sm">
-                          <button 
-                            type="button"
-                            onClick={() => handleNavSelect('my-drive')}
-                            className="px-4 py-2 bg-orange-500/10 hover:bg-orange-500/20 text-orange-400 border border-orange-500/30 rounded-xl text-sm font-medium transition-colors cursor-pointer"
-                          >
-                            ← Back to My Drive
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  )
-                ) : viewMode === 'grid' ? (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
-                    <AnimatePresence mode="popLayout">
-                      {displayedItems.map((item) => {
-                        const isSelected = selectedItems.has(item.id);
-                        return (
-                          <motion.div
-                            layout
-                            initial={{ opacity: 0, scale: 0.95 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            exit={{ opacity: 0, scale: 0.9 }}
-                            key={item.id}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              if (e.metaKey || e.ctrlKey) {
-                                toggleSelection(item.id);
-                              } else {
-                                if (item.type === 'folder') {
-                                  handleItemClick(item);
-                                } else {
-                                  setSelectedItems(new Set([item.id]));
-                                }
-                              }
-                            }}
-                            onDoubleClick={() => handleItemClick(item)}
-                            className={cn(
-                              "group relative flex flex-col p-4 rounded-2xl border transition-all cursor-pointer select-none",
-                              isSelected 
-                                ? "bg-[#251710] border-orange-500/60 shadow-lg shadow-orange-950/20" 
-                                : "bg-[#141824] border-[#252d3f] hover:border-orange-500/40 hover:shadow-md"
-                            )}
-                          >
-                            <div className="flex items-start justify-between mb-3">
-                              <div className={cn(
-                                "w-10 h-10 rounded-xl flex items-center justify-center transition-colors relative",
-                                item.type === 'folder' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' : 
-                                item.type === 'video' ? 'bg-purple-500/10 text-purple-400 border border-purple-500/20' :
-                                'bg-[#1e2433] text-slate-300 border border-[#2d374d]'
-                              )}>
-                                {getIconForType(item.type, "w-6 h-6")}
-                                {item.type === 'video' && (
-                                  <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-orange-600 rounded-full flex items-center justify-center text-white shadow-2xs">
-                                    <Play className="w-2.5 h-2.5 fill-white ml-0.5" />
-                                  </div>
-                                )}
-                              </div>
-                              <div className="flex items-center gap-1">
-                                {item.starred && (
-                                  <Star className="w-4 h-4 text-amber-400 fill-current" />
-                                )}
-                                <button 
-                                  onClick={(e) => handleOpenItemMenu(item, e)}
-                                  className="text-slate-400 hover:text-white sm:opacity-0 group-hover:opacity-100 opacity-90 transition-all p-1.5 rounded-lg hover:bg-[#1b2131] active:bg-[#252d3f] cursor-pointer"
-                                  aria-label={`More options for ${item.name}`}
-                                  title="More actions"
-                                >
-                                  <MoreVertical className="w-5 h-5" />
-                                </button>
-                              </div>
-                            </div>
-
-                            <h4 className="font-semibold text-white text-sm truncate mb-0.5" title={item.name}>
-                              {item.name}
-                            </h4>
-
-                            {item.source === 'computer' ? (
-                              <div className="flex items-center justify-between text-[11px] font-medium mb-1.5 bg-emerald-500/10 text-emerald-400 px-2 py-1 rounded-md border border-emerald-500/20">
-                                <span className="inline-flex items-center gap-1 truncate font-semibold">
-                                  <CheckCircle2 className="w-3 h-3 text-emerald-400 shrink-0" />
-                                  Synced
-                                </span>
-                                <span className="text-[10px] text-emerald-300 font-mono truncate">
-                                  {item.computerDevice || 'This PC'}
-                                </span>
-                              </div>
-                            ) : activeNav === 'computers' ? (
-                              <div className="flex items-center gap-1 text-[11px] text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20 font-medium mb-1">
-                                <Clock className="w-3 h-3 shrink-0" />
-                                <span>Queued for Sync</span>
-                              </div>
-                            ) : null}
-
-                            {item.type === 'video' && !item.trashed && (
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  openVideoPreview(item);
-                                }}
-                                className="my-2 w-full flex items-center justify-center gap-1.5 py-1.5 px-2 bg-orange-500/10 hover:bg-orange-500/20 text-orange-400 border border-orange-500/30 rounded-lg text-xs font-semibold transition-colors cursor-pointer"
-                              >
-                                <Play className="w-3 h-3 fill-orange-500" /> Watch Video
-                              </button>
-                            )}
-
-                            <p className="text-xs text-slate-400 flex items-center justify-between mt-auto pt-2 border-t border-[#1e2433]">
-                              <span suppressHydrationWarning className="truncate mr-2">{formatDateSafe(item.updatedAt)}</span>
-                              {item.type !== 'folder' && item.size !== undefined && <span className="font-mono shrink-0">{formatBytes(item.size)}</span>}
-                            </p>
-                          </motion.div>
-                        );
-                      })}
-                    </AnimatePresence>
-                  </div>
-                ) : (
-                  <div className="bg-[#141824] border border-[#252d3f] rounded-2xl overflow-hidden shadow-lg">
-                    <table className="min-w-full divide-y divide-[#1e2433] text-sm text-left">
-                      <thead className="bg-[#0f131d] text-slate-400">
-                        <tr>
-                          <th scope="col" className="px-6 py-3 font-medium">Name</th>
-                          <th scope="col" className="px-6 py-3 font-medium hidden sm:table-cell">Owner</th>
-                          <th scope="col" className="px-6 py-3 font-medium hidden md:table-cell">Last modified</th>
-                          <th scope="col" className="px-6 py-3 font-medium text-right">File size</th>
-                          <th scope="col" className="relative px-6 py-3"><span className="sr-only">Actions</span></th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-[#1e2433] bg-[#141824]">
-                        {displayedItems.map((item) => {
-                          const isSelected = selectedItems.has(item.id);
-                          return (
-                            <tr 
-                              key={item.id}
-                              onClick={(e) => {
-                                if (e.metaKey || e.ctrlKey) {
-                                  toggleSelection(item.id);
-                                } else {
-                                  setSelectedItems(new Set([item.id]));
-                                }
-                              }}
-                              onDoubleClick={() => handleItemClick(item)}
-                              className={cn(
-                                "cursor-pointer transition-colors select-none",
-                                isSelected ? "bg-[#251710] text-orange-300" : "hover:bg-[#191f2e] text-slate-200"
-                              )}
-                            >
-                              <td className="px-6 py-3.5 whitespace-nowrap">
-                                <div className="flex items-center gap-3">
-                                  {getIconForType(item.type)}
-                                  <div className="flex items-center gap-2 min-w-0">
-                                    <span className="font-medium text-white truncate max-w-xs">{item.name}</span>
-                                    {item.type === 'video' && !item.trashed && (
-                                      <button
-                                        type="button"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          openVideoPreview(item);
-                                        }}
-                                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-orange-500/10 text-orange-400 border border-orange-500/20 hover:bg-orange-500/20 transition-colors shrink-0 cursor-pointer"
-                                        title="Watch Video"
-                                      >
-                                        <Play className="w-3 h-3 fill-orange-500" /> Watch
-                                      </button>
-                                    )}
-                                    {item.source === 'computer' && (
-                                      <span className="inline-flex items-center gap-1 text-[10px] text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full font-medium shrink-0">
-                                        <CheckCircle2 className="w-2.5 h-2.5 text-emerald-400" /> Synced ({item.computerDevice || 'This PC'})
-                                      </span>
-                                    )}
-                                  </div>
-                                  {item.starred && <Star className="w-3.5 h-3.5 text-amber-400 fill-current shrink-0" />}
-                                </div>
-                              </td>
-                              <td className="px-6 py-3.5 whitespace-nowrap text-slate-400 hidden sm:table-cell">
-                                {item.owner}
-                              </td>
-                              <td suppressHydrationWarning className="px-6 py-3.5 whitespace-nowrap text-slate-400 hidden md:table-cell">
-                                {formatDateSafe(item.updatedAt)}
-                              </td>
-                              <td className="px-6 py-3.5 whitespace-nowrap text-slate-400 font-mono text-right">
-                                {formatBytes(item.size)}
-                              </td>
-                              <td className="px-6 py-3.5 whitespace-nowrap text-right text-slate-400">
-                                <button 
-                                  onClick={(e) => handleOpenItemMenu(item, e)}
-                                  className="hover:text-white text-slate-400 p-1.5 rounded-lg hover:bg-[#1b2131] active:bg-[#252d3f] transition-colors cursor-pointer"
-                                  aria-label={`More options for ${item.name}`}
-                                  title="More actions"
-                                >
-                                  <MoreVertical className="w-4 h-4" />
-                                </button>
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </div>
-
-              {/* DETAILS SIDEBAR */}
-              <AnimatePresence>
-                {showDetails && (
-                  <motion.div
-                    initial={{ width: 0, opacity: 0 }}
-                    animate={{ width: 320, opacity: 1 }}
-                    exit={{ width: 0, opacity: 0 }}
-                    className="border-l border-[#1e2433] bg-[#0c0e14] overflow-hidden flex flex-col shrink-0 text-white"
-                  >
-                    {selectedItemDetails ? (
-                      <div className="p-6 flex-1 overflow-y-auto">
-                        <div className="flex items-center justify-between mb-6">
-                          <h3 className="font-semibold text-white truncate" title={selectedItemDetails.name}>
-                            {selectedItemDetails.name}
-                          </h3>
-                          <button onClick={() => setShowDetails(false)} className="text-slate-400 hover:text-white p-1">
-                            <X className="w-4 h-4" />
-                          </button>
-                        </div>
-
-                        <div className="h-40 bg-[#141824] rounded-2xl flex items-center justify-center mb-6 border border-[#252d3f]">
-                          {getIconForType(selectedItemDetails.type, "w-16 h-16")}
-                        </div>
-
-                        {selectedItemDetails.type === 'video' && !selectedItemDetails.trashed && (
-                          <button 
-                            type="button"
-                            onClick={() => setPreviewVideoItem(selectedItemDetails)}
-                            className="w-full mb-3 flex items-center justify-center gap-2 bg-orange-600 hover:bg-orange-500 text-white py-2.5 rounded-xl text-sm font-semibold transition-all shadow-md shadow-orange-600/20 cursor-pointer"
-                          >
-                            <Play className="w-4 h-4 fill-white" /> Watch Video
-                          </button>
-                        )}
-
-                        <div className="flex gap-2 mb-3">
-                          <button 
-                            onClick={() => {
-                              setShareModalItem(selectedItemDetails);
-                              logActivity('share', 'Created public share link', selectedItemDetails.name);
-                            }}
-                            className="flex-1 flex items-center justify-center gap-2 bg-[#141824] hover:bg-[#1b2131] border border-[#252d3f] text-white py-2 rounded-xl text-sm font-medium transition-colors"
-                          >
-                            <Share2 className="w-4 h-4 text-orange-400" /> Share
-                          </button>
-                          <button 
-                            onClick={() => handleDownloadItem(selectedItemDetails)}
-                            className="flex-1 flex items-center justify-center gap-2 bg-[#141824] hover:bg-[#1b2131] border border-[#252d3f] text-white py-2 rounded-xl text-sm font-medium transition-colors"
-                          >
-                            <Download className="w-4 h-4 text-slate-400" /> Download
-                          </button>
-                        </div>
-
-                        <button
-                          type="button"
-                          onClick={() => handleToggleComputerSync(selectedItemDetails)}
-                          className={cn(
-                            "w-full mb-6 flex items-center justify-center gap-2 py-2 px-3 rounded-xl text-xs font-semibold border transition-all cursor-pointer",
-                            selectedItemDetails.source === 'computer'
-                              ? "bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border-amber-500/30"
-                              : "bg-orange-500/10 hover:bg-orange-500/20 text-orange-400 border-orange-500/30"
-                          )}
-                        >
-                          <Computer className="w-4 h-4" />
-                          {selectedItemDetails.source === 'computer' 
-                            ? 'Remove from Computer Sync' 
-                            : 'Link to Computer Sync & Backup'}
-                        </button>
-
-                        <div className="space-y-4">
-                          <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Properties</h4>
-                          
-                          <div className="grid grid-cols-3 gap-y-4 text-sm">
-                            <div className="text-slate-400">Size</div>
-                            <div className="col-span-2 text-white font-medium font-mono">{formatBytes(selectedItemDetails.size)}</div>
-                            
-                            <div className="text-slate-400">Owner</div>
-                            <div className="col-span-2 text-white font-medium capitalize">{selectedItemDetails.owner}</div>
-
-                            {selectedItemDetails.source === 'computer' && (
-                              <>
-                                <div className="text-slate-400">Sync Status</div>
-                                <div className="col-span-2 text-emerald-400 font-medium flex items-center gap-1.5">
-                                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                                  <span>Synced &amp; Up to date</span>
-                                </div>
-                                <div className="text-slate-400">Computer</div>
-                                <div className="col-span-2 text-orange-400 font-medium flex items-center gap-1.5 truncate">
-                                  <Computer className="w-3.5 h-3.5 shrink-0" />
-                                  <span>{selectedItemDetails.computerDevice || 'This PC'}</span>
-                                </div>
-                                {selectedItemDetails.folderPath && (
-                                  <>
-                                    <div className="text-slate-400">Sync Folder</div>
-                                    <div className="col-span-2 text-slate-300 font-mono text-xs truncate">
-                                      {selectedItemDetails.folderPath}
-                                    </div>
-                                  </>
-                                )}
-                              </>
-                            )}
-                            
-                            <div className="text-slate-400">Modified</div>
-                            <div suppressHydrationWarning className="col-span-2 text-white font-medium">
-                              {formatDateSafe(selectedItemDetails.updatedAt)}
-                            </div>
-                            
-                            <div className="text-slate-400">Location</div>
-                            <div className="col-span-2 text-white font-medium truncate">
-                              {selectedItemDetails.source === 'computer' 
-                                ? `Computers > ${selectedItemDetails.computerDevice || 'My PC'}`
-                                : (breadcrumbs.find(c => c.id === selectedItemDetails.parentId)?.name || 'My Drive')}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="p-6 h-full flex flex-col items-center justify-center text-center text-slate-400">
-                        <Info className="w-12 h-12 text-slate-600 mb-4" />
-                        <p className="text-sm">Select a file or folder to view its properties.</p>
-                      </div>
-                    )}
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
-          </>
-        )}
-      </div>
-
-      {/* FLOATING ACTION BUTTON */}
-      <div className="fixed bottom-6 right-6 lg:bottom-8 lg:right-8 z-40 flex flex-col items-end">
-        <AnimatePresence>
-          {showUploadMenu && (
-            <motion.div
-              initial={{ opacity: 0, y: 10, scale: 0.95 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 10, scale: 0.95 }}
-              className="mb-4 bg-[#141824] rounded-2xl shadow-2xl border border-[#252d3f] overflow-hidden flex flex-col min-w-[220px] divide-y divide-[#1e2433] text-white"
-            >
-              {activeNav === 'computers' ? (
-                <>
-                  <button 
-                    onClick={() => {
-                      setShowUploadMenu(false);
-                      computerFolderInputRef.current?.click();
-                    }}
-                    className="flex items-center gap-3 px-4 py-3 text-sm font-medium text-slate-300 hover:bg-[#1b2131] hover:text-white transition-colors text-left cursor-pointer"
-                  >
-                    <Folder className="w-4 h-4 text-amber-400" />
-                    Sync computer folder
-                  </button>
-                  <button 
-                    onClick={() => {
-                      setShowUploadMenu(false);
-                      computerFileInputRef.current?.click();
-                    }}
-                    className="flex items-center gap-3 px-4 py-3 text-sm font-medium text-slate-300 hover:bg-[#1b2131] hover:text-white transition-colors text-left cursor-pointer"
-                  >
-                    <UploadCloud className="w-4 h-4 text-orange-400" />
-                    Sync computer file
-                  </button>
-                  <button 
-                    onClick={() => {
-                      setShowUploadMenu(false);
-                      setIsSyncModalOpen(true);
-                    }}
-                    className="flex items-center gap-3 px-4 py-3 text-sm font-medium text-slate-300 hover:bg-[#1b2131] hover:text-white transition-colors text-left cursor-pointer"
-                  >
-                    <Monitor className="w-4 h-4 text-purple-400" />
-                    Device presets (PC / Mac)
-                  </button>
-                </>
-              ) : (
-                <>
-                  <button 
-                    onClick={() => {
-                      setShowUploadMenu(false);
-                      fileInputRef.current?.click();
-                    }}
-                    className="flex items-center gap-3 px-4 py-3 text-sm font-medium text-slate-300 hover:bg-[#1b2131] hover:text-white transition-colors text-left cursor-pointer"
-                  >
-                    <File className="w-4 h-4 text-orange-400" />
-                    File upload
-                  </button>
-                  <button 
-                    onClick={() => {
-                      setShowUploadMenu(false);
-                      folderInputRef.current?.click();
-                    }}
-                    className="flex items-center gap-3 px-4 py-3 text-sm font-medium text-slate-300 hover:bg-[#1b2131] hover:text-white transition-colors text-left cursor-pointer"
-                  >
-                    <Folder className="w-4 h-4 text-amber-400" />
-                    Folder upload
-                  </button>
-                  <div className="px-4 py-2.5 bg-[#0f131d] border-t border-[#1e2433] text-[11px] text-slate-400 flex items-center gap-2">
-                    <UploadCloud className="w-3.5 h-3.5 text-orange-400 shrink-0" />
-                    <span>Or drag &amp; drop files/folders anywhere</span>
-                  </div>
-                </>
-              )}
-            </motion.div>
-          )}
-        </AnimatePresence>
-        <button 
-          onClick={() => setShowUploadMenu(!showUploadMenu)}
-          className="w-14 h-14 bg-orange-600 hover:bg-orange-500 text-white rounded-2xl flex items-center justify-center shadow-lg shadow-orange-600/30 transition-all hover:-translate-y-1 hover:shadow-orange-600/40 cursor-pointer active:scale-95"
-          aria-label="Upload files or folders"
-        >
-          <Plus className={cn("w-6 h-6 transition-transform duration-200", showUploadMenu && "rotate-45")} />
-        </button>
-      </div>
-
-      {/* HIDDEN FILE INPUTS */}
-      <input 
-        type="file" 
-        ref={fileInputRef} 
-        onChange={handleFileUpload} 
-        className="hidden" 
-        multiple 
-        suppressHydrationWarning
-      />
-      <input 
-        type="file" 
-        ref={folderInputRef} 
-        onChange={handleFileUpload} 
-        className="hidden" 
-        multiple
-        {...({ webkitdirectory: '', directory: '' } as unknown as React.InputHTMLAttributes<HTMLInputElement>)}
-        suppressHydrationWarning 
-      />
-      <input 
-        type="file" 
-        ref={computerFileInputRef} 
-        onChange={(e) => handleComputerUpload(e, 'This PC')} 
-        className="hidden" 
-        multiple 
-        suppressHydrationWarning
-      />
-      <input 
-        type="file" 
-        ref={computerFolderInputRef} 
-        onChange={(e) => handleComputerUpload(e, 'This PC')} 
-        className="hidden" 
-        multiple
-        {...({ webkitdirectory: '', directory: '' } as unknown as React.InputHTMLAttributes<HTMLInputElement>)}
-        suppressHydrationWarning 
-      />
-
-      {/* DELETE CONFIRMATION MODAL */}
-      <AnimatePresence>
-        {isDeleteDialogOpen && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 bg-slate-900/50 flex items-center justify-center p-4 backdrop-blur-xs"
-          >
-            <motion.div
-              initial={{ scale: 0.95, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.95, opacity: 0 }}
-              className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6 overflow-hidden"
-            >
-              <div className="flex items-start gap-4">
-                <div className="w-10 h-10 rounded-full bg-rose-100 flex items-center justify-center shrink-0">
-                  <AlertTriangle className="w-5 h-5 text-rose-600" />
-                </div>
-                <div>
-                  <h3 className="text-lg font-semibold text-slate-900 mb-2">Delete permanently?</h3>
-                  <p className="text-slate-500 text-sm mb-6">
-                    {selectedItems.size === 1 
-                      ? "This item will be deleted forever and you won't be able to restore it." 
-                      : `These ${selectedItems.size} items will be deleted forever and you won't be able to restore them.`}
-                  </p>
-                  <div className="flex items-center justify-end gap-3">
-                    <button 
-                      onClick={() => setIsDeleteDialogOpen(false)}
-                      className="px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
-                    >
-                      Cancel
-                    </button>
-                    <button 
-                      onClick={handleDeletePermanent}
-                      className="px-4 py-2 text-sm font-medium text-white bg-rose-600 hover:bg-rose-700 rounded-lg transition-colors shadow-sm"
-                    >
-                      Delete forever
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* UPGRADE STORAGE MODAL */}
-      <AnimatePresence>
-        {isUpgradeModalOpen && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[80] bg-black/75 flex items-center justify-center p-3 sm:p-6 backdrop-blur-sm overflow-y-auto"
-            onClick={() => setIsUpgradeModalOpen(false)}
-          >
-            <motion.div
-              initial={{ scale: 0.95, opacity: 0, y: 15 }}
-              animate={{ scale: 1, opacity: 1, y: 0 }}
-              exit={{ scale: 0.95, opacity: 0, y: 15 }}
-              onClick={(e) => e.stopPropagation()}
-              className="bg-[#141824] rounded-2xl sm:rounded-3xl shadow-2xl max-w-xl w-full flex flex-col max-h-[calc(100vh-2rem)] my-auto overflow-hidden border border-[#252d3f] text-white"
-            >
-              {/* Header */}
-              <div className="p-5 sm:px-8 sm:pt-7 sm:pb-4 border-b border-[#1e2433] shrink-0 bg-[#141824]">
-                <div className="flex justify-between items-start gap-4">
-                  <div>
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <h2 className="text-xl sm:text-2xl font-bold text-white">Upgrade your storage</h2>
-                      <span className={cn(
-                        "text-[11px] font-semibold px-2 py-0.5 rounded-full border",
-                        currentPlan.isFree 
-                          ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" 
-                          : "bg-orange-500/10 text-orange-400 border-orange-500/20"
-                      )}>
-                        Current: {currentPlan.name} ({currentPlan.storage})
-                      </span>
-                    </div>
-                    <p className="text-xs sm:text-sm text-slate-400 mt-1">
-                      Choose a plan to instantly expand your cloud storage capacity.
-                    </p>
-                  </div>
-                  <button 
-                    onClick={() => setIsUpgradeModalOpen(false)} 
-                    className="text-slate-400 hover:text-white p-2 rounded-full hover:bg-[#1a202d] transition-colors -mr-2 shrink-0 cursor-pointer"
-                    aria-label="Close upgrade dialog"
-                  >
-                    <X className="w-5 h-5" />
-                  </button>
-                </div>
-              </div>
-                
-              {/* Scrollable Plan List */}
-              <div className="p-4 sm:p-6 sm:px-8 overflow-y-auto flex-1 space-y-3">
-                {UPGRADE_PLANS.map((plan) => {
-                  const isSelected = selectedPlanId === plan.id;
-                  const isCurrent = currentPlan.id === plan.id;
-                  return (
-                    <div 
-                      key={plan.id}
-                      onClick={() => setSelectedPlanId(plan.id)}
-                      role="radio"
-                      aria-checked={isSelected}
-                      tabIndex={0}
-                      onKeyDown={(e) => {
-                        if (e.key === ' ' || e.key === 'Enter') {
-                          e.preventDefault();
-                          setSelectedPlanId(plan.id);
-                        }
-                      }}
-                      className={cn(
-                        "flex items-center justify-between p-4 rounded-2xl border transition-all cursor-pointer relative select-none",
-                        isSelected 
-                          ? "border-orange-500 bg-[#251710] ring-1 ring-orange-500 shadow-sm" 
-                          : "border-[#252d3f] hover:border-[#35405a] hover:bg-[#191f2e] bg-[#0f131d]"
-                      )}
-                    >
-                      <div className="flex items-center gap-4 min-w-0">
-                        <div className={cn(
-                          "w-20 sm:w-24 py-2 rounded-xl font-bold text-center text-sm shrink-0 transition-colors font-mono",
-                          isSelected ? "bg-orange-600 text-white shadow-sm" : "bg-[#1a202d] text-slate-200"
-                        )}>
-                          {plan.storage}
-                        </div>
-                        <div className="flex flex-col min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className={cn(
-                              "font-semibold text-sm sm:text-base transition-colors",
-                              isSelected ? "text-orange-400" : "text-white"
-                            )}>
-                              {plan.price}
-                            </span>
-                            {plan.recommended && (
-                              <span className="bg-amber-500/10 text-amber-400 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider shrink-0 border border-amber-500/20">
-                                Recommended
-                              </span>
-                            )}
-                            {isCurrent && (
-                              <span className="bg-emerald-500/10 text-emerald-400 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider shrink-0 border border-emerald-500/20">
-                                Current
-                              </span>
-                            )}
-                          </div>
-                          <span className="text-xs text-slate-400 mt-0.5">
-                            Billed monthly · Cancel anytime
-                          </span>
-                        </div>
-                      </div>
-                      
-                      {/* Accessible Radio Button */}
-                      <div className="pl-3 shrink-0">
-                        <div className={cn(
-                          "w-6 h-6 rounded-full flex items-center justify-center transition-all border-2",
-                          isSelected 
-                            ? "border-orange-500 bg-orange-600 shadow-sm" 
-                            : "border-slate-600 bg-[#1a202d]"
-                        )}>
-                          {isSelected && <div className="w-2.5 h-2.5 rounded-full bg-white" />}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-
-              {/* Fixed Footer */}
-              <div className="p-4 sm:px-8 sm:py-5 border-t border-[#1e2433] shrink-0 bg-[#0f131d] flex flex-col sm:flex-row items-center justify-between gap-3 rounded-b-2xl sm:rounded-b-3xl">
-                <div>
-                  {!currentPlan.isFree ? (
-                    <button
-                      onClick={handleDowngradeToFree}
-                      className="text-xs text-slate-400 hover:text-white underline font-medium cursor-pointer"
-                    >
-                      Switch back to Free Plan (1 GB)
-                    </button>
-                  ) : (
-                    <span className="text-xs text-slate-400">
-                      Simulated instant upgrade · No credit card charged
-                    </span>
-                  )}
-                </div>
-                <div className="flex items-center justify-end gap-3 w-full sm:w-auto">
-                  <button 
-                    onClick={() => setIsUpgradeModalOpen(false)} 
-                    className="flex-1 sm:flex-none px-5 py-2.5 rounded-xl font-medium text-slate-400 hover:bg-[#1a202d] hover:text-white transition-colors text-sm cursor-pointer"
-                  >
-                    Cancel
-                  </button>
-                  <button 
-                    onClick={handleConfirmUpgrade} 
-                    className="flex-1 sm:flex-none px-6 py-2.5 rounded-xl font-semibold text-white bg-orange-600 hover:bg-orange-500 transition-colors shadow-md shadow-orange-600/25 text-sm active:scale-95 cursor-pointer"
-                  >
-                    Continue
-                  </button>
-                </div>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* FULL SCREEN PROFILE MODAL */}
-      <AnimatePresence>
-        {isProfileMenuOpen && (
-          <motion.div
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 30 }}
-            transition={{ duration: 0.2, ease: "easeOut" }}
-            className="fixed inset-0 z-[70] bg-slate-50 flex flex-col overflow-y-auto"
-          >
-            {/* Header */}
-            <div className="flex items-center justify-between px-6 py-4 bg-white border-b border-slate-200 shrink-0 sticky top-0 z-10 shadow-xs">
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
-                  <Cloud className="w-5 h-5" />
-                </div>
-                <h2 className="text-xl font-semibold text-slate-800">Account Center</h2>
-              </div>
-              <button 
-                onClick={() => setIsProfileMenuOpen(false)}
-                className="p-2 rounded-full hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors"
-                aria-label="Close profile"
-              >
-                <X className="w-6 h-6" />
-              </button>
-            </div>
-            
-            <div className="flex-1 w-full max-w-3xl mx-auto px-4 py-8 sm:px-6 sm:py-10">
-              {/* Profile Card */}
-              <div className="bg-white rounded-3xl shadow-sm border border-slate-200 p-8 flex flex-col items-center mb-8 text-center relative overflow-hidden">
-                <div className="w-24 h-24 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-3xl mb-3 shadow-inner">
-                  JS
-                </div>
-                <h1 className="text-2xl font-bold text-slate-900 mb-0.5">John Smith</h1>
-                <p className="text-slate-500 text-sm">verno7897123@gmail.com</p>
-                
-                {/* Active Plan Badge */}
-                <div className="flex items-center gap-2 mt-3">
-                  {currentPlan.isFree ? (
-                    <span className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                      Free Plan · 1 GB Storage
-                    </span>
-                  ) : (
-                    <span className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200">
-                      <Sparkles className="w-3.5 h-3.5 text-blue-600" />
-                      {currentPlan.name} ({currentPlan.storage})
-                    </span>
-                  )}
-                </div>
-
-                <div className="flex items-center gap-3 mt-5 flex-wrap justify-center">
-                  <button 
-                    onClick={() => {
-                      setIsUpgradeModalOpen(true);
-                    }}
-                    className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-full font-medium text-sm transition-colors shadow-sm flex items-center gap-1.5"
-                  >
-                    <Sparkles className="w-4 h-4" />
-                    {currentPlan.isFree ? 'Upgrade Storage' : 'Change Subscription'}
-                  </button>
-                  <button 
-                    onClick={() => setActiveProfileDetail('personal')}
-                    className="px-5 py-2 border border-slate-300 rounded-full font-medium text-slate-700 hover:bg-slate-50 transition-colors text-sm"
-                  >
-                    Manage Account
-                  </button>
-                </div>
-              </div>
-
-              {/* VISUAL BREAKDOWN OF STORAGE USAGE BY FILE TYPE (RECHARTS) */}
-              <div className="mb-8">
-                <StorageAnalyticsChart
-                  items={driveItems}
-                  plan={currentPlan}
-                  onUpgradeClick={() => setIsUpgradeModalOpen(true)}
-                />
-              </div>
-
-              {/* Settings Groups */}
-              <div className="w-full flex flex-col gap-6">
-                
-                {/* Group 1: Account */}
-                <div>
-                  <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-3 px-4">Account</h3>
-                  <div className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden divide-y divide-slate-100">
-                    <div 
-                      className="px-6 py-4 flex items-center gap-4 hover:bg-slate-50 cursor-pointer transition-colors" 
-                      onClick={() => setActiveProfileDetail('personal')}
-                    >
-                      <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center shrink-0">
-                        <User className="w-5 h-5 text-slate-600" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <h4 className="font-medium text-slate-900">Personal Info</h4>
-                        <p className="text-sm text-slate-500">Name, email, and user credentials</p>
-                      </div>
-                      <ChevronRight className="w-5 h-5 text-slate-400" />
-                    </div>
-                    
-                    {/* Storage Row in Profile */}
-                    <div 
-                      className="px-6 py-4 flex items-center gap-4 hover:bg-slate-50 cursor-pointer transition-colors" 
-                      onClick={() => {
-                        setIsUpgradeModalOpen(true);
-                      }}
-                    >
-                      <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center shrink-0">
-                        <HardDrive className="w-5 h-5 text-blue-600" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <h4 className="font-medium text-slate-900">Storage</h4>
-                          <span className={cn(
-                            "px-2 py-0.5 rounded text-[11px] font-semibold border",
-                            currentPlan.isFree 
-                              ? "bg-emerald-50 text-emerald-700 border-emerald-200" 
-                              : "bg-blue-50 text-blue-700 border-blue-200"
-                          )}>
-                            {currentPlan.isFree ? "Free Plan" : `${currentPlan.storage}`}
-                          </span>
-                        </div>
-                        <p className="text-sm text-slate-500 mt-0.5">
-                          {totalUsedBytes === 0 ? '0 B' : formatBytes(totalUsedBytes)} of {currentPlan.storage} used ({Math.round(storagePercentage)}%)
-                        </p>
-                      </div>
-                      <ChevronRight className="w-5 h-5 text-slate-400" />
-                    </div>
-                    
-                    <div 
-                      className="px-6 py-4 flex items-center gap-4 hover:bg-slate-50 cursor-pointer transition-colors" 
-                      onClick={() => setActiveProfileDetail('security')}
-                    >
-                      <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center shrink-0">
-                        <Shield className="w-5 h-5 text-slate-600" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <h4 className="font-medium text-slate-900">Security</h4>
-                        <p className="text-sm text-slate-500">Password, 2FA, and session devices</p>
-                      </div>
-                      <ChevronRight className="w-5 h-5 text-slate-400" />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Group 2: Preferences */}
-                <div>
-                  <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-3 px-4">Preferences</h3>
-                  <div className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden divide-y divide-slate-100">
-                    <div 
-                      className="px-6 py-4 flex items-center gap-4 hover:bg-slate-50 cursor-pointer transition-colors" 
-                      onClick={() => setActiveProfileDetail('settings')}
-                    >
-                      <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center shrink-0">
-                        <Settings className="w-5 h-5 text-slate-600" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <h4 className="font-medium text-slate-900">General Settings</h4>
-                        <p className="text-sm text-slate-500">File handling, uploads, and default folders</p>
-                      </div>
-                      <ChevronRight className="w-5 h-5 text-slate-400" />
-                    </div>
-
-                    <div 
-                      className="px-6 py-4 flex items-center gap-4 hover:bg-slate-50 cursor-pointer transition-colors" 
-                      onClick={() => setActiveProfileDetail('offline')}
-                    >
-                      <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center shrink-0">
-                        <CloudOff className="w-5 h-5 text-slate-600" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <h4 className="font-medium text-slate-900">Offline Access</h4>
-                        <p className="text-sm text-slate-500">Manage files available without internet connection</p>
-                      </div>
-                      <ChevronRight className="w-5 h-5 text-slate-400" />
-                    </div>
-
-                    <div 
-                      className="px-6 py-4 flex items-center gap-4 hover:bg-slate-50 cursor-pointer transition-colors" 
-                      onClick={() => setActiveProfileDetail('notifications')}
-                    >
-                      <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center shrink-0">
-                        <Bell className="w-5 h-5 text-slate-600" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <h4 className="font-medium text-slate-900">Notifications</h4>
-                        <p className="text-sm text-slate-500">Manage email, quota alerts, and desktop notices</p>
-                      </div>
-                      <ChevronRight className="w-5 h-5 text-slate-400" />
-                    </div>
-                    
-                    <div 
-                      className="px-6 py-4 flex items-center gap-4 hover:bg-slate-50 cursor-pointer transition-colors" 
-                      onClick={() => setActiveProfileDetail('appearance')}
-                    >
-                      <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center shrink-0">
-                        <Palette className="w-5 h-5 text-slate-600" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <h4 className="font-medium text-slate-900">Appearance</h4>
-                        <p className="text-sm text-slate-500">Theme, view modes, and display accessibility</p>
-                      </div>
-                      <ChevronRight className="w-5 h-5 text-slate-400" />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Group 3: Support & About */}
-                <div>
-                  <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-3 px-4">Support & About</h3>
-                  <div className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden divide-y divide-slate-100">
-                    <div 
-                      className="px-6 py-4 flex items-center gap-4 hover:bg-slate-50 cursor-pointer transition-colors" 
-                      onClick={() => setActiveProfileDetail('contact')}
-                    >
-                      <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center shrink-0">
-                        <HelpCircle className="w-5 h-5 text-slate-600" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <h4 className="font-medium text-slate-900">Help & Contact</h4>
-                        <p className="text-sm text-slate-500">Get assistance, send feedback, or report problems</p>
-                      </div>
-                      <ChevronRight className="w-5 h-5 text-slate-400" />
-                    </div>
-                    
-                    <div 
-                      className="px-6 py-4 flex items-center gap-4 hover:bg-slate-50 cursor-pointer transition-colors" 
-                      onClick={() => setActiveProfileDetail('about')}
-                    >
-                      <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center shrink-0">
-                        <Info className="w-5 h-5 text-slate-600" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <h4 className="font-medium text-slate-900">About AsterDrive</h4>
-                        <p className="text-sm text-slate-500">Version 1.2.0 · Release information and storage tiers</p>
-                      </div>
-                      <ChevronRight className="w-5 h-5 text-slate-400" />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Group 4: Legal & Compliance */}
-                <div>
-                  <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-3 px-4">Legal & Compliance</h3>
-                  <div className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden divide-y divide-slate-100">
-                    <div 
-                      className="px-6 py-4 flex items-center gap-4 hover:bg-slate-50 cursor-pointer transition-colors" 
-                      onClick={() => setActiveProfileDetail('terms')}
-                    >
-                      <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center shrink-0">
-                        <FileText className="w-5 h-5 text-slate-600" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <h4 className="font-medium text-slate-900">Terms of Service</h4>
-                        <p className="text-sm text-slate-500">Rules and policies governing cloud storage usage</p>
-                      </div>
-                      <ChevronRight className="w-5 h-5 text-slate-400" />
-                    </div>
-                    
-                    <div 
-                      className="px-6 py-4 flex items-center gap-4 hover:bg-slate-50 cursor-pointer transition-colors" 
-                      onClick={() => setActiveProfileDetail('privacy')}
-                    >
-                      <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center shrink-0">
-                        <ShieldCheck className="w-5 h-5 text-slate-600" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <h4 className="font-medium text-slate-900">Privacy Policy</h4>
-                        <p className="text-sm text-slate-500">Data encryption, collection principles, and user privacy</p>
-                      </div>
-                      <ChevronRight className="w-5 h-5 text-slate-400" />
-                    </div>
-                    
-                    <div 
-                      className="px-6 py-4 flex items-center gap-4 hover:bg-slate-50 cursor-pointer transition-colors" 
-                      onClick={() => setActiveProfileDetail('acceptable')}
-                    >
-                      <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center shrink-0">
-                        <Scale className="w-5 h-5 text-slate-600" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <h4 className="font-medium text-slate-900">Acceptable Use Policy</h4>
-                        <p className="text-sm text-slate-500">Content limits, sharing rules, and security guidelines</p>
-                      </div>
-                      <ChevronRight className="w-5 h-5 text-slate-400" />
-                    </div>
-
-                    <div 
-                      className="px-6 py-4 flex items-center gap-4 hover:bg-slate-50 cursor-pointer transition-colors" 
-                      onClick={() => setActiveProfileDetail('copyright')}
-                    >
-                      <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center shrink-0">
-                        <BookOpen className="w-5 h-5 text-slate-600" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <h4 className="font-medium text-slate-900">Copyright & DMCA</h4>
-                        <p className="text-sm text-slate-500">Intellectual property protection and notices</p>
-                      </div>
-                      <ChevronRight className="w-5 h-5 text-slate-400" />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Sign Out Action */}
-                <div className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden mt-2">
-                  <div 
-                    className="px-6 py-4 flex items-center gap-4 hover:bg-rose-50 cursor-pointer transition-colors" 
-                    onClick={() => {
-                      setIsProfileMenuOpen(false);
-                      showToast({
-                        type: 'info',
-                        title: 'Signed Out',
-                        message: 'You have been signed out from verno7897123@gmail.com. Session saved locally.'
-                      });
-                    }}
-                  >
-                    <div className="w-10 h-10 rounded-full bg-rose-100 flex items-center justify-center shrink-0">
-                      <LogOut className="w-5 h-5 text-rose-600" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h4 className="font-medium text-rose-600">Sign out</h4>
-                      <p className="text-sm text-rose-500/80">Log out of this browser session</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* PROFILE DETAIL SUB-MODAL */}
-      <AnimatePresence>
-        {activeProfileDetail && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[85] bg-slate-900/60 flex items-center justify-center p-4 backdrop-blur-sm overflow-y-auto"
-            onClick={() => setActiveProfileDetail(null)}
-          >
-            <motion.div
-              initial={{ scale: 0.95, opacity: 0, y: 15 }}
-              animate={{ scale: 1, opacity: 1, y: 0 }}
-              exit={{ scale: 0.95, opacity: 0, y: 15 }}
-              onClick={(e) => e.stopPropagation()}
-              className="bg-white rounded-3xl shadow-2xl max-w-xl w-full flex flex-col max-h-[85vh] overflow-hidden border border-slate-100"
-            >
-              {/* Header */}
-              <div className="p-6 border-b border-slate-100 flex items-center justify-between shrink-0 bg-white">
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 font-bold">
-                    {activeProfileDetail === 'personal' && <User className="w-5 h-5" />}
-                    {activeProfileDetail === 'security' && <Shield className="w-5 h-5" />}
-                    {activeProfileDetail === 'settings' && <Settings className="w-5 h-5" />}
-                    {activeProfileDetail === 'offline' && <CloudOff className="w-5 h-5" />}
-                    {activeProfileDetail === 'notifications' && <Bell className="w-5 h-5" />}
-                    {activeProfileDetail === 'appearance' && <Palette className="w-5 h-5" />}
-                    {activeProfileDetail === 'contact' && <HelpCircle className="w-5 h-5" />}
-                    {activeProfileDetail === 'about' && <Info className="w-5 h-5" />}
-                    {activeProfileDetail === 'terms' && <FileText className="w-5 h-5" />}
-                    {activeProfileDetail === 'privacy' && <ShieldCheck className="w-5 h-5" />}
-                    {activeProfileDetail === 'acceptable' && <Scale className="w-5 h-5" />}
-                    {activeProfileDetail === 'copyright' && <BookOpen className="w-5 h-5" />}
-                  </div>
-                  <div>
-                    <h3 className="font-bold text-slate-900 text-lg capitalize">
-                      {activeProfileDetail === 'personal' && 'Personal Information'}
-                      {activeProfileDetail === 'security' && 'Security Settings'}
-                      {activeProfileDetail === 'settings' && 'General Settings'}
-                      {activeProfileDetail === 'offline' && 'Offline Access'}
-                      {activeProfileDetail === 'notifications' && 'Notification Preferences'}
-                      {activeProfileDetail === 'appearance' && 'Appearance & Theme'}
-                      {activeProfileDetail === 'contact' && 'Help & Contact Support'}
-                      {activeProfileDetail === 'about' && 'About AsterDrive'}
-                      {activeProfileDetail === 'terms' && 'Terms of Service'}
-                      {activeProfileDetail === 'privacy' && 'Privacy Policy'}
-                      {activeProfileDetail === 'acceptable' && 'Acceptable Use Policy'}
-                      {activeProfileDetail === 'copyright' && 'Copyright & DMCA'}
-                    </h3>
-                  </div>
-                </div>
-                <button 
-                  onClick={() => setActiveProfileDetail(null)}
-                  className="text-slate-400 hover:text-slate-600 p-2 rounded-full hover:bg-slate-100 transition-colors"
-                  aria-label="Close dialog"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-
-              {/* Body */}
-              <div className="p-6 overflow-y-auto flex-1 text-sm text-slate-600 space-y-4">
-                {activeProfileDetail === 'personal' && (
-                  <div className="space-y-4">
-                    <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex items-center justify-between">
-                      <div>
-                        <span className="text-xs text-slate-400 block">Full Name</span>
-                        <span className="text-sm font-semibold text-slate-800">John Smith</span>
-                      </div>
-                      <span className="text-xs font-semibold text-blue-600">Verified</span>
-                    </div>
-                    <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex items-center justify-between">
-                      <div>
-                        <span className="text-xs text-slate-400 block">Email Address</span>
-                        <span className="text-sm font-semibold text-slate-800">verno7897123@gmail.com</span>
-                      </div>
-                      <span className="text-xs font-semibold text-emerald-600">Primary</span>
-                    </div>
-                    <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex items-center justify-between">
-                      <div>
-                        <span className="text-xs text-slate-400 block">Active Storage Tier</span>
-                        <span className="text-sm font-semibold text-slate-800">{currentPlan.name} ({currentPlan.storage})</span>
-                      </div>
-                      <span className="text-xs font-semibold text-blue-600">
-                        {currentPlan.isFree ? 'Free Tier' : 'Subscription'}
-                      </span>
-                    </div>
-                  </div>
-                )}
-
-                {activeProfileDetail === 'security' && (
-                  <div className="space-y-4">
-                    <div className="p-4 bg-emerald-50/60 rounded-2xl border border-emerald-100 flex items-center gap-3">
-                      <ShieldCheck className="w-6 h-6 text-emerald-600 shrink-0" />
-                      <div>
-                        <h5 className="font-semibold text-emerald-950 text-sm">Account Protected</h5>
-                        <p className="text-xs text-emerald-700 mt-0.5">Two-factor authentication is active via your primary device.</p>
-                      </div>
-                    </div>
-                    <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 space-y-2">
-                      <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Active Sessions</span>
-                      <div className="flex items-center justify-between text-xs text-slate-700 pt-1">
-                        <span className="flex items-center gap-2">
-                          <Computer className="w-4 h-4 text-slate-400" /> Current Web Browser
-                        </span>
-                        <span className="text-emerald-600 font-semibold">Online now</span>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {activeProfileDetail === 'settings' && (
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between p-3 bg-slate-50 rounded-xl">
-                      <div>
-                        <p className="font-medium text-slate-800 text-sm">Confirm file deletion</p>
-                        <p className="text-xs text-slate-500">Always ask before moving items to trash</p>
-                      </div>
-                      <input type="checkbox" defaultChecked className="w-4 h-4 text-blue-600 rounded" />
-                    </div>
-                    <div className="flex items-center justify-between p-3 bg-slate-50 rounded-xl">
-                      <div>
-                        <p className="font-medium text-slate-800 text-sm">Automatic folder sync</p>
-                        <p className="text-xs text-slate-500">Sync changes across browser sessions</p>
-                      </div>
-                      <input type="checkbox" defaultChecked className="w-4 h-4 text-blue-600 rounded" />
-                    </div>
-                  </div>
-                )}
-
-                {activeProfileDetail === 'offline' && (
-                  <div className="space-y-3">
-                    <p className="text-xs text-slate-500 leading-relaxed">
-                      Offline access caches your recently opened documents so you can read and browse files even when your device loses internet connectivity.
-                    </p>
-                    <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex items-center justify-between">
-                      <span className="text-sm font-medium text-slate-700">Offline caching</span>
-                      <span className="text-xs font-semibold px-2 py-1 rounded bg-emerald-100 text-emerald-800">Enabled</span>
-                    </div>
-                  </div>
-                )}
-
-                {activeProfileDetail === 'notifications' && (
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between p-3 bg-slate-50 rounded-xl">
-                      <div>
-                        <p className="font-medium text-slate-800 text-sm">Storage quota alerts</p>
-                        <p className="text-xs text-slate-500">Notify when storage reaches 85% and 100% capacity</p>
-                      </div>
-                      <input type="checkbox" defaultChecked className="w-4 h-4 text-blue-600 rounded" />
-                    </div>
-                    <div className="flex items-center justify-between p-3 bg-slate-50 rounded-xl">
-                      <div>
-                        <p className="font-medium text-slate-800 text-sm">Upload completion sound</p>
-                        <p className="text-xs text-slate-500">Chime on upload completion</p>
-                      </div>
-                      <input type="checkbox" defaultChecked className="w-4 h-4 text-blue-600 rounded" />
-                    </div>
-                  </div>
-                )}
-
-                {activeProfileDetail === 'appearance' && (
-                  <div className="space-y-3">
-                    <p className="text-xs text-slate-500">Customize the visual theme and density of your AsterDrive workspace.</p>
-                    <div className="grid grid-cols-2 gap-3 pt-2">
-                      <div className="p-3 rounded-xl border-2 border-blue-600 bg-blue-50/50 flex flex-col items-center gap-2 cursor-pointer">
-                        <div className="w-full h-12 bg-white rounded-lg border border-slate-200 shadow-xs flex items-center justify-center text-xs font-semibold text-slate-700">
-                          Light Mode
-                        </div>
-                        <span className="text-xs font-semibold text-blue-600">Active</span>
-                      </div>
-                      <div 
-                        onClick={() => showToast({ type: 'info', title: 'Dark Mode', message: 'Dark mode theme is in beta preview.' })}
-                        className="p-3 rounded-xl border border-slate-200 bg-slate-50 flex flex-col items-center gap-2 cursor-pointer hover:border-slate-300"
-                      >
-                        <div className="w-full h-12 bg-slate-900 rounded-lg shadow-xs flex items-center justify-center text-xs font-semibold text-slate-100">
-                          Dark Mode
-                        </div>
-                        <span className="text-xs text-slate-500">Preview</span>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {activeProfileDetail === 'contact' && (
-                  <div className="space-y-4">
-                    <p className="text-xs text-slate-500">Have a question or need technical support with your storage? Send us a message directly.</p>
-                    <div>
-                      <label className="block text-xs font-medium text-slate-700 mb-1">Your Email</label>
-                      <input type="email" defaultValue="verno7897123@gmail.com" readOnly className="w-full px-3 py-2 bg-slate-100 border border-slate-200 rounded-lg text-sm text-slate-600 outline-none" suppressHydrationWarning />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium text-slate-700 mb-1">Subject</label>
-                      <input type="text" placeholder="e.g. Question about 1 GB Free Plan quota" className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm outline-none focus:border-blue-500" suppressHydrationWarning />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium text-slate-700 mb-1">Message</label>
-                      <textarea rows={3} placeholder="Describe your question or issue..." className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm outline-none focus:border-blue-500" suppressHydrationWarning />
-                    </div>
-                    <button 
-                      onClick={() => {
-                        setActiveProfileDetail(null);
-                        showToast({
-                          type: 'success',
-                          title: 'Message Sent',
-                          message: 'Thank you! Our support team will review your inquiry shortly.'
-                        });
-                      }}
-                      className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl text-sm transition-colors shadow-sm flex items-center justify-center gap-2 cursor-pointer"
-                    >
-                      <Send className="w-4 h-4" /> Send Message
-                    </button>
-                  </div>
-                )}
-
-                {activeProfileDetail === 'about' && (
-                  <div className="space-y-4 leading-relaxed">
-                    <div className="p-4 bg-orange-500/10 rounded-2xl border border-orange-500/20">
-                      <h4 className="font-bold text-slate-900 text-base">AsterDrive Cloud Storage</h4>
-                      <p className="text-xs text-orange-600 mt-1">Version 1.2.0 · Build 2026.10</p>
-                    </div>
-                    <p className="text-xs text-slate-600">
-                      AsterDrive provides fast, reliable, encrypted cloud storage for individuals and teams. Every new user receives a free 1 GB tier to store essential documents, spreadsheets, photos, and presentations.
-                    </p>
-                    <div className="border-t border-slate-100 pt-3 text-xs space-y-1.5">
-                      <p><strong className="text-slate-800">Current Plan:</strong> {currentPlan.name} ({currentPlan.storage})</p>
-                      <p><strong className="text-slate-800">Storage Used:</strong> {formatBytes(totalUsedBytes)} of {currentPlan.storage}</p>
-                      <p><strong className="text-slate-800">Supported Formats:</strong> Documents, Media, Archives, Folders</p>
-                    </div>
-                  </div>
-                )}
-
-                {activeProfileDetail === 'terms' && (
-                  <div className="space-y-3 leading-relaxed text-xs text-slate-600">
-                    <h5 className="font-bold text-slate-900 text-sm">AsterDrive Terms of Service</h5>
-                    <p>Last updated: October 2026</p>
-                    <h6 className="font-semibold text-slate-800 pt-2">1. Storage Quota &amp; Free Account</h6>
-                    <p>
-                      New users are allocated 1 GB of complimentary cloud storage (&ldquo;Free Plan&rdquo;). When your stored data reaches 1 GB, subsequent file uploads are restricted until additional space is freed or the account is upgraded to a paid tier.
-                    </p>
-                    <h6 className="font-semibold text-slate-800 pt-2">2. Subscription Upgrades</h6>
-                    <p>
-                      Users may upgrade their storage to 50 GB, 200 GB, 2 TB, 6 TB, or 12 TB. Storage tiers activate immediately upon confirmation.
-                    </p>
-                    <h6 className="font-semibold text-slate-800 pt-2">3. User Responsibilities</h6>
-                    <p>
-                      You are solely responsible for maintaining the confidentiality of your account credentials and the files uploaded to your storage volume.
-                    </p>
-                  </div>
-                )}
-
-                {activeProfileDetail === 'privacy' && (
-                  <div className="space-y-3 leading-relaxed text-xs text-slate-600">
-                    <h5 className="font-bold text-slate-900 text-sm">AsterDrive Privacy Policy</h5>
-                    <p>Effective Date: October 2026</p>
-                    <h6 className="font-semibold text-slate-800 pt-2">1. Data Encryption & Security</h6>
-                    <p>
-                      All files uploaded to AsterDrive are protected in transit using TLS 1.3 and at rest using AES-256 encryption. We never access the contents of your files without explicit authorization.
-                    </p>
-                    <h6 className="font-semibold text-slate-800 pt-2">2. Information Collection</h6>
-                    <p>
-                      We collect minimal information necessary to deliver cloud storage services, such as your email (verno7897123@gmail.com), storage usage metrics, and file metadata.
-                    </p>
-                    <h6 className="font-semibold text-slate-800 pt-2">3. Data Retention & Deletion</h6>
-                    <p>
-                      When you delete files or your account, all corresponding data blocks are permanently purged from storage systems.
-                    </p>
-                  </div>
-                )}
-
-                {activeProfileDetail === 'acceptable' && (
-                  <div className="space-y-3 leading-relaxed text-xs text-slate-600">
-                    <h5 className="font-bold text-slate-900 text-sm">Acceptable Use Policy</h5>
-                    <p>
-                      AsterDrive is dedicated to maintaining a secure, safe environment for all cloud storage users.
-                    </p>
-                    <ul className="list-disc pl-4 space-y-1.5 text-xs">
-                      <li>Do not upload or distribute malicious software, viruses, or phishing kits.</li>
-                      <li>Do not store content that infringes upon third-party intellectual property rights.</li>
-                      <li>Do not attempt to bypass storage quota limits through automated exploitation.</li>
-                    </ul>
-                  </div>
-                )}
-
-                {activeProfileDetail === 'copyright' && (
-                  <div className="space-y-3 leading-relaxed text-xs text-slate-600">
-                    <h5 className="font-bold text-slate-900 text-sm">Copyright & DMCA Policy</h5>
-                    <p>
-                      AsterDrive respects the intellectual property rights of creators and complies with the Digital Millennium Copyright Act (DMCA).
-                    </p>
-                    <p>
-                      To submit a DMCA takedown notice or counter-notification, please contact our designated copyright agent through the Help & Contact section with specific file identifiers.
-                    </p>
-                  </div>
-                )}
-              </div>
-
-              {/* Footer */}
-              <div className="p-4 border-t border-slate-100 bg-slate-50 flex justify-end">
-                <button 
-                  onClick={() => setActiveProfileDetail(null)}
-                  className="px-5 py-2 rounded-xl text-sm font-medium bg-slate-200 text-slate-700 hover:bg-slate-300 transition-colors"
-                >
-                  Close
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* ITEM THREE-DOTS CONTEXT MENU */}
-      <AnimatePresence>
-        {activeItemMenu && (
-          <>
-            <div 
-              className="fixed inset-0 z-[60] bg-black/5 sm:bg-transparent"
-              onClick={() => setActiveItemMenu(null)}
-              onTouchStart={() => setActiveItemMenu(null)}
-            />
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: -4 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: -4 }}
-              transition={{ duration: 0.12 }}
-              style={{
-                position: 'fixed',
-                top: activeItemMenu.top,
-                left: activeItemMenu.left,
-                zIndex: 65,
-              }}
-              className="w-56 bg-white rounded-2xl shadow-2xl border border-slate-200 py-1.5 overflow-hidden text-sm divide-y divide-slate-100"
-              onClick={(e) => e.stopPropagation()}
-              onTouchStart={(e) => e.stopPropagation()}
-            >
-              <div className="px-3.5 py-2 bg-slate-50/80 border-b border-slate-100 flex items-center gap-2.5">
-                {getIconForType(activeItemMenu.item.type, "w-4 h-4 shrink-0")}
-                <span className="font-semibold text-slate-800 text-xs truncate max-w-[170px]" title={activeItemMenu.item.name}>
-                  {activeItemMenu.item.name}
-                </span>
-              </div>
-
-              <div className="py-1">
-                {activeItemMenu.item.type === 'video' && !activeItemMenu.item.trashed && (
-                  <button
-                    onClick={() => {
-                      openVideoPreview(activeItemMenu.item);
-                      setActiveItemMenu(null);
-                    }}
-                    className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-purple-700 bg-purple-50/70 hover:bg-purple-100 font-semibold transition-colors text-left text-xs sm:text-sm cursor-pointer"
-                  >
-                    <Play className="w-4 h-4 text-purple-600 fill-purple-600" />
-                    Watch Video
-                  </button>
-                )}
-
-                {activeItemMenu.item.type === 'folder' ? (
-                  <button
-                    onClick={() => {
-                      setCurrentFolderId(activeItemMenu.item.id);
-                      setSelectedItems(new Set());
-                      setActiveItemMenu(null);
-                    }}
-                    className="w-full flex items-center gap-2.5 px-3.5 py-2 text-slate-700 hover:bg-slate-100 transition-colors text-left text-xs sm:text-sm cursor-pointer"
-                  >
-                    <FolderOpen className="w-4 h-4 text-blue-500" />
-                    Open Folder
-                  </button>
-                ) : (
-                  <button
-                    onClick={() => handleDownloadItem(activeItemMenu.item)}
-                    className="w-full flex items-center gap-2.5 px-3.5 py-2 text-slate-700 hover:bg-slate-100 transition-colors text-left text-xs sm:text-sm cursor-pointer"
-                  >
-                    <Download className="w-4 h-4 text-emerald-600" />
-                    Download
-                  </button>
-                )}
-
-                <button
-                  onClick={() => handleOpenRename(activeItemMenu.item)}
-                  className="w-full flex items-center gap-2.5 px-3.5 py-2 text-slate-700 hover:bg-slate-100 transition-colors text-left text-xs sm:text-sm cursor-pointer"
-                >
-                  <Pencil className="w-4 h-4 text-slate-500" />
-                  Rename
-                </button>
-
-                <button
-                  onClick={() => handleShareItem(activeItemMenu.item)}
-                  className="w-full flex items-center gap-2.5 px-3.5 py-2 text-slate-700 hover:bg-slate-100 transition-colors text-left text-xs sm:text-sm cursor-pointer"
-                >
-                  <Share2 className="w-4 h-4 text-blue-600" />
-                  Share Link
-                </button>
-
-                <button
-                  onClick={() => handleToggleStarSingle(activeItemMenu.item)}
-                  className="w-full flex items-center gap-2.5 px-3.5 py-2 text-slate-700 hover:bg-slate-100 transition-colors text-left text-xs sm:text-sm cursor-pointer"
-                >
-                  <Star className={cn("w-4 h-4", activeItemMenu.item.starred ? "text-amber-500 fill-amber-500" : "text-slate-400")} />
-                  {activeItemMenu.item.starred ? 'Remove Star' : 'Add to Starred'}
-                </button>
-
-                <button
-                  onClick={() => {
-                    setSelectedItems(new Set([activeItemMenu.item.id]));
-                    setShowDetails(true);
-                    setActiveItemMenu(null);
-                  }}
-                  className="w-full flex items-center gap-2.5 px-3.5 py-2 text-slate-700 hover:bg-slate-100 transition-colors text-left text-xs sm:text-sm cursor-pointer"
-                >
-                  <Info className="w-4 h-4 text-slate-500" />
-                  Details &amp; Info
-                </button>
-
-                <button
-                  onClick={() => handleToggleComputerSync(activeItemMenu.item)}
-                  className="w-full flex items-center gap-2.5 px-3.5 py-2 text-slate-700 hover:bg-slate-100 transition-colors text-left text-xs sm:text-sm cursor-pointer"
-                >
-                  <Computer className="w-4 h-4 text-indigo-600" />
-                  {activeItemMenu.item.source === 'computer' ? 'Remove from Computer Sync' : 'Link to Computer Sync'}
-                </button>
-              </div>
-
-              <div className="py-1">
-                {activeItemMenu.item.trashed ? (
-                  <>
-                    <button
-                      onClick={() => {
-                        const itemId = activeItemMenu.item.id;
-                        setDriveItems(prev => prev.map(i => i.id === itemId ? { ...i, trashed: false } : i));
-                        setActiveItemMenu(null);
-                        showToast({
-                          type: 'success',
-                          title: 'Restored',
-                          message: `"${activeItemMenu.item.name}" restored from Trash.`
-                        });
-                      }}
-                      className="w-full flex items-center gap-2.5 px-3.5 py-2 text-emerald-700 hover:bg-emerald-50 transition-colors text-left text-xs sm:text-sm cursor-pointer"
-                    >
-                      <RotateCcw className="w-4 h-4 text-emerald-600" />
-                      Restore
-                    </button>
-                    <button
-                      onClick={() => {
-                        setSelectedItems(new Set([activeItemMenu.item.id]));
-                        setIsDeleteDialogOpen(true);
-                        setActiveItemMenu(null);
-                      }}
-                      className="w-full flex items-center gap-2.5 px-3.5 py-2 text-rose-600 hover:bg-rose-50 transition-colors text-left text-xs sm:text-sm cursor-pointer"
-                    >
-                      <Trash2 className="w-4 h-4 text-rose-600" />
-                      Delete Permanently
-                    </button>
-                  </>
-                ) : (
-                  <button
-                    onClick={() => {
-                      const itemId = activeItemMenu.item.id;
-                      const itemName = activeItemMenu.item.name;
-                      setDriveItems(prev => prev.map(i => i.id === itemId ? { ...i, trashed: true } : i));
-                      setSelectedItems(prev => {
-                        const next = new Set(prev);
-                        next.delete(itemId);
-                        return next;
-                      });
-                      setActiveItemMenu(null);
-                      showToast({
-                        type: 'info',
-                        title: 'Moved to Trash',
-                        message: `"${itemName}" moved to trash.`
-                      });
-                    }}
-                    className="w-full flex items-center gap-2.5 px-3.5 py-2 text-rose-600 hover:bg-rose-50 transition-colors text-left text-xs sm:text-sm cursor-pointer"
-                  >
-                    <Trash2 className="w-4 h-4 text-rose-600" />
-                    Move to Trash
-                  </button>
-                )}
-              </div>
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>
-
-      {/* RENAME ITEM MODAL */}
-      <AnimatePresence>
-        {itemToRename && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[80] bg-slate-900/50 flex items-center justify-center p-4 backdrop-blur-xs"
-            onClick={() => setItemToRename(null)}
-          >
-            <motion.div
-              initial={{ scale: 0.95, opacity: 0, y: 10 }}
-              animate={{ scale: 1, opacity: 1, y: 0 }}
-              exit={{ scale: 0.95, opacity: 0, y: 10 }}
-              onClick={(e) => e.stopPropagation()}
-              className="bg-white rounded-2xl shadow-xl max-w-sm w-full p-6 overflow-hidden border border-slate-100"
-            >
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center shrink-0">
-                  {getIconForType(itemToRename.type, "w-5 h-5")}
-                </div>
-                <div>
-                  <h3 className="text-base font-semibold text-slate-900">Rename</h3>
-                  <p className="text-xs text-slate-500 capitalize">{itemToRename.type}</p>
-                </div>
-              </div>
-
-              <div className="mb-5">
-                <input
-                  type="text"
-                  value={renameInput}
-                  onChange={(e) => setRenameInput(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') handleSaveRename();
-                    if (e.key === 'Escape') setItemToRename(null);
-                  }}
-                  autoFocus
-                  className="w-full px-3.5 py-2.5 bg-slate-50 focus:bg-white border border-slate-300 focus:border-blue-600 rounded-xl text-sm font-medium outline-none transition-all shadow-inner"
-                  placeholder="Item name"
-                  suppressHydrationWarning
-                />
-              </div>
-
-              <div className="flex items-center justify-end gap-2.5">
-                <button
-                  onClick={() => setItemToRename(null)}
-                  className="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleSaveRename}
-                  className="px-5 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-xl transition-colors shadow-sm cursor-pointer"
-                >
-                  Save
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* VIDEO PREVIEW PLAYER MODAL */}
-      <AnimatePresence>
-        {previewVideoItem && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[130] bg-black/95 flex flex-col justify-between backdrop-blur-md p-3 sm:p-6"
-            onClick={closeVideoPreview}
-          >
-            {/* Top Header Bar */}
-            <div 
-              onClick={(e) => e.stopPropagation()} 
-              className="flex items-center justify-between text-white pb-3 sm:pb-4 border-b border-white/10 shrink-0 gap-3"
-            >
-              <div className="flex items-center gap-3 min-w-0 pr-2">
-                <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-purple-600/30 border border-purple-500/40 text-purple-300 flex items-center justify-center shrink-0">
-                  <Video className="w-5 h-5" />
-                </div>
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <h3 className="font-semibold text-sm sm:text-base text-white truncate max-w-xs sm:max-w-md md:max-w-xl" title={previewVideoItem.name}>
-                      {previewVideoItem.name}
-                    </h3>
-                    <span className="text-[10px] font-mono uppercase bg-purple-900/60 text-purple-300 border border-purple-700/50 px-2 py-0.5 rounded-full font-semibold">
-                      Video Player
-                    </span>
-                    {previewVideoItem.source === 'computer' && (
-                      <span className="inline-flex items-center gap-1 text-[10px] bg-blue-900/60 text-blue-300 border border-blue-700/50 px-2 py-0.5 rounded-full font-medium">
-                        <Computer className="w-3 h-3" /> {previewVideoItem.computerDevice || 'Computer Sync'}
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-xs text-white/60 mt-0.5 flex items-center gap-2 font-mono tabular-nums">
-                    <span>{formatBytes(previewVideoItem.size)}</span>
-                    <span>•</span>
-                    <span suppressHydrationWarning>{formatDateSafe(previewVideoItem.updatedAt)}</span>
-                    {previewVideoItem.folderPath && (
-                      <>
-                        <span>•</span>
-                        <span className="truncate max-w-xs text-white/40 font-sans">{previewVideoItem.folderPath}</span>
-                      </>
-                    )}
-                  </p>
-                </div>
-              </div>
-
-              {/* Action Controls */}
-              <div className="flex items-center gap-2 shrink-0">
-                {/* Speed Controls (Desktop) */}
-                <div className="hidden lg:flex items-center gap-1 bg-white/10 p-1 rounded-xl">
-                  <span className="text-[11px] text-white/60 px-1.5 font-medium">Speed</span>
-                  {[0.75, 1, 1.25, 1.5, 2].map((spd) => (
-                    <button
-                      key={spd}
-                      type="button"
-                      onClick={() => {
-                        setVideoPlaybackSpeed(spd);
-                        if (videoPlayerRef.current) {
-                          videoPlayerRef.current.playbackRate = spd;
-                        }
-                      }}
-                      className={cn(
-                        "px-1.5 py-0.5 rounded-md text-[11px] font-mono transition-all cursor-pointer",
-                        videoPlaybackSpeed === spd
-                          ? "bg-purple-600 text-white font-bold shadow-xs"
-                          : "text-white/70 hover:text-white hover:bg-white/10"
-                      )}
-                    >
-                      {spd}x
-                    </button>
-                  ))}
-                </div>
-
-                {/* Fullscreen Button */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (videoPlayerRef.current) {
-                      if (document.fullscreenElement) {
-                        document.exitFullscreen().catch(() => {});
-                      } else {
-                        videoPlayerRef.current.requestFullscreen?.().catch(() => {});
-                      }
-                    }
-                  }}
-                  className="p-2 sm:px-3 sm:py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white text-xs font-medium transition-colors flex items-center gap-1.5 cursor-pointer"
-                  title="Full screen"
-                >
-                  <Maximize2 className="w-4 h-4 text-purple-300" />
-                  <span className="hidden sm:inline">Fullscreen</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => handleDownloadItem(previewVideoItem)}
-                  className="p-2 sm:px-3 sm:py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white text-xs font-medium transition-colors flex items-center gap-1.5 cursor-pointer"
-                  title="Download video"
-                >
-                  <Download className="w-4 h-4 text-emerald-400" />
-                  <span className="hidden sm:inline">Download</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => handleShareItem(previewVideoItem)}
-                  className="p-2 sm:px-3 sm:py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white text-xs font-medium transition-colors flex items-center gap-1.5 cursor-pointer"
-                  title="Share video link"
-                >
-                  <Share2 className="w-4 h-4 text-blue-300" />
-                  <span className="hidden sm:inline">Share</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    handleToggleStarSingle(previewVideoItem);
-                    setPreviewVideoItem(prev => prev ? { ...prev, starred: !prev.starred } : null);
-                  }}
-                  className="p-2 rounded-lg bg-white/10 hover:bg-white/20 text-white transition-colors cursor-pointer"
-                  title={previewVideoItem.starred ? "Remove star" : "Star video"}
-                >
-                  <Star className={cn("w-4 h-4", previewVideoItem.starred ? "text-amber-400 fill-amber-400" : "text-white/70")} />
-                </button>
-                <div className="w-px h-6 bg-white/15 mx-1" />
-                <button
-                  type="button"
-                  onClick={closeVideoPreview}
-                  className="p-2 rounded-lg bg-white/10 hover:bg-rose-600/80 text-white transition-colors cursor-pointer"
-                  title="Close (Esc)"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-            </div>
-
-            {/* Video Display Center */}
-            <div 
-              onClick={(e) => e.stopPropagation()} 
-              className="flex-1 flex flex-col items-center justify-center p-2 sm:p-4 min-h-0 relative my-auto"
-            >
-              <video
-                ref={videoPlayerRef}
-                key={previewVideoItem.id + (activeVideoUrl || previewVideoItem.videoUrl || 'video')}
-                src={activeVideoUrl || previewVideoItem.videoUrl || ''}
-                controls
-                autoPlay
-                playsInline
-                onError={() => {
-                  if (!videoLoadError) {
-                    setVideoLoadError(true);
-                  }
-                }}
-                className="max-h-[64vh] sm:max-h-[70vh] w-auto max-w-full rounded-2xl shadow-2xl bg-black border border-white/10 object-contain mx-auto"
-              >
-                Your browser does not support the video tag.
-              </video>
-
-              {/* Mobile/Tablet Speed Selector */}
-              <div className="lg:hidden flex items-center gap-1.5 mt-3 bg-white/10 px-3 py-1.5 rounded-full">
-                <span className="text-[11px] text-white/70">Speed:</span>
-                {[0.75, 1, 1.25, 1.5, 2].map((spd) => (
-                  <button
-                    key={spd}
-                    type="button"
-                    onClick={() => {
-                      setVideoPlaybackSpeed(spd);
-                      if (videoPlayerRef.current) {
-                        videoPlayerRef.current.playbackRate = spd;
-                      }
-                    }}
-                    className={cn(
-                      "px-2 py-0.5 rounded text-xs font-mono font-medium",
-                      videoPlaybackSpeed === spd ? "bg-purple-600 text-white font-bold" : "text-white/60 hover:text-white"
-                    )}
-                  >
-                    {spd}x
-                  </button>
                 ))}
               </div>
             </div>
+          )}
 
-            {/* Bottom Info Bar & Shortcuts */}
-            <div 
-              onClick={(e) => e.stopPropagation()} 
-              className="flex items-center justify-between text-xs text-white/60 pt-3 border-t border-white/10 shrink-0 flex-wrap gap-2"
-            >
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="inline-flex items-center gap-1.5 text-purple-300 font-medium">
-                  <Sparkles className="w-3.5 h-3.5" /> High Definition Video Player
-                </span>
-                {videoLoadError ? (
-                  <span className="text-[11px] text-amber-300 font-medium bg-amber-950/60 px-2 py-0.5 rounded border border-amber-700/50">
-                    ● Streaming cloud preview fallback
-                  </span>
-                ) : previewVideoItem.videoUrl?.startsWith('blob:') ? (
-                  <span className="text-[11px] text-emerald-400 font-medium bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-800/40">
-                    ● Streaming local uploaded file
-                  </span>
+          {/* ======================= TAB: PEOPLE (Matching Screenshot 2) ======================= */}
+          {activeTab === 'people' && (
+            <div className="space-y-6">
+              <div>
+                <div className="text-orange-500 text-xs font-semibold uppercase tracking-wider">People</div>
+                <h1 className="text-3xl font-bold text-white tracking-tight mt-0.5">People</h1>
+                <p className="text-xs text-slate-400 mt-1">Manage collaborators and file access.</p>
+              </div>
+
+              {/* Main Card from Screenshot 2 */}
+              <div className="bg-[#11141d] border border-[#1e2433] rounded-2xl p-6 space-y-5">
+                <div className="flex items-start justify-between">
+                  <div className="flex items-start gap-4">
+                    <div className="w-10 h-10 rounded-xl bg-[#26150b] border border-orange-500/30 flex items-center justify-center text-orange-500 shrink-0">
+                      <Users className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <div className="text-[11px] font-medium text-slate-400 uppercase tracking-wider">People & access</div>
+                      <div className="text-2xl font-bold text-white tracking-tight mt-0.5">
+                        {collaborators.length} {collaborators.length === 1 ? 'person' : 'people'}
+                      </div>
+                      <div className="text-xs text-slate-400 mt-0.5">
+                        {collaborators.length === 0 ? 'No collaborators yet' : `${collaborators.length} active collaborator(s)`}
+                      </div>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setShowInviteModal(true)}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-orange-500 hover:bg-orange-600 text-white rounded-md shadow-sm transition-colors"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Invite collaborator</span>
+                  </button>
+                </div>
+
+                {/* Dashed area from Screenshot 2 */}
+                {collaborators.length === 0 ? (
+                  <div className="border border-dashed border-[#1e2433] rounded-xl p-8 text-center bg-[#0c0e14]/50">
+                    <p className="text-xs text-slate-400">People you share files with will appear here.</p>
+                  </div>
                 ) : (
-                  <span className="text-[11px] text-blue-300 font-medium bg-blue-950/60 px-2 py-0.5 rounded border border-blue-800/40">
-                    ● 1080p Cloud Stream
-                  </span>
+                  <div className="divide-y divide-[#1e2433] rounded-xl border border-[#1e2433] bg-[#0c0e14]/50 overflow-hidden">
+                    {collaborators.map((collab) => (
+                      <div key={collab.id} className="p-3.5 flex items-center justify-between text-xs">
+                        <div className="flex items-center gap-3">
+                          <div className="w-7 h-7 rounded-full bg-slate-800 flex items-center justify-center text-[10px] font-bold text-orange-400">
+                            {collab.email[0].toUpperCase()}
+                          </div>
+                          <div>
+                            <p className="text-slate-200 font-medium">{collab.email}</p>
+                            <p className="text-slate-500 text-[10px]">Added recently</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[11px] bg-slate-800 text-slate-300 px-2 py-0.5 rounded">
+                            {collab.role}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setCollaborators((prev) => prev.filter((c) => c.id !== collab.id));
+                              showToast(`Revoked access for ${collab.email}`);
+                            }}
+                            className="text-xs text-rose-400 hover:text-rose-300 px-2 py-1"
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 )}
               </div>
-              <div className="flex items-center gap-3">
-                <span className="hidden md:inline">
-                  Press <kbd className="px-1.5 py-0.5 bg-white/15 rounded text-[11px] font-mono text-white">Space</kbd> to Play/Pause, <kbd className="px-1.5 py-0.5 bg-white/15 rounded text-[11px] font-mono text-white">Esc</kbd> to exit
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setPreviewVideoItem(null)}
-                  className="text-white hover:text-purple-300 font-medium transition-colors cursor-pointer"
-                >
-                  Close Viewer
-                </button>
+            </div>
+          )}
+
+          {/* ======================= TAB: TRASH (Matching Screenshot 3) ======================= */}
+          {activeTab === 'trash' && (
+            <div className="space-y-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-orange-500 text-xs font-semibold uppercase tracking-wider">Trash</div>
+                  <h1 className="text-3xl font-bold text-white tracking-tight mt-0.5">Trash</h1>
+                  <p className="text-xs text-slate-400 mt-1">Everything you&apos;re working on, in one place.</p>
+                </div>
+                {items.some((it) => it.trashed) && (
+                  <button
+                    type="button"
+                    onClick={handleEmptyTrash}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-rose-500/20 hover:bg-rose-500/30 text-rose-400 border border-rose-500/30 rounded-md transition-colors"
+                  >
+                    <Trash className="w-3.5 h-3.5" />
+                    <span>Empty trash</span>
+                  </button>
+                )}
+              </div>
+
+              {/* Trash View matching Screenshot 3 */}
+              {!items.some((it) => it.trashed) ? (
+                <div className="bg-[#11141d] border border-[#1e2433] rounded-2xl p-16 text-center">
+                  <div className="w-12 h-12 rounded-xl bg-slate-900 border border-[#1e2433] flex items-center justify-center mx-auto text-slate-500 mb-4">
+                    <Trash2 className="w-6 h-6" />
+                  </div>
+                  <h3 className="text-base font-semibold text-white">Trash is empty</h3>
+                  <p className="text-xs text-slate-400 mt-1 max-w-sm mx-auto">
+                    Deleted files will stay here temporarily so you can restore them before permanent removal.
+                  </p>
+                </div>
+              ) : (
+                <div className="bg-[#11141d] border border-[#1e2433] rounded-xl overflow-hidden">
+                  <table className="w-full text-left text-xs text-slate-300">
+                    <thead className="bg-slate-900/60 text-slate-400 text-[11px] uppercase tracking-wider border-b border-[#1e2433]">
+                      <tr>
+                        <th className="px-4 py-2.5 font-medium">Name</th>
+                        <th className="px-4 py-2.5 font-medium">Size</th>
+                        <th className="px-4 py-2.5 font-medium text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[#1e2433]/60">
+                      {items
+                        .filter((it) => it.trashed)
+                        .map((item) => (
+                          <tr key={item.id} className="hover:bg-slate-800/40 transition-colors">
+                            <td className="px-4 py-3 flex items-center gap-2.5 truncate max-w-xs">
+                              {getItemIcon(item.type)}
+                              <span className="font-medium text-slate-200 truncate">{item.name}</span>
+                            </td>
+                            <td className="px-4 py-3 text-slate-400">{formatFileSize(item.size)}</td>
+                            <td className="px-4 py-3 text-right space-x-2">
+                              <button
+                                type="button"
+                                onClick={(e) => handleRestoreItem(item.id, e)}
+                                className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-200 rounded border border-slate-700"
+                              >
+                                <RotateCcw className="w-3 h-3 text-emerald-400" />
+                                <span>Restore</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={(e) => handleDeletePermanent(item.id, e)}
+                                className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 rounded border border-rose-500/20"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                                <span>Delete Forever</span>
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ======================= TAB: SECURITY (Matching Screenshot 4) ======================= */}
+          {activeTab === 'security' && (
+            <div className="space-y-6">
+              <div>
+                <div className="text-orange-500 text-xs font-semibold uppercase tracking-wider">Security</div>
+                <h1 className="text-3xl font-bold text-white tracking-tight mt-0.5">Security</h1>
+                <p className="text-xs text-slate-400 mt-1">Review workspace access and protection.</p>
+              </div>
+
+              {/* Main Card from Screenshot 4 */}
+              <div className="bg-[#11141d] border border-[#1e2433] rounded-2xl p-6 space-y-5">
+                <div className="flex items-start justify-between">
+                  <div className="flex items-start gap-4">
+                    <div className="w-10 h-10 rounded-xl bg-[#26150b] border border-orange-500/30 flex items-center justify-center text-orange-500 shrink-0">
+                      <ShieldCheck className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <div className="text-[11px] font-medium text-slate-400 uppercase tracking-wider">Workspace health</div>
+                      <div className="text-2xl font-bold text-white tracking-tight mt-0.5">
+                        {isScanning ? 'Scanning...' : scanResult}
+                      </div>
+                      <div className="text-xs text-slate-400 mt-0.5">Your workspace is ready</div>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleRunSecurityScan}
+                    disabled={isScanning}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white rounded-md shadow-sm transition-colors"
+                  >
+                    <Sparkles className="w-3.5 h-3.5" />
+                    <span>{isScanning ? 'Scanning...' : 'Run Scan'}</span>
+                  </button>
+                </div>
+
+                {/* 3 Status Cards */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+                  <div className="bg-[#0c0e14]/60 border border-[#1e2433] rounded-xl p-4">
+                    <div className="text-[11px] font-medium text-slate-400">File protection</div>
+                    <div className="text-xs font-semibold text-emerald-400 mt-1">Active</div>
+                  </div>
+                  <div className="bg-[#0c0e14]/60 border border-[#1e2433] rounded-xl p-4">
+                    <div className="text-[11px] font-medium text-slate-400">Sharing access</div>
+                    <div className="text-xs font-semibold text-slate-200 mt-1">Controlled</div>
+                  </div>
+                  <div className="bg-[#0c0e14]/60 border border-[#1e2433] rounded-xl p-4">
+                    <div className="text-[11px] font-medium text-slate-400">Suspicious activity</div>
+                    <div className="text-xs font-semibold text-slate-400 mt-1">None detected</div>
+                  </div>
+                </div>
+
+                {/* Security checks bar from Screenshot 4 */}
+                <div className="bg-[#1b120c] border border-orange-500/20 rounded-xl p-4">
+                  <p className="text-xs text-orange-300">Security checks will appear here.</p>
+                </div>
               </div>
             </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+          )}
 
-      {/* COMPUTER SYNC PRESET MODAL */}
-      <AnimatePresence>
-        {isSyncModalOpen && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[100] bg-slate-900/60 flex items-center justify-center p-4 backdrop-blur-xs"
-            onClick={() => setIsSyncModalOpen(false)}
-          >
-            <motion.div
-              initial={{ scale: 0.95, opacity: 0, y: 10 }}
-              animate={{ scale: 1, opacity: 1, y: 0 }}
-              exit={{ scale: 0.95, opacity: 0, y: 10 }}
-              onClick={(e) => e.stopPropagation()}
-              className="bg-white rounded-2xl sm:rounded-3xl shadow-2xl max-w-lg w-full p-6 border border-slate-100 overflow-hidden"
-            >
-              <div className="flex items-start justify-between mb-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
-                    <Computer className="w-5 h-5" />
+          {/* ======================= TAB: FEEDBACK (Matching Screenshot 5) ======================= */}
+          {activeTab === 'feedback' && (
+            <div className="space-y-6">
+              <div>
+                <div className="text-orange-500 text-xs font-semibold uppercase tracking-wider">Feedback</div>
+                <h1 className="text-3xl font-bold text-white tracking-tight mt-0.5">Feedback</h1>
+                <p className="text-xs text-slate-400 mt-1">Everything you&apos;re working on, in one place.</p>
+              </div>
+
+              {/* Main Card from Screenshot 5 */}
+              <div className="bg-[#11141d] border border-[#1e2433] rounded-2xl p-6 space-y-5 max-w-2xl">
+                <div className="flex items-start gap-4">
+                  <div className="w-10 h-10 rounded-xl bg-[#26150b] border border-orange-500/30 flex items-center justify-center text-orange-500 shrink-0">
+                    <MessageSquarePlus className="w-5 h-5" />
                   </div>
                   <div>
-                    <h3 className="text-lg font-bold text-slate-900">Sync &amp; Backup Computers</h3>
-                    <p className="text-xs text-slate-500">Connect PC or Mac folders for continuous backup</p>
+                    <h3 className="text-sm font-semibold text-white">Help us improve AsterDrive</h3>
+                    <p className="text-xs text-slate-400 mt-0.5">
+                      Tell us what works well or what you would like to see next.
+                    </p>
                   </div>
                 </div>
-                <button 
-                  onClick={() => setIsSyncModalOpen(false)}
-                  className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
 
-              <div className="space-y-3 mb-6">
-                <div 
-                  onClick={() => {
-                    setIsSyncModalOpen(false);
-                    computerFolderInputRef.current?.click();
-                  }}
-                  className="p-4 rounded-xl border border-slate-200 hover:border-blue-500 bg-slate-50/50 hover:bg-blue-50/30 transition-all cursor-pointer flex items-center justify-between group"
-                >
-                  <div className="flex items-center gap-3">
-                    <Folder className="w-6 h-6 text-blue-600 shrink-0" />
-                    <div>
-                      <h4 className="font-semibold text-slate-900 text-sm group-hover:text-blue-700 transition-colors">Sync Folder from this Computer</h4>
-                      <p className="text-xs text-slate-500">Select any local folder from your PC/Mac to sync its contents to AsterDrive</p>
+                <form onSubmit={handleSendFeedback} className="space-y-4">
+                  <textarea
+                    rows={5}
+                    value={feedbackText}
+                    onChange={(e) => setFeedbackText(e.target.value)}
+                    placeholder="Share your feedback..."
+                    className="w-full p-3 bg-[#0c0e14] border border-[#1e2433] rounded-xl text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500/40 resize-none"
+                  />
+
+                  <button
+                    type="submit"
+                    disabled={!feedbackText.trim() || feedbackSent}
+                    className="inline-flex items-center gap-2 px-4 py-2 text-xs font-medium bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white rounded-md shadow-sm transition-colors"
+                  >
+                    <span>{feedbackSent ? 'Sending...' : 'Send feedback'}</span>
+                  </button>
+                </form>
+              </div>
+            </div>
+          )}
+        </main>
+      </div>
+
+      {/* 
+        ===================================================================
+        MODAL: 100% DARK THEMED USER PROFILE MODAL
+        (Solves the user's issue: "saya klik/ketuk image profile masih warna putih")
+        ===================================================================
+      */}
+      {profileModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="w-full max-w-md bg-[#11141d] border border-[#1e2433] rounded-2xl shadow-2xl overflow-hidden text-slate-100 animate-in fade-in zoom-in-95 duration-150">
+            {/* Modal Header */}
+            <div className="px-6 py-4 border-b border-[#1e2433] flex items-center justify-between bg-[#151924]/60">
+              <div className="flex items-center gap-2.5">
+                <User className="w-4 h-4 text-orange-400" />
+                <h3 className="font-semibold text-sm text-white">User Profile & Account</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setProfileModalOpen(false)}
+                className="p-1 rounded-md text-slate-400 hover:text-white hover:bg-slate-800/60"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6 space-y-5 bg-[#11141d]">
+              {/* Profile Avatar section */}
+              <div className="flex items-center gap-4">
+                <div className="relative group">
+                  <div className="w-16 h-16 rounded-full bg-gradient-to-tr from-orange-600 to-amber-500 p-[2px]">
+                    <div className="w-full h-full rounded-full bg-[#121620] flex items-center justify-center text-lg font-bold text-orange-400">
+                      AD
                     </div>
                   </div>
-                  <span className="text-xs font-semibold text-blue-600 shrink-0 ml-2">Choose Folder →</span>
-                </div>
-
-                <div 
-                  onClick={() => {
-                    setIsSyncModalOpen(false);
-                    setNewSyncFolderName('');
-                    setIsNewSyncFolderModalOpen(true);
-                  }}
-                  className="p-4 rounded-xl border border-slate-200 hover:border-emerald-500 bg-slate-50/50 hover:bg-emerald-50/30 transition-all cursor-pointer flex items-center justify-between group"
-                >
-                  <div className="flex items-center gap-3">
-                    <FolderPlus className="w-6 h-6 text-emerald-600 shrink-0" />
-                    <div>
-                      <h4 className="font-semibold text-slate-900 text-sm group-hover:text-emerald-700 transition-colors">Create New Sync Folder</h4>
-                      <p className="text-xs text-slate-500">Name a new folder and sync files from this PC inside it</p>
-                    </div>
+                  <div className="absolute inset-0 bg-black/50 rounded-full opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity cursor-pointer">
+                    <Camera className="w-4 h-4 text-white" />
                   </div>
-                  <span className="text-xs font-semibold text-emerald-600 shrink-0 ml-2">New Folder →</span>
-                </div>
-
-                <div 
-                  onClick={() => {
-                    setIsSyncModalOpen(false);
-                    computerFileInputRef.current?.click();
-                  }}
-                  className="p-4 rounded-xl border border-slate-200 hover:border-indigo-500 bg-slate-50/50 hover:bg-indigo-50/30 transition-all cursor-pointer flex items-center justify-between group"
-                >
-                  <div className="flex items-center gap-3">
-                    <FileText className="w-6 h-6 text-indigo-600 shrink-0" />
-                    <div>
-                      <h4 className="font-semibold text-slate-900 text-sm group-hover:text-indigo-700 transition-colors">Sync Files from this Computer</h4>
-                      <p className="text-xs text-slate-500">Pick individual documents, media, or archives to backup directly</p>
-                    </div>
-                  </div>
-                  <span className="text-xs font-semibold text-indigo-600 shrink-0 ml-2">Choose Files →</span>
-                </div>
-
-                <div className="p-3.5 rounded-xl border border-slate-200/80 bg-slate-50/80 text-xs text-slate-600 flex items-start gap-2.5">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                  <div>
-                    <span className="font-semibold text-slate-800">100% Real Browser Storage: </span>
-                    All synced files are stored persistently in IndexedDB on this device without server upload limits or simulated data.
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex justify-end">
-                <button
-                  onClick={() => setIsSyncModalOpen(false)}
-                  className="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
-                >
-                  Close
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* NEW SYNC FOLDER MODAL */}
-      <AnimatePresence>
-        {isNewSyncFolderModalOpen && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[110] bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4"
-            onClick={() => setIsNewSyncFolderModalOpen(false)}
-          >
-            <motion.div
-              initial={{ scale: 0.95, opacity: 0, y: 10 }}
-              animate={{ scale: 1, opacity: 1, y: 0 }}
-              exit={{ scale: 0.95, opacity: 0, y: 10 }}
-              onClick={(e) => e.stopPropagation()}
-              className="bg-white rounded-3xl shadow-2xl max-w-sm w-full p-6 border border-slate-100 overflow-hidden"
-            >
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-10 h-10 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
-                  <FolderPlus className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="text-base font-bold text-slate-900">New Sync Folder</h3>
-                  <p className="text-xs text-slate-500">Create a folder for PC backup</p>
+                  <h4 className="font-semibold text-base text-white">Alex Driver</h4>
+                  <p className="text-xs text-slate-400">alex.driver@asterdrive.io</p>
+                  <span className="inline-block mt-1 text-[10px] bg-orange-500/20 text-orange-400 border border-orange-500/30 px-2 py-0.5 rounded font-medium">
+                    Pro Plan Account
+                  </span>
                 </div>
               </div>
 
-              <div className="mb-5">
-                <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-2">
-                  Folder Name
-                </label>
-                <input
-                  type="text"
-                  value={newSyncFolderName}
-                  onChange={(e) => setNewSyncFolderName(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') handleCreateNewSyncFolder();
-                    if (e.key === 'Escape') setIsNewSyncFolderModalOpen(false);
-                  }}
-                  autoFocus
-                  className="w-full px-3.5 py-2.5 bg-slate-50 focus:bg-white border border-slate-300 focus:border-indigo-600 rounded-xl text-sm font-medium outline-none transition-all shadow-inner"
-                  placeholder="e.g. Work Documents, Photos"
-                  suppressHydrationWarning
-                />
+              {/* Form fields in dark theme */}
+              <div className="space-y-3 pt-2">
+                <div>
+                  <label className="block text-[11px] font-medium text-slate-400 uppercase tracking-wider mb-1">
+                    Display Name
+                  </label>
+                  <input
+                    type="text"
+                    defaultValue="Alex Driver"
+                    className="w-full px-3 py-2 bg-[#0c0e14] border border-[#1e2433] rounded-lg text-xs text-slate-200 focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500/40"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-medium text-slate-400 uppercase tracking-wider mb-1">
+                    Email Address
+                  </label>
+                  <input
+                    type="email"
+                    disabled
+                    defaultValue="alex.driver@asterdrive.io"
+                    className="w-full px-3 py-2 bg-[#0c0e14]/50 border border-[#1e2433] rounded-lg text-xs text-slate-400 cursor-not-allowed"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-medium text-slate-400 uppercase tracking-wider mb-1">
+                    Storage Quota
+                  </label>
+                  <div className="p-3 bg-[#0c0e14] border border-[#1e2433] rounded-lg space-y-1.5">
+                    <div className="flex justify-between text-xs">
+                      <span className="text-slate-300">28.4 GB Used</span>
+                      <span className="text-slate-400">100 GB Total</span>
+                    </div>
+                    <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                      <div className="h-full bg-gradient-to-r from-orange-500 to-amber-500 w-[28.4%]" />
+                    </div>
+                  </div>
+                </div>
               </div>
+            </div>
 
-              <div className="flex items-center justify-end gap-2.5">
+            {/* Modal Footer */}
+            <div className="px-6 py-3.5 bg-[#151924]/60 border-t border-[#1e2433] flex items-center justify-between">
+              <button
+                type="button"
+                onClick={() => {
+                  setProfileModalOpen(false);
+                  showToast('Logged out');
+                }}
+                className="text-xs text-rose-400 hover:text-rose-300 font-medium"
+              >
+                Sign out
+              </button>
+              <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  onClick={() => setIsNewSyncFolderModalOpen(false)}
-                  className="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
+                  onClick={() => setProfileModalOpen(false)}
+                  className="px-3 py-1.5 text-xs text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 rounded-md transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   type="button"
-                  onClick={handleCreateNewSyncFolder}
-                  className="px-5 py-2 text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl transition-colors shadow-sm cursor-pointer"
+                  onClick={() => {
+                    setProfileModalOpen(false);
+                    showToast('Profile updated');
+                  }}
+                  className="px-3.5 py-1.5 text-xs font-medium bg-orange-500 hover:bg-orange-600 text-white rounded-md shadow-sm transition-colors"
                 >
-                  Create Folder
+                  Save changes
                 </button>
               </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+            </div>
+          </div>
+        </div>
+      )}
 
-      {/* PUBLIC SHARE LINK MODAL */}
-      <AnimatePresence>
-        {shareModalItem && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[120] bg-black/75 backdrop-blur-xs flex items-center justify-center p-4"
-            onClick={() => setShareModalItem(null)}
-          >
-            <motion.div
-              initial={{ scale: 0.95, opacity: 0, y: 15 }}
-              animate={{ scale: 1, opacity: 1, y: 0 }}
-              exit={{ scale: 0.95, opacity: 0, y: 15 }}
-              onClick={(e) => e.stopPropagation()}
-              className="bg-[#141824] rounded-3xl shadow-2xl max-w-md w-full p-6 border border-[#252d3f] overflow-hidden text-white"
-            >
-              <div className="flex items-start justify-between mb-5">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-2xl bg-orange-500/10 border border-orange-500/20 text-orange-400 flex items-center justify-center font-bold shadow-xs">
-                    <Share2 className="w-5 h-5" />
+      {/* MODAL: INVITE COLLABORATOR */}
+      {showInviteModal && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="w-full max-w-sm bg-[#11141d] border border-[#1e2433] rounded-2xl shadow-2xl p-6 text-slate-100">
+            <div className="flex items-center justify-between pb-3 border-b border-[#1e2433]">
+              <h3 className="font-semibold text-sm text-white">Invite Collaborator</h3>
+              <button type="button" onClick={() => setShowInviteModal(false)} className="text-slate-400 hover:text-white">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <form onSubmit={handleAddCollaborator} className="mt-4 space-y-4">
+              <div>
+                <label className="block text-[11px] font-medium text-slate-400 mb-1">Email address</label>
+                <input
+                  type="email"
+                  required
+                  value={newCollabEmail}
+                  onChange={(e) => setNewCollabEmail(e.target.value)}
+                  placeholder="collaborator@example.com"
+                  className="w-full px-3 py-2 bg-[#0c0e14] border border-[#1e2433] rounded-lg text-xs text-slate-200 focus:outline-none focus:border-orange-500"
+                />
+              </div>
+              <div>
+                <label className="block text-[11px] font-medium text-slate-400 mb-1">Permission Role</label>
+                <select
+                  value={newCollabRole}
+                  onChange={(e) => setNewCollabRole(e.target.value as 'Viewer' | 'Editor')}
+                  className="w-full px-3 py-2 bg-[#0c0e14] border border-[#1e2433] rounded-lg text-xs text-slate-200 focus:outline-none focus:border-orange-500"
+                >
+                  <option value="Viewer">Viewer (Can view & download)</option>
+                  <option value="Editor">Editor (Can edit & upload)</option>
+                </select>
+              </div>
+              <div className="pt-2 flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowInviteModal(false)}
+                  className="px-3 py-1.5 text-xs text-slate-300 hover:text-white bg-slate-800 rounded"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-3 py-1.5 text-xs font-medium bg-orange-500 hover:bg-orange-600 text-white rounded"
+                >
+                  Send Invite
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: PREVIEW ITEM (Full Media Player & File Viewer) */}
+      {previewItem && (
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-5 overflow-y-auto">
+          <div className="w-full max-w-4xl bg-[#11141d] border border-[#1e2433] rounded-2xl shadow-2xl flex flex-col overflow-hidden text-slate-100 max-h-[92vh]">
+            {/* Header */}
+            <div className="px-5 py-3.5 bg-[#151924]/80 border-b border-[#1e2433] flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="p-1.5 rounded-lg bg-slate-800/80 shrink-0">
+                  {getItemIcon(previewItem.type)}
+                </div>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="font-semibold text-sm text-white truncate max-w-xs sm:max-w-md">
+                      {previewItem.name}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={(e) => handleToggleStar(previewItem.id, e)}
+                      className="text-slate-400 hover:text-amber-400"
+                      title={previewItem.starred ? 'Starred' : 'Add star'}
+                    >
+                      <Star className={`w-3.5 h-3.5 ${previewItem.starred ? 'text-amber-400 fill-amber-400' : ''}`} />
+                    </button>
                   </div>
-                  <div>
-                    <h3 className="text-lg font-bold text-white">Share Public Link</h3>
-                    <p className="text-xs text-slate-400">Anyone with this link can view &amp; download</p>
+                  <div className="flex items-center gap-2 text-[11px] text-slate-400">
+                    <span className="uppercase text-[10px] font-semibold tracking-wider px-1.5 py-0.5 bg-slate-800 text-orange-400 rounded">
+                      {previewItem.type}
+                    </span>
+                    <span>•</span>
+                    <span>{formatFileSize(previewItem.size)}</span>
+                    <span>•</span>
+                    <span>{new Date(previewItem.updatedAt).toLocaleDateString('id-ID')}</span>
                   </div>
                 </div>
+              </div>
+
+              {/* Header Right Actions */}
+              <div className="flex items-center gap-2 shrink-0">
+                {/* Tabs switcher: Preview vs Details */}
+                <div className="flex items-center bg-[#0c0e14] border border-[#1e2433] rounded-lg p-0.5">
+                  <button
+                    type="button"
+                    onClick={() => setPreviewTab('preview')}
+                    className={`px-2.5 py-1 text-xs rounded-md transition-colors flex items-center gap-1.5 ${
+                      previewTab === 'preview' ? 'bg-orange-500 text-white font-medium' : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    <Eye className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">Preview</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPreviewTab('details')}
+                    className={`px-2.5 py-1 text-xs rounded-md transition-colors flex items-center gap-1.5 ${
+                      previewTab === 'details' ? 'bg-orange-500 text-white font-medium' : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    <Info className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">Details</span>
+                  </button>
+                </div>
+
                 <button
-                  onClick={() => setShareModalItem(null)}
-                  className="p-1.5 rounded-full text-slate-400 hover:text-white hover:bg-[#1b2131] transition-colors cursor-pointer"
-                  aria-label="Close share dialog"
+                  type="button"
+                  onClick={() => handleDownloadItem(previewItem)}
+                  className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white rounded-lg border border-slate-700 transition-colors"
+                  title="Download File"
+                >
+                  <Download className="w-3.5 h-3.5 text-orange-400" />
+                  <span>Download</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleClosePreview}
+                  className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/80 transition-colors"
+                  aria-label="Close Preview"
                 >
                   <X className="w-5 h-5" />
                 </button>
               </div>
+            </div>
 
-              {/* Shared Item Card */}
-              <div className="p-3.5 bg-[#0f131d] border border-[#22293a] rounded-2xl flex items-center gap-3 mb-5">
-                <div className="w-10 h-10 rounded-xl bg-[#1a202d] flex items-center justify-center shrink-0 border border-[#2d374d] shadow-2xs">
-                  {getIconForType(shareModalItem.type, "w-6 h-6")}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <h4 className="text-sm font-semibold text-white truncate" title={shareModalItem.name}>
-                    {shareModalItem.name}
-                  </h4>
-                  <p className="text-[11px] text-slate-400 font-mono">
-                    {formatBytes(shareModalItem.size)} • {formatDateSafe(shareModalItem.updatedAt)}
-                  </p>
-                </div>
-              </div>
-
-              {/* Public Link Box */}
-              <div className="mb-5">
-                <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
-                  Public Share Link (Cloud Run)
-                </label>
-                <div className="flex items-center gap-2">
-                  <div className="flex-1 bg-[#0f131d] border border-[#22293a] rounded-xl px-3 py-2 text-xs font-mono text-orange-300 truncate select-all">
-                    {getPublicShareUrl(shareModalItem)}
+            {/* Modal Body */}
+            <div className="p-4 sm:p-6 overflow-y-auto flex-1">
+              {previewTab === 'details' ? (
+                /* Metadata Details View */
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between pb-3 border-b border-[#1e2433]">
+                    <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-300">File Properties</h4>
+                    <span className="text-[10px] bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded font-medium">
+                      Encrypted AES-256
+                    </span>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const url = getPublicShareUrl(shareModalItem);
-                      if (navigator.clipboard) {
-                        navigator.clipboard.writeText(url);
-                      }
-                      setCopiedShareLink(true);
-                      showToast({
-                        type: 'success',
-                        title: 'Public Link Copied!',
-                        message: 'Cloud Run public link copied to clipboard.'
-                      });
-                      setTimeout(() => setCopiedShareLink(false), 3000);
-                    }}
-                    className={cn(
-                      "px-4 py-2 rounded-xl text-xs font-semibold transition-all shrink-0 cursor-pointer flex items-center gap-1.5 shadow-xs",
-                      copiedShareLink 
-                        ? "bg-emerald-600 text-white" 
-                        : "bg-orange-600 hover:bg-orange-500 text-white shadow-orange-600/20"
-                    )}
-                  >
-                    {copiedShareLink ? (
-                      <>
-                        <Check className="w-3.5 h-3.5" />
-                        <span>Copied!</span>
-                      </>
-                    ) : (
-                      <>
-                        <Copy className="w-3.5 h-3.5" />
-                        <span>Copy Link</span>
-                      </>
-                    )}
-                  </button>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                    <div className="p-3 bg-[#0c0e14] border border-[#1e2433] rounded-xl space-y-1">
+                      <span className="text-[11px] text-slate-400 font-medium">File Name</span>
+                      <p className="text-slate-200 font-semibold break-all">{previewItem.name}</p>
+                    </div>
+                    <div className="p-3 bg-[#0c0e14] border border-[#1e2433] rounded-xl space-y-1">
+                      <span className="text-[11px] text-slate-400 font-medium">Content Type</span>
+                      <p className="text-slate-200 capitalize font-medium">{previewItem.type} file</p>
+                    </div>
+                    <div className="p-3 bg-[#0c0e14] border border-[#1e2433] rounded-xl space-y-1">
+                      <span className="text-[11px] text-slate-400 font-medium">Exact Size</span>
+                      <p className="text-slate-200 font-medium">{previewItem.size ? `${previewItem.size.toLocaleString()} bytes (${formatFileSize(previewItem.size)})` : 'Folder / Dynamic'}</p>
+                    </div>
+                    <div className="p-3 bg-[#0c0e14] border border-[#1e2433] rounded-xl space-y-1">
+                      <span className="text-[11px] text-slate-400 font-medium">Owner</span>
+                      <p className="text-slate-200 font-medium">{previewItem.owner}</p>
+                    </div>
+                    <div className="p-3 bg-[#0c0e14] border border-[#1e2433] rounded-xl space-y-1">
+                      <span className="text-[11px] text-slate-400 font-medium">Last Modified</span>
+                      <p className="text-slate-200 font-medium">{new Date(previewItem.updatedAt).toLocaleString('id-ID')}</p>
+                    </div>
+                    <div className="p-3 bg-[#0c0e14] border border-[#1e2433] rounded-xl space-y-1">
+                      <span className="text-[11px] text-slate-400 font-medium">Storage Location</span>
+                      <p className="text-slate-200 font-medium">{previewItem.source === 'computer' ? `Synced from ${previewItem.computerDevice || 'Local PC'}` : 'AsterDrive Cloud Vault'}</p>
+                    </div>
+                  </div>
                 </div>
-              </div>
+              ) : (
+                /* Interactive Preview View */
+                <div>
+                  {/* VIDEO PLAYER */}
+                  {previewItem.type === 'video' && (
+                    <div className="space-y-3">
+                      <div className="relative bg-black rounded-xl overflow-hidden border border-[#1e2433] flex flex-col items-center justify-center min-h-[320px] max-h-[60vh] shadow-2xl">
+                        {isLoadingMedia ? (
+                          <div className="flex flex-col items-center gap-3 text-slate-400 py-16">
+                            <div className="w-8 h-8 border-2 border-orange-500 border-t-transparent rounded-full animate-spin" />
+                            <span className="text-xs">Memuat streaming video AsterDrive...</span>
+                          </div>
+                        ) : activeMediaUrl ? (
+                          <video
+                            ref={videoRef}
+                            key={activeMediaUrl}
+                            src={activeMediaUrl}
+                            controls
+                            autoPlay
+                            playsInline
+                            className="w-full max-h-[56vh] object-contain bg-black outline-none"
+                          >
+                            Browser Anda tidak mendukung tag video HTML5.
+                          </video>
+                        ) : (
+                          <div className="text-center py-12">
+                            <AlertCircle className="w-10 h-10 text-amber-500 mx-auto mb-2" />
+                            <p className="text-sm font-medium text-slate-300">Sumber video tidak tersedia</p>
+                          </div>
+                        )}
+                      </div>
 
-              {/* Quick Share Apps */}
-              <div className="mb-6 pt-4 border-t border-[#1e2433]">
-                <span className="block text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-2.5">
-                  Share Directly
-                </span>
-                <div className="grid grid-cols-3 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const url = getPublicShareUrl(shareModalItem);
-                      const text = encodeURIComponent(`Lihat dan unduh file "${shareModalItem.name}" di AsterDrive:\n${url}`);
-                      window.open(`https://api.whatsapp.com/send?text=${text}`, '_blank');
-                    }}
-                    className="p-2 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
-                  >
-                    <span>WhatsApp</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const url = getPublicShareUrl(shareModalItem);
-                      const text = encodeURIComponent(`AsterDrive Shared File: ${shareModalItem.name}`);
-                      window.open(`https://t.me/share/url?url=${encodeURIComponent(url)}&text=${text}`, '_blank');
-                    }}
-                    className="p-2 bg-sky-500/10 hover:bg-sky-500/20 text-sky-400 border border-sky-500/30 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
-                  >
-                    <span>Telegram</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const url = getPublicShareUrl(shareModalItem);
-                      const subject = encodeURIComponent(`Shared File: ${shareModalItem.name}`);
-                      const body = encodeURIComponent(`Hello,\n\nI shared "${shareModalItem.name}" with you via AsterDrive.\n\nYou can access and download it here:\n${url}\n\nAsterDrive Cloud Storage`);
-                      window.location.href = `mailto:?subject=${subject}&body=${body}`;
-                    }}
-                    className="p-2 bg-[#1b2131] hover:bg-[#222a3d] text-slate-200 border border-[#2d374d] rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
-                  >
-                    <span>Email</span>
-                  </button>
+                      {/* Video Bar Controls */}
+                      <div className="flex flex-wrap items-center justify-between gap-2 bg-[#0c0e14] p-3 rounded-xl border border-[#1e2433] text-xs">
+                        <div className="flex items-center gap-2">
+                          <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                          <span className="text-slate-300 font-medium">Direct Video Streaming</span>
+                          <span className="text-slate-600 hidden sm:inline">•</span>
+                          <span className="text-slate-400 hidden sm:inline">1080p Full HD • AAC Audio</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[11px] text-slate-400 mr-1 hidden sm:inline">Kecepatan:</span>
+                          {[0.75, 1, 1.25, 1.5, 2].map((speed) => (
+                            <button
+                              key={speed}
+                              type="button"
+                              onClick={() => {
+                                if (videoRef.current) {
+                                  videoRef.current.playbackRate = speed;
+                                  showToast(`Kecepatan: ${speed}x`);
+                                }
+                              }}
+                              className="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-[11px] transition-colors"
+                            >
+                              {speed}x
+                            </button>
+                          ))}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (videoRef.current) {
+                                if (videoRef.current.requestFullscreen) {
+                                  videoRef.current.requestFullscreen();
+                                }
+                              }
+                            }}
+                            className="ml-2 px-2.5 py-1 rounded bg-orange-500/20 text-orange-400 hover:bg-orange-500/30 flex items-center gap-1 text-[11px] font-medium transition-colors"
+                            title="Layar Penuh"
+                          >
+                            <Maximize2 className="w-3.5 h-3.5" />
+                            <span>Layar Penuh</span>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* IMAGE / PHOTO VIEWER */}
+                  {previewItem.type === 'image' && (
+                    <div className="space-y-3">
+                      {/* Image toolbar */}
+                      <div className="flex items-center justify-between bg-[#0c0e14] px-4 py-2 rounded-xl border border-[#1e2433] text-xs">
+                        <span className="text-slate-400 text-[11px]">
+                          Zoom: <span className="text-white font-medium">{Math.round(imageZoom * 100)}%</span> • Rotasi: <span className="text-white font-medium">{imageRotation}°</span>
+                        </span>
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => setImageZoom((z) => Math.max(0.5, +(z - 0.25).toFixed(2)))}
+                            title="Perkecil (-)"
+                            className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors"
+                          >
+                            <ZoomOut className="w-4 h-4" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setImageZoom((z) => Math.min(3, +(z + 0.25).toFixed(2)))}
+                            title="Perbesar (+)"
+                            className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors"
+                          >
+                            <ZoomIn className="w-4 h-4" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setImageRotation((r) => (r + 90) % 360)}
+                            title="Putar 90°"
+                            className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors"
+                          >
+                            <RotateCw className="w-4 h-4" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setImageZoom(1);
+                              setImageRotation(0);
+                            }}
+                            title="Reset"
+                            className="px-2 py-1 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg text-[11px] transition-colors"
+                          >
+                            Reset
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Image Viewer Container */}
+                      <div className="relative bg-[#07090e] rounded-xl border border-[#1e2433] p-4 flex items-center justify-center min-h-[320px] max-h-[60vh] overflow-hidden shadow-2xl">
+                        {isLoadingMedia ? (
+                          <div className="flex flex-col items-center gap-3 text-slate-400 py-16">
+                            <div className="w-8 h-8 border-2 border-orange-500 border-t-transparent rounded-full animate-spin" />
+                            <span className="text-xs">Memuat foto...</span>
+                          </div>
+                        ) : activeMediaUrl || previewItem.previewUrl ? (
+                          <div className="w-full h-full flex items-center justify-center overflow-auto">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={activeMediaUrl || previewItem.previewUrl}
+                              alt={previewItem.name}
+                              className="max-h-[54vh] max-w-full object-contain rounded-lg shadow-2xl transition-transform duration-200"
+                              style={{
+                                transform: `scale(${imageZoom}) rotate(${imageRotation}deg)`
+                              }}
+                            />
+                          </div>
+                        ) : (
+                          <div className="text-center py-12">
+                            <ImageIcon className="w-10 h-10 text-slate-600 mx-auto mb-2" />
+                            <p className="text-sm font-medium text-slate-300">Foto tidak dapat dimuat</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* DOCUMENT (PDF / DOC) READER */}
+                  {previewItem.type === 'document' && (
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between bg-[#0c0e14] px-4 py-2 rounded-xl border border-[#1e2433] text-xs">
+                        <div className="flex items-center gap-2 text-slate-300">
+                          <FileText className="w-4 h-4 text-orange-400" />
+                          <span className="font-medium">AsterDrive PDF Document Reader</span>
+                        </div>
+                        <span className="text-slate-400 text-[11px]">Halaman 1 dari 4 • Mode Baca</span>
+                      </div>
+
+                      <div className="bg-[#151924] border border-[#23293a] rounded-xl p-6 sm:p-8 space-y-5 text-slate-200 shadow-xl max-h-[56vh] overflow-y-auto">
+                        <div className="border-b border-[#23293a] pb-4">
+                          <div className="text-[11px] font-semibold text-orange-400 uppercase tracking-widest">
+                            Whitepaper Teknis
+                          </div>
+                          <h2 className="text-xl font-bold text-white mt-1">
+                            AsterDrive: Arsitektur Cloud Storage Terdesentralisasi & Enkripsi Zero-Knowledge
+                          </h2>
+                          <p className="text-xs text-slate-400 mt-1">
+                            Disusun oleh Tim Arsitektur AsterDrive • Tanggal rilis: Oktober 2026
+                          </p>
+                        </div>
+
+                        <div className="space-y-3 text-xs leading-relaxed text-slate-300">
+                          <h3 className="text-sm font-semibold text-white">1. Ringkasan Eksekutif</h3>
+                          <p>
+                            AsterDrive menyediakan penyimpanan awan dengan standar keamanan militer AES-256-GCM. Berkas Anda dipecah menjadi blok terenkripsi sebelum meninggalkan perangkat, memastikan bahwa tidak ada pihak ketiga yang dapat membaca data Anda.
+                          </p>
+
+                          <h3 className="text-sm font-semibold text-white mt-4">2. Mesin Streaming Media Definisi Tinggi</h3>
+                          <p>
+                            Fitur pemutaran video langsung (Direct Playback) memanfaatkan pipeline HTTP Live Streaming (HLS) dan kontainer MP4 terindeks byte-range, memungkinkan pengguna memutar video 1080p/4K tanpa perlu mengunduh keseluruhan berkas terlebih dahulu.
+                          </p>
+
+                          <h3 className="text-sm font-semibold text-white mt-4">3. Sinkronisasi Antar Perangkat</h3>
+                          <p>
+                            Koneksi peer-to-peer terenkripsi memastikan sinkronisasi instan antara komputer desktop (macOS / Windows / Linux) dan cloud vault dengan verifikasi integritas checksum SHA-256.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* SPREADSHEET VIEWER */}
+                  {previewItem.type === 'spreadsheet' && (
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between bg-[#0c0e14] px-4 py-2 rounded-xl border border-[#1e2433] text-xs">
+                        <div className="flex items-center gap-2 text-slate-300">
+                          <FileSpreadsheet className="w-4 h-4 text-emerald-400" />
+                          <span className="font-medium">Data Spreadsheet: Alokasi Anggaran Q4</span>
+                        </div>
+                        <span className="text-[11px] bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded font-mono">
+                          5 Baris Terindeks
+                        </span>
+                      </div>
+
+                      <div className="bg-[#0c0e14] border border-[#1e2433] rounded-xl overflow-hidden shadow-xl">
+                        <table className="w-full text-left text-xs text-slate-300">
+                          <thead className="bg-[#151924] text-slate-400 text-[11px] uppercase tracking-wider border-b border-[#1e2433]">
+                            <tr>
+                              <th className="px-4 py-2.5 font-medium">Pos Anggaran</th>
+                              <th className="px-4 py-2.5 font-medium">Kapasitas</th>
+                              <th className="px-4 py-2.5 font-medium">Estimasi (USD)</th>
+                              <th className="px-4 py-2.5 font-medium">Status</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-[#1e2433]">
+                            <tr>
+                              <td className="px-4 py-2.5 font-medium text-white">Edge Storage Nodes (Multi-Region S3)</td>
+                              <td className="px-4 py-2.5 text-slate-400">100 TB</td>
+                              <td className="px-4 py-2.5 font-mono text-emerald-400">$1,450.00</td>
+                              <td className="px-4 py-2.5"><span className="text-[10px] bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded">Disetujui</span></td>
+                            </tr>
+                            <tr>
+                              <td className="px-4 py-2.5 font-medium text-white">Video Transcoding GPU Fleet</td>
+                              <td className="px-4 py-2.5 text-slate-400">8x A100 Nodes</td>
+                              <td className="px-4 py-2.5 font-mono text-emerald-400">$3,200.00</td>
+                              <td className="px-4 py-2.5"><span className="text-[10px] bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded">Aktif</span></td>
+                            </tr>
+                            <tr>
+                              <td className="px-4 py-2.5 font-medium text-white">Global CDN Bandwidth Band</td>
+                              <td className="px-4 py-2.5 text-slate-400">50 TB Egress</td>
+                              <td className="px-4 py-2.5 font-mono text-emerald-400">$850.00</td>
+                              <td className="px-4 py-2.5"><span className="text-[10px] bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded">Aktif</span></td>
+                            </tr>
+                            <tr>
+                              <td className="px-4 py-2.5 font-medium text-white">KMS Hardware Security Modules (HSM)</td>
+                              <td className="px-4 py-2.5 text-slate-400">Dedicated</td>
+                              <td className="px-4 py-2.5 font-mono text-emerald-400">$420.00</td>
+                              <td className="px-4 py-2.5"><span className="text-[10px] bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded">Tervalidasi</span></td>
+                            </tr>
+                          </tbody>
+                          <tfoot className="bg-[#151924]/60 font-semibold text-white border-t border-[#1e2433]">
+                            <tr>
+                              <td className="px-4 py-2.5" colSpan={2}>Total Anggaran</td>
+                              <td className="px-4 py-2.5 font-mono text-orange-400" colSpan={2}>$5,920.00 USD</td>
+                            </tr>
+                          </tfoot>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* ARCHIVE (ZIP) VIEWER */}
+                  {previewItem.type === 'archive' && (
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between bg-[#0c0e14] px-4 py-2 rounded-xl border border-[#1e2433] text-xs">
+                        <div className="flex items-center gap-2 text-slate-300">
+                          <FileArchive className="w-4 h-4 text-purple-400" />
+                          <span className="font-medium">Struktur Arsip Cadangan (ZIP)</span>
+                        </div>
+                        <span className="text-[11px] bg-purple-500/20 text-purple-400 px-2 py-0.5 rounded font-mono">
+                          Kompresi 62%
+                        </span>
+                      </div>
+
+                      <div className="bg-[#0c0e14] border border-[#1e2433] rounded-xl p-4 divide-y divide-[#1e2433] text-xs">
+                        {[
+                          { name: 'src/storage/engine.ts', size: '24.5 KB', type: 'TypeScript' },
+                          { name: 'src/video/h264_streamer.ts', size: '18.2 KB', type: 'TypeScript' },
+                          { name: 'public/brand/logo.svg', size: '4.8 KB', type: 'Vector SVG' },
+                          { name: 'database/asterdrive_dump.sql', size: '15.1 MB', type: 'SQL Backup' },
+                          { name: 'package.json', size: '1.2 KB', type: 'Config' }
+                        ].map((f, i) => (
+                          <div key={i} className="py-2.5 flex items-center justify-between first:pt-0 last:pb-0">
+                            <div className="flex items-center gap-2 text-slate-300">
+                              <FileText className="w-3.5 h-3.5 text-purple-400" />
+                              <span className="font-mono text-[11px]">{f.name}</span>
+                            </div>
+                            <div className="flex items-center gap-3 text-slate-500 text-[11px]">
+                              <span>{f.type}</span>
+                              <span className="font-mono text-slate-300">{f.size}</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
-              </div>
+              )}
+            </div>
 
-              {/* Footer status */}
-              <div className="flex items-center justify-between text-xs text-slate-400">
-                <span className="inline-flex items-center gap-1 text-emerald-400 font-medium">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-                  Public Cloud Access Active
-                </span>
+            {/* Footer */}
+            <div className="px-5 py-3.5 bg-[#151924]/80 border-t border-[#1e2433] flex items-center justify-between gap-3 text-xs">
+              <div className="text-slate-400 text-[11px] hidden sm:block">
+                <span>Ukuran: <strong className="text-slate-200">{formatFileSize(previewItem.size)}</strong></span>
+                <span className="mx-2">•</span>
+                <span>Pemilik: <strong className="text-slate-200">{previewItem.owner}</strong></span>
+              </div>
+              <div className="flex items-center gap-2 ml-auto">
                 <button
                   type="button"
-                  onClick={() => setShareModalItem(null)}
-                  className="font-semibold text-orange-400 hover:text-orange-300 cursor-pointer"
+                  onClick={() => {
+                    const toShare = previewItem;
+                    setPreviewItem(null);
+                    setShareItem(toShare);
+                  }}
+                  className="px-3 py-1.5 text-xs text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 rounded-md transition-colors flex items-center gap-1.5"
                 >
-                  Done
+                  <Share2 className="w-3.5 h-3.5" />
+                  <span>Bagi Tautan</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleDownloadItem(previewItem)}
+                  className="px-3.5 py-1.5 text-xs font-medium bg-orange-500 hover:bg-orange-600 text-white rounded-md shadow-sm transition-colors flex items-center gap-1.5"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>Unduh Berkas</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleClosePreview}
+                  className="px-3 py-1.5 text-xs text-slate-400 hover:text-white transition-colors"
+                >
+                  Tutup
                 </button>
               </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+            </div>
+          </div>
+        </div>
+      )}
 
-      {/* TOAST NOTIFICATION CONTAINER */}
-      <div className="fixed bottom-5 right-5 z-[100] flex flex-col gap-2 max-w-sm pointer-events-none">
-        <AnimatePresence>
-          {toasts.map((toast) => (
-            <motion.div
-              key={toast.id}
-              initial={{ opacity: 0, y: 20, scale: 0.95 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 10, scale: 0.95 }}
-              className={cn(
-                "pointer-events-auto p-4 rounded-2xl shadow-2xl border flex items-start gap-3 bg-[#141824] text-white",
-                toast.type === 'warning' ? "border-amber-500/40 text-amber-200" :
-                toast.type === 'success' ? "border-emerald-500/40 text-emerald-200" :
-                toast.type === 'error' ? "border-rose-500/40 text-rose-200" :
-                "border-orange-500/30 text-slate-200"
-              )}
-            >
-              <div className="shrink-0 mt-0.5">
-                {toast.type === 'warning' && <AlertTriangle className="w-5 h-5 text-amber-400" />}
-                {toast.type === 'success' && <Check className="w-5 h-5 text-emerald-400" />}
-                {toast.type === 'error' && <AlertCircle className="w-5 h-5 text-rose-400" />}
-                {toast.type === 'info' && <Info className="w-5 h-5 text-orange-400" />}
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-white">{toast.title}</p>
-                <p className="text-xs text-slate-400 mt-0.5 leading-relaxed">{toast.message}</p>
-              </div>
-              <button 
-                onClick={() => setToasts(prev => prev.filter(t => t.id !== toast.id))}
-                className="text-slate-400 hover:text-white p-0.5 rounded transition-colors"
-                aria-label="Dismiss toast"
-              >
+      {/* MODAL: SHARE ITEM */}
+      {shareItem && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="w-full max-w-sm bg-[#11141d] border border-[#1e2433] rounded-2xl shadow-2xl p-6 text-slate-100">
+            <div className="flex items-center justify-between pb-3 border-b border-[#1e2433]">
+              <h3 className="font-semibold text-sm text-white">Share &quot;{shareItem.name}&quot;</h3>
+              <button type="button" onClick={() => setShareItem(null)} className="text-slate-400 hover:text-white">
                 <X className="w-4 h-4" />
               </button>
-            </motion.div>
-          ))}
-        </AnimatePresence>
-      </div>
+            </div>
+            <div className="py-4 space-y-3">
+              <p className="text-xs text-slate-400">Anyone with this link can view this file:</p>
+              <div className="flex items-center gap-2 p-2 bg-[#0c0e14] border border-[#1e2433] rounded-lg">
+                <input
+                  type="text"
+                  readOnly
+                  value={`https://asterdrive.io/share/${shareItem.id}`}
+                  className="flex-1 bg-transparent text-xs text-slate-300 focus:outline-none"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigator.clipboard.writeText(`https://asterdrive.io/share/${shareItem.id}`);
+                    showToast('Link copied to clipboard!');
+                    setShareItem(null);
+                  }}
+                  className="p-1 text-orange-400 hover:text-orange-300"
+                >
+                  <Copy className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Floating toast message */}
+      {toastMessage && (
+        <div className="fixed bottom-4 right-4 z-50 bg-[#121620] border border-[#1e2433] text-slate-100 text-xs px-3.5 py-2.5 rounded-xl shadow-2xl flex items-center gap-2.5">
+          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+          <span>{toastMessage}</span>
+        </div>
+      )}
     </div>
   );
 }
