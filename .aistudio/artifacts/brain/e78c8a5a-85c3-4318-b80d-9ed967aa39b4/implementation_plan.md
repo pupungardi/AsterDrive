@@ -1,89 +1,105 @@
-# Rencana Implementasi: Perubahan Desain Dark Theme & Aksen Oranye AsterDrive
+# Rencana Implementasi: Desain Halaman People, Trash, Security & Feedback ForgeDrive
 
-Berdasarkan screenshot referensi yang Anda berikan dan jawaban klarifikasi, kami akan memperbarui desain AsterDrive menjadi tema gelap premium (*dark mode*) dengan aksen oranye cerah (*warm orange* `#f97316` / `#ea580c`), menata ulang menu sidebar dengan bagian **WORKSPACE**, serta membuat halaman khusus untuk **Storage** dan **Activity**.
-
----
-
-## 1. Skema Warna & Tema Global (*Dark Obsidian + Orange Accent*)
-- **Background Utama**: Warna gelap elegan (`bg-[#0c0e14]` / `#11141c`) untuk nuansa modern, bersih, dan kontras tinggi.
-- **Card & Surface**: Panel gelap bertingkat (`bg-[#161a23]`, `bg-[#1c2230]`, border `#2a3245`).
-- **Aksen Oranye**:
-  - Tombol aksi utama (*Call to Action*): `bg-orange-600 hover:bg-orange-500 text-white font-medium shadow-md shadow-orange-600/20`.
-  - Status aktif menu navigasi: latar gelap dengan border oranye dan teks oranye cerah (`bg-orange-950/30 border-orange-500/30 text-orange-400`).
-  - Badge kategori: teks oranye dengan badge minimalis seperti pada screenshot referensi.
-  - Ikon dan highlight pilihan file/folder: aksen oranye dan ring fokus.
+Pembaruan antarmuka ini menyelaraskan empat halaman di bagian **WORKSPACE** (`People`, `Trash`, `Security`, dan `Feedback`) secara presisi dengan 4 tangkapan layar referensi baru yang Anda berikan, mengadopsi nama brand **ForgeDrive**, serta menyematkan interaktivitas penuh untuk manajemen kolaborator dan pemulihan berkas di tempat sampah.
 
 ---
 
-## 2. Struktur Navigasi Sidebar Baru
-Sesuai preferensi Anda untuk menggabungkan menu screenshot dan fitur Sync Computers:
-- **Header**: Logo AsterDrive dengan ikon awan/drive bernuansa oranye gelap.
-- **Menu Utama**:
-  - `My Drive` (Ikon Hard Drive / Home, aktif secara default)
-  - `Computers` (Ikon Laptop/PC untuk fitur Sync & Backup folder lokal)
-  - `Shared with me` (Ikon Users)
-  - `Recent` (Ikon Clock)
-  - `Starred` (Ikon Star)
-- **Bagian WORKSPACE** (sesuai Screenshot 1):
-  - `Storage` (Membuka tampilan ringkasan kapasitas & paket penyimpanan)
-  - `Activity` (Membuka riwayat aktivitas berkas dan sinkronisasi)
-  - `People` (Manajemen kolaborator & akses bersama)
-  - `Trash` (Tempat sampah berkas terhapus)
-  - `Security` (Keamanan akun & enkripsi)
-  - `Feedback` (Kritik & saran pengguna)
-- **Footer Sidebar**:
-  - Tautan reguler: `About us`, `Help center`, `Privacy`, `Terms`.
-  - Mini widget kuota penyimpanan oranye.
+## Ringkasan Keputusan Pengguna
+
+> [!IMPORTANT]
+> - **Nama Brand**: Menggunakan **ForgeDrive** di seluruh judul aplikasi, header, kartu feedback, dan metadata.
+> - **Interaktivitas Halaman People**: Interaktivitas penuh dengan kemampuan mengundang kolaborator melalui input email, memilih role akses (Viewer/Editor), dan daftar orang yang dibagikan berkas.
+> - **Interaktivitas Halaman Trash**: Tampilan kosong presisi sesuai screenshot, ditambah daftar berkas terhapus dengan tombol aksi **Restore** (pulihkan ke Drive) dan **Delete Forever** (hapus permanen dari IndexedDB).
 
 ---
 
-## 3. Tampilan Halaman Khusus
+## 1. Konsep & Arsitektur Visual
 
-### A. Halaman Storage (Sesuai Screenshot 2)
-- Label kategori oranye kecil: **Storage**.
-- Judul besar: **Storage** dengan subjudul *"Everything you're working on, in one place."*
-- Card utama **Storage overview**:
-  - Ikon drive/vault dengan lingkaran aksen oranye.
-  - Teks kapasitas total terpakai (contoh: `0 GB` atau ukuran dinamis file riil yang tersimpan).
-  - Keterangan status file tersimpan.
-- Sub-cards:
-  - **Used**: Menampilkan ukuran total file aktif pengguna secara akurat (format byte/MB/GB).
-  - **Free space**: Menampilkan sisa kuota penyimpanan dari paket aktif (misal 1 GB Free atau 2 TB Pro).
-- Tombol aksi utama oranye: **Buy storage** (langsung membuka modal pemilihan paket penyimpanan).
-- Grafik rincian alokasi tipe file (Video, Gambar, Dokumen, Arsip).
+Aplikasi mengusung estetika **Dark Obsidian + Warm Orange** (`#f97316`) dengan hierarki tipografi bersih sesuai panduan *SaaS & Dashboard Guidelines*:
+- **Background Utama**: `#0c0e14` dengan kartu permukaan `#11141d` dan garis batas subtil `#1e2433`.
+- **Label Kategori**: Teks oranye kapital tanpa pill enclosure (`text-orange-500 text-xs font-semibold uppercase tracking-wider`).
+- **Judul Halaman**: Teks besar `text-3xl font-bold text-white tracking-tight` dengan subjudul jelas abu-abu terang.
+- **Brand ForgeDrive**: Logo palu & awan (*forge & cloud*) dengan nama `ForgeDrive` di sidebar dan bar judul.
 
-### B. Halaman Activity (Sesuai Screenshot 3)
-- Label kategori oranye: **Activity**.
-- Judul besar: **Activity** dengan subjudul *"Everything you're working on, in one place."*
-- Card utama **Recent activity**:
-  - Ikon jam melingkar dalam lingkaran oranye.
-  - Jumlah total aktivitas (badge counter).
-  - Kontainer dashed elegan: *"Uploads and changes will appear here."*
-  - Riwayat kronologis aktivitas nyata: riwayat unggah file, sinkronisasi folder dari PC, pembuatan link publik, dan penghapusan file.
-
-### C. Halaman My Drive & Computers
-- Tampilan kartu file & folder dengan tema gelap modern.
-- Toolbar pencarian, tombol unggah, tampilan Grid/List, serta navigasi folder (breadcrumbs) bernuansa gelap dan tajam.
-- Dukungan drag-and-drop dan fitur penyimpanan lokal riil IndexedDB tetap dipertahankan 100%.
-
----
-
-## 4. Penyesuaian Modal & Dialog Interaktif
-- **Modal Share Link Publik**: Latar gelap dengan badge link publik Cloud Run dan tombol salin oranye.
-- **Modal Sync Folder**: Pemilihan direktori browser dan daftar folder PC dengan gaya dark mode.
-- **Modal Video Player**: Pemutar video gelap dengan kontrol playback speed dan opsi download.
-- **Modal Upgrade Storage**: Pilihan paket Free, 50 GB, 200 GB, hingga 2 TB dengan kartu yang rapi dan tombol oranye.
+```
+┌────────────────────────────────────────────────────────────────────────┐
+│                              ForgeDrive                                │
+├───────────────┬────────────────────────────────────────────────────────┤
+│ SIDEBAR       │ WORKSPACE VIEWPORT                                     │
+│               │                                                        │
+│ • My Drive    │ [Category Tag: People / Trash / Security / Feedback]   │
+│ • Computers   │ [Page Title & Subtitle]                                │
+│ • Shared      │ ┌────────────────────────────────────────────────────┐ │
+│ • Recent      │ │ Primary Dark Card (#11141d, border #1e2433)        │ │
+│ • Starred     │ │ • Status Header (Icon Badge + Metrics)             │ │
+│ ───────────── │ │ • Grid Sub-cards / Dashed Drop Area / Interactive  │ │
+│ WORKSPACE     │ │ • Action Triggers (Invite, Restore, Send Feedback) │ │
+│ • Storage     │ └────────────────────────────────────────────────────┘ │
+│ • Activity    │                                                        │
+│ • People      │                                                        │
+│ • Trash       │                                                        │
+│ • Security    │                                                        │
+│ • Feedback    │                                                        │
+└───────────────┴────────────────────────────────────────────────────────┘
+```
 
 ---
 
-## 5. Rencana Pengujian & Verifikasi
-1. **Verifikasi Tampilan**:
-   - Sidebar navigasi menampilkan menu utama, bagian `WORKSPACE`, dan tautan footer.
-   - Halaman `Storage` menampilkan layout persis seperti Screenshot 2.
-   - Halaman `Activity` menampilkan layout persis seperti Screenshot 3.
-2. **Verifikasi Fungsionalitas**:
-   - Upload file dan folder tetap berfungsi dengan penyimpanan riil IndexedDB.
-   - Fitur Sync Computers tetap dapat menambahkan dan memfilter folder komputer.
-   - Pembuatan tautan publik Cloud Run tetap berjalan lancar.
-3. **Kompilasi & Linting**:
-   - Menjalankan `compile_applet` dan `lint_applet` untuk memastikan kode bebas dari error TypeScript atau styling.
+## 2. Rincian Desain 4 Halaman Baru
+
+### A. Halaman People (Sesuai Screenshot 1)
+- **Header**: Tag oranye `People`, judul `People`, subjudul *"Manage collaborators and file access."*
+- **Card Utama**:
+  - Ikon oranye `Users` dalam kontainer rounded `#161b26` dengan border oranye.
+  - Sub-label `People & access` dengan counter dinamis: `0 people` (atau jumlah kolaborator nyata) dan status `No collaborators yet`.
+  - Area dashed presisi: *"People you share files with will appear here."*
+- **Fitur Interaktif Penuh**:
+  - Tombol aksi *"Invite collaborator"* yang memunculkan input penambahan email pengguna dan role (Viewer / Editor).
+  - Daftar kartu kolaborator yang dapat dicabut (*revoke*) atau diubah hak aksesnya, tersimpan di state persisten.
+
+### B. Halaman Trash (Sesuai Screenshot 2)
+- **Header**: Tag oranye `Trash`, judul `Trash`, subjudul *"Everything you're working on, in one place."*
+- **Empty State (Presisi Sesuai Screenshot)**:
+  - Kartu gelap terpusat dengan ikon tempat sampah `#1e2433`.
+  - Judul `Trash is empty`.
+  - Deskripsi: *"Deleted files will stay here temporarily so you can restore them before permanent removal."*
+- **Populated State (Interaktivitas Penuh)**:
+  - Ketika ada berkas yang dihapus ke sampah, menampilkan tabel/kartu berkas terhapus dengan tanggal dihapus dan ukuran file.
+  - Tombol aksi per berkas: **Restore** (mengembalikan berkas ke folder asalnya di Drive) dan **Delete Forever** (menghapus blob IndexedDB secara permanen).
+  - Tombol **Empty Trash** di pojok kanan atas untuk membersihkan seluruh isi tempat sampah sekaligus.
+
+### C. Halaman Security (Sesuai Screenshot 3)
+- **Header**: Tag oranye `Security`, judul `Security`, subjudul *"Review workspace access and protection."*
+- **Card Utama**:
+  - Ikon perisai oranye `ShieldCheck` dengan label `Workspace health`.
+  - Status besar `Ready` dengan subteks `Your workspace is ready`.
+- **3 Kartu Status Grid**:
+  1. `File protection`: **Active** (Enkripsi penyimpanan lokal & transfer HTTPS aman).
+  2. `Sharing access`: **Controlled** (Validasi token tautan publik Cloud Run).
+  3. `Suspicious activity`: **None detected** (Pemantauan anomali berkas).
+- **Security Checks Footer**:
+  - Area gelap dengan border oranye gelap halus: *"Security checks will appear here."*
+  - Tombol aksi untuk menjalankan *Scan Workspace Health* secara interaktif.
+
+### D. Halaman Feedback (Sesuai Screenshot 4)
+- **Header**: Tag oranye `Feedback`, judul `Feedback`, subjudul *"Everything you're working on, in one place."*
+- **Card Utama**:
+  - Ikon pesan oranye `MessageSquarePlus` dengan judul `Help us improve ForgeDrive`.
+  - Subteks: *"Tell us what works well or what you would like to see next."*
+  - Area input `textarea` gelap dengan placeholder *"Share your feedback..."* dan fokus border oranye.
+  - Tombol oranye solid `Send feedback` (`bg-orange-500 hover:bg-orange-600`).
+- **Interaktivitas**:
+  - Validasi karakter, feedback pengiriman sukses (toast notifikasi), dan penyimpanan riwayat masukan.
+
+---
+
+## 3. Rencana Eksekusi & Verifikasi
+
+1. **Pembaruan Branding**:
+   - Memperbarui nama aplikasi dan logo menjadi **ForgeDrive** di `app/page.tsx`, `app/layout.tsx`, dan `metadata.json`.
+2. **Implementasi Komponen Halaman**:
+   - Menghubungkan state kolaborator (`collaborators`) dan integrasi tempat sampah nyata (`trashedItems`, `restoreItem`, `permanentDelete`).
+   - Menyusun layout People, Trash, Security, dan Feedback sesuai screenshot referensi secara detail (warna, padding, font, ikon, border).
+3. **Pengujian & Verifikasi**:
+   - Menjalankan `lint_applet` untuk memastikan tidak ada kesalahan sintaks atau TypeScript.
+   - Menjalankan `compile_applet` untuk memverifikasi aplikasi berhasil dikompilasi.

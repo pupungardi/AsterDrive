@@ -129,31 +129,31 @@ export default function SharedFilePage({ params }: { params: Promise<{ id: strin
   const getIcon = (type: string) => {
     switch (type) {
       case 'folder': return <Folder className="w-12 h-12 text-amber-500" />;
-      case 'image': return <ImageIcon className="w-12 h-12 text-blue-500" />;
+      case 'image': return <ImageIcon className="w-12 h-12 text-rose-500" />;
       case 'video': return <Video className="w-12 h-12 text-purple-600" />;
-      case 'archive': return <Archive className="w-12 h-12 text-rose-500" />;
+      case 'archive': return <Archive className="w-12 h-12 text-amber-500" />;
       case 'spreadsheet': return <FileText className="w-12 h-12 text-emerald-600" />;
       default: return <File className="w-12 h-12 text-slate-500" />;
     }
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-800 flex flex-col font-sans select-none">
+    <div className="min-h-screen bg-[#0c0e14] text-slate-100 flex flex-col font-sans select-none">
       {/* Top Navigation Bar */}
-      <header className="h-16 bg-white border-b border-slate-200 px-4 sm:px-8 flex items-center justify-between sticky top-0 z-30 shadow-2xs">
+      <header className="h-16 bg-[#11141d] border-b border-[#1e2433] px-4 sm:px-8 flex items-center justify-between sticky top-0 z-30 shadow-xs">
         <Link href="/" className="flex items-center gap-2.5 group">
-          <div className="w-9 h-9 rounded-xl bg-blue-600 text-white flex items-center justify-center font-bold shadow-sm shadow-blue-500/20 group-hover:scale-105 transition-transform">
+          <div className="w-9 h-9 rounded-xl bg-orange-500/10 border border-orange-500/20 text-orange-500 flex items-center justify-center font-bold shadow-xs group-hover:scale-105 transition-transform">
             <HardDrive className="w-5 h-5" />
           </div>
-          <span className="font-bold text-lg text-slate-900 tracking-tight">AsterDrive</span>
-          <span className="text-[11px] bg-blue-50 text-blue-700 font-semibold px-2 py-0.5 rounded-full border border-blue-200/60 hidden sm:inline-block">
+          <span className="font-bold text-lg text-white tracking-tight">AsterDrive</span>
+          <span className="text-[11px] bg-orange-500/10 text-orange-400 font-semibold px-2 py-0.5 rounded-full border border-orange-500/20 hidden sm:inline-block">
             Public Share
           </span>
         </Link>
 
         <Link 
           href="/" 
-          className="flex items-center gap-2 text-xs sm:text-sm font-semibold text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 px-3.5 py-2 rounded-xl transition-colors cursor-pointer"
+          className="flex items-center gap-2 text-xs sm:text-sm font-semibold text-orange-400 hover:text-orange-300 bg-orange-500/10 hover:bg-orange-500/20 px-3.5 py-2 rounded-xl border border-orange-500/30 transition-colors cursor-pointer"
         >
           <ArrowLeft className="w-4 h-4" />
           <span>Open AsterDrive</span>

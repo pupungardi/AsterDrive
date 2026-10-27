@@ -1,6 +1,6 @@
 {
   "name": "AsterDrive",
-  "description": "A clean, modern file storage and drive application.",
+  "description": "Secure cloud storage, backup, and sync for all your files.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

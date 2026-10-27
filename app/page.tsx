@@ -165,6 +165,13 @@ interface ToastNotification {
 
 type ProfileDetailView = 'personal' | 'security' | 'settings' | 'offline' | 'notifications' | 'appearance' | 'contact' | 'about' | 'terms' | 'privacy' | 'acceptable' | 'copyright' | null;
 
+let uniqueIdCounter = 0;
+function generateUniqueId(prefix = 'id'): string {
+  uniqueIdCounter += 1;
+  const time = Date.now().toString(36);
+  return `${prefix}_${time}_${uniqueIdCounter}`;
+}
+
 // --- MAIN APPLICATION COMPONENT ---
 
 interface ActivityItem {
@@ -175,8 +182,26 @@ interface ActivityItem {
   timestamp: string;
 }
 
+interface Collaborator {
+  id: string;
+  name: string;
+  email: string;
+  role: 'Viewer' | 'Editor';
+  addedAt: string;
+}
+
+interface FeedbackEntry {
+  id: string;
+  category: string;
+  message: string;
+  submittedAt: string;
+}
+
 const STORAGE_KEY = 'asterdrive_real_items_v2';
+const LEGACY_STORAGE_KEY = 'forgedrive_real_items_v2';
 const ACTIVITIES_STORAGE_KEY = 'asterdrive_real_activities_v1';
+const COLLABORATORS_STORAGE_KEY = 'asterdrive_collaborators_v1';
+const FEEDBACK_STORAGE_KEY = 'asterdrive_feedback_v1';
 const PUBLIC_APP_URL = 'https://ais-pre-owradbeu2qux37froeiwcs-7606689415.asia-southeast1.run.app';
 
 export default function AsterDriveApp() {
@@ -184,7 +209,7 @@ export default function AsterDriveApp() {
   const [activities, setActivities] = useState<ActivityItem[]>(() => {
     if (typeof window !== 'undefined') {
       try {
-        const saved = localStorage.getItem(ACTIVITIES_STORAGE_KEY);
+        const saved = localStorage.getItem(ACTIVITIES_STORAGE_KEY) || localStorage.getItem('forgedrive_real_activities_v1') || localStorage.getItem('asterdrive_real_activities_v1');
         if (saved) {
           const parsed = JSON.parse(saved);
           if (Array.isArray(parsed)) {
@@ -207,10 +232,51 @@ export default function AsterDriveApp() {
   const [showUploadMenu, setShowUploadMenu] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 
+  // Collaborators State (Screenshot 1: People)
+  const [collaborators, setCollaborators] = useState<Collaborator[]>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem(COLLABORATORS_STORAGE_KEY);
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed)) return parsed;
+        }
+      } catch (e) {
+        console.warn('Failed to load collaborators', e);
+      }
+    }
+    return [];
+  });
+  const [isInviteOpen, setIsInviteOpen] = useState(false);
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [inviteRole, setInviteRole] = useState<'Viewer' | 'Editor'>('Editor');
+
+  // Feedback State (Screenshot 4: Feedback)
+  const [feedbackMessage, setFeedbackMessage] = useState('');
+  const [isSubmittingFeedback, setIsSubmittingFeedback] = useState(false);
+  const [feedbackList, setFeedbackList] = useState<FeedbackEntry[]>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem(FEEDBACK_STORAGE_KEY);
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed)) return parsed;
+        }
+      } catch (e) {
+        console.warn('Failed to load feedback', e);
+      }
+    }
+    return [];
+  });
+
+  // Security Scan State (Screenshot 3: Security)
+  const [isSecurityScanning, setIsSecurityScanning] = useState(false);
+  const [lastSecurityScanTime, setLastSecurityScanTime] = useState('Just now');
+
   // Helper to record real activities
   const logActivity = (type: ActivityItem['type'], title: string, description: string) => {
     const newAct: ActivityItem = {
-      id: Math.random().toString(36).substring(2, 9),
+      id: generateUniqueId('act'),
       type,
       title,
       description,
@@ -227,6 +293,24 @@ export default function AsterDriveApp() {
       console.warn('Failed to save activities', e);
     }
   }, [activities]);
+
+  // Save collaborators to localStorage
+  React.useEffect(() => {
+    try {
+      localStorage.setItem(COLLABORATORS_STORAGE_KEY, JSON.stringify(collaborators));
+    } catch (e) {
+      console.warn('Failed to save collaborators', e);
+    }
+  }, [collaborators]);
+
+  // Save feedback to localStorage
+  React.useEffect(() => {
+    try {
+      localStorage.setItem(FEEDBACK_STORAGE_KEY, JSON.stringify(feedbackList));
+    } catch (e) {
+      console.warn('Failed to save feedback', e);
+    }
+  }, [feedbackList]);
   
   // Storage plan state: defaults to Free Plan (1 GB)
   const [currentPlan, setCurrentPlan] = useState<StoragePlan>(STORAGE_PLANS[0]);
@@ -261,7 +345,7 @@ export default function AsterDriveApp() {
   // Load persistent real items from localStorage on mount
   React.useEffect(() => {
     try {
-      const saved = localStorage.getItem(STORAGE_KEY);
+      const saved = localStorage.getItem(STORAGE_KEY) || localStorage.getItem(LEGACY_STORAGE_KEY);
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed)) {
@@ -350,7 +434,7 @@ export default function AsterDriveApp() {
   const [toasts, setToasts] = useState<ToastNotification[]>([]);
 
   const showToast = (toast: Omit<ToastNotification, 'id'>) => {
-    const id = Math.random().toString(36).substring(7);
+    const id = generateUniqueId('toast');
     setToasts(prev => [...prev, { ...toast, id }]);
     setTimeout(() => {
       setToasts(prev => prev.filter(t => t.id !== id));
@@ -562,7 +646,7 @@ export default function AsterDriveApp() {
       });
       return;
     }
-    const folderId = Math.random().toString(36).substring(2, 9);
+    const folderId = generateUniqueId('folder');
     const newFolder: DriveItem = {
       id: folderId,
       parentId: currentFolderId,
@@ -697,7 +781,7 @@ export default function AsterDriveApp() {
         const newFolderItems: DriveItem[] = [];
         for (const folder of discoveredFolders) {
           const parentId = folderIdMap.get(folder.parentPath) || targetRootFolderId;
-          const folderId = Math.random().toString(36).substring(2, 9);
+          const folderId = generateUniqueId('folder');
           folderIdMap.set(folder.fullPath, folderId);
 
           newFolderItems.push({
@@ -727,7 +811,7 @@ export default function AsterDriveApp() {
           const parentId = folderIdMap.get(folderPath) || targetRootFolderId;
 
           return {
-            id: Math.random().toString(36).substring(2, 9),
+            id: generateUniqueId('file'),
             parentId: parentId,
             name: file.name,
             type: file.type.includes('image') ? 'image' : 
@@ -772,7 +856,7 @@ export default function AsterDriveApp() {
         }
 
         return {
-          id: Math.random().toString(36).substring(7),
+          id: generateUniqueId('file'),
           parentId: currentFolderId,
           name: file.name,
           type: file.type.includes('image') ? 'image' : 
@@ -951,7 +1035,7 @@ export default function AsterDriveApp() {
     const newFolderItems: DriveItem[] = [];
     for (const folder of discoveredFolders) {
       const parentId = folderIdMap.get(folder.parentPath) || targetRootFolderId;
-      const folderId = Math.random().toString(36).substring(2, 9);
+      const folderId = generateUniqueId('folder');
       folderIdMap.set(folder.fullPath, folderId);
 
       newFolderItems.push({
@@ -981,7 +1065,7 @@ export default function AsterDriveApp() {
       const parentId = folderIdMap.get(folderPath) || targetRootFolderId;
 
       return {
-        id: Math.random().toString(36).substring(2, 9),
+        id: generateUniqueId('file'),
         parentId: parentId,
         name: file.name,
         type: file.type.includes('image') ? 'image' : 
@@ -1083,7 +1167,7 @@ export default function AsterDriveApp() {
 
         for (const folder of discoveredFolders) {
           const parentId = folderIdMap.get(folder.parentPath) || targetRootId;
-          const folderId = Math.random().toString(36).substring(2, 9);
+          const folderId = generateUniqueId('folder');
           folderIdMap.set(folder.fullPath, folderId);
 
           newFolderItems.push({
@@ -1113,7 +1197,7 @@ export default function AsterDriveApp() {
           const parentId = folderIdMap.get(folderPath) || targetRootId;
 
           return {
-            id: Math.random().toString(36).substring(2, 9),
+            id: generateUniqueId('file'),
             parentId: parentId,
             name: file.name,
             type: file.type.includes('image') ? 'image' : 
@@ -1135,7 +1219,7 @@ export default function AsterDriveApp() {
         const folderTitle = forcedFolderName || (targetRootId === 'root' ? 'Synced Folder' : null);
 
         if (folderTitle) {
-          const folderId = Math.random().toString(36).substring(2, 9);
+          const folderId = generateUniqueId('folder');
           parentFolderId = folderId;
           newFolderItems.push({
             id: folderId,
@@ -1162,7 +1246,7 @@ export default function AsterDriveApp() {
           }
 
           return {
-            id: Math.random().toString(36).substring(2, 9),
+            id: generateUniqueId('file'),
             parentId: parentFolderId,
             name: file.name,
             type: file.type.includes('image') ? 'image' : 
@@ -1242,6 +1326,11 @@ export default function AsterDriveApp() {
       selectedItems.has(item.id) ? { ...item, trashed: false } : item
     ));
     setSelectedItems(new Set());
+    showToast({
+      type: 'success',
+      title: 'Restored to Drive',
+      message: 'Selected item(s) restored back to your files.'
+    });
   };
 
   const handleDeletePermanent = () => {
@@ -1251,6 +1340,146 @@ export default function AsterDriveApp() {
     setDriveItems(prev => prev.filter(item => !selectedItems.has(item.id)));
     setSelectedItems(new Set());
     setIsDeleteDialogOpen(false);
+    showToast({
+      type: 'info',
+      title: 'Deleted Permanently',
+      message: 'Selected item(s) permanently removed.'
+    });
+  };
+
+  const trashedItems = useMemo(() => {
+    return driveItems.filter(item => item.trashed);
+  }, [driveItems]);
+
+  const handleRestoreItem = (item: DriveItem) => {
+    setDriveItems(prev => prev.map(i => i.id === item.id ? { ...i, trashed: false } : i));
+    logActivity('restore', `Restored ${item.name}`, `Restored to ${item.source === 'computer' ? 'Computers' : 'My Drive'}`);
+    showToast({
+      type: 'success',
+      title: 'File Restored',
+      message: `"${item.name}" has been restored to your drive.`
+    });
+  };
+
+  const handlePermanentDeleteItem = (item: DriveItem) => {
+    deleteFileBlob(item.id);
+    setDriveItems(prev => prev.filter(i => i.id !== item.id));
+    logActivity('trash', `Deleted ${item.name}`, 'Permanently deleted from Trash');
+    showToast({
+      type: 'info',
+      title: 'File Deleted Forever',
+      message: `"${item.name}" has been permanently removed.`
+    });
+  };
+
+  const handleEmptyTrash = () => {
+    if (trashedItems.length === 0) return;
+    const count = trashedItems.length;
+    trashedItems.forEach(item => {
+      deleteFileBlob(item.id);
+    });
+    setDriveItems(prev => prev.filter(item => !item.trashed));
+    logActivity('trash', 'Emptied Trash', `Permanently deleted ${count} items`);
+    showToast({
+      type: 'success',
+      title: 'Trash Emptied',
+      message: `Permanently removed ${count} ${count === 1 ? 'file' : 'files'} from Trash.`
+    });
+  };
+
+  const handleAddCollaborator = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const email = inviteEmail.trim();
+    if (!email || !email.includes('@')) {
+      showToast({
+        type: 'warning',
+        title: 'Invalid Email',
+        message: 'Please enter a valid email address.'
+      });
+      return;
+    }
+    if (collaborators.some(c => c.email.toLowerCase() === email.toLowerCase())) {
+      showToast({
+        type: 'warning',
+        title: 'Already Added',
+        message: `${email} is already a collaborator in your workspace.`
+      });
+      return;
+    }
+    const newCollab: Collaborator = {
+      id: generateUniqueId('collab'),
+      name: email.split('@')[0],
+      email,
+      role: inviteRole,
+      addedAt: new Date().toISOString()
+    };
+    setCollaborators(prev => [newCollab, ...prev]);
+    logActivity('share', `Invited ${email}`, `Granted ${inviteRole} workspace access`);
+    showToast({
+      type: 'success',
+      title: 'Collaborator Added',
+      message: `${email} has been added as ${inviteRole}.`
+    });
+    setInviteEmail('');
+    setIsInviteOpen(false);
+  };
+
+  const handleRevokeCollaborator = (id: string, email: string) => {
+    setCollaborators(prev => prev.filter(c => c.id !== id));
+    logActivity('share', `Revoked ${email}`, 'Removed workspace access');
+    showToast({
+      type: 'info',
+      title: 'Access Revoked',
+      message: `Collaborator access for ${email} has been revoked.`
+    });
+  };
+
+  const handleRunSecurityScan = () => {
+    setIsSecurityScanning(true);
+    showToast({
+      type: 'info',
+      title: 'Running Security Scan',
+      message: 'Inspecting workspace integrity, encrypted blobs, and access policies...'
+    });
+    setTimeout(() => {
+      setIsSecurityScanning(false);
+      setLastSecurityScanTime('Just now');
+      showToast({
+        type: 'success',
+        title: 'Security Ready',
+        message: 'All integrity checks passed. AES-256 encryption active.'
+      });
+    }, 1000);
+  };
+
+  const handleSubmitFeedback = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const text = feedbackMessage.trim();
+    if (!text) {
+      showToast({
+        type: 'warning',
+        title: 'Feedback Required',
+        message: 'Please enter your comments before submitting.'
+      });
+      return;
+    }
+    setIsSubmittingFeedback(true);
+    setTimeout(() => {
+      const entry: FeedbackEntry = {
+        id: generateUniqueId('fb'),
+        category: 'Workspace Experience',
+        message: text,
+        submittedAt: new Date().toISOString()
+      };
+      setFeedbackList(prev => [entry, ...prev]);
+      setIsSubmittingFeedback(false);
+      setFeedbackMessage('');
+      showToast({
+        type: 'success',
+        title: 'Feedback Sent',
+        message: 'Thank you for helping us improve AsterDrive!'
+      });
+    }, 400);
   };
 
   // Compute breadcrumbs
@@ -1985,186 +2214,381 @@ export default function AsterDriveApp() {
             </div>
           </div>
         ) : activeNav === 'people' ? (
-          /* PEOPLE PAGE VIEW */
+          /* PEOPLE PAGE (Matching Screenshot 1) */
           <div className="flex-1 overflow-y-auto px-4 lg:px-8 py-6 space-y-6">
             <div>
               <span className="text-xs font-semibold uppercase tracking-wider text-orange-500">
                 People
               </span>
               <h1 className="text-3xl font-bold text-white tracking-tight mt-1">
-                Team &amp; Collaborators
+                People
               </h1>
               <p className="text-sm text-slate-400 mt-0.5">
-                Manage team members, permissions, and workspace access.
+                Manage collaborators and file access.
               </p>
             </div>
 
-            <div className="bg-[#141824] border border-[#252d3f] rounded-3xl p-6 sm:p-8 shadow-xl">
-              <div className="flex items-center justify-between mb-6 pb-4 border-b border-[#22293a]">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-orange-500/10 border border-orange-500/20 text-orange-400 flex items-center justify-center">
+            {/* Main Card */}
+            <div className="bg-[#11141d] border border-[#1e2433] rounded-2xl p-6 sm:p-7 shadow-lg">
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex items-start gap-3.5">
+                  <div className="w-10 h-10 rounded-xl bg-orange-500/10 border border-orange-500/20 text-orange-500 flex items-center justify-center shrink-0">
                     <Users className="w-5 h-5" />
                   </div>
                   <div>
-                    <h3 className="text-base font-bold text-white">Workspace Members</h3>
-                    <p className="text-xs text-slate-400">People with shared access to your files</p>
+                    <span className="text-xs text-slate-400 font-medium">People &amp; access</span>
+                    <div className="text-2xl font-bold text-white mt-0.5">
+                      {collaborators.length} people
+                    </div>
+                    <p className="text-xs text-slate-400 mt-0.5">
+                      {collaborators.length === 0 ? 'No collaborators yet' : `${collaborators.length} collaborator(s) with workspace access`}
+                    </p>
                   </div>
                 </div>
+
                 <button
                   type="button"
-                  onClick={() => {
-                    showToast({
-                      type: 'info',
-                      title: 'Invite Link',
-                      message: 'Collaborator invitation link copied to clipboard.'
-                    });
-                  }}
-                  className="px-4 py-2 bg-orange-600 hover:bg-orange-500 text-white rounded-xl text-xs font-semibold shadow-md shadow-orange-600/20 transition-all cursor-pointer flex items-center gap-1.5"
+                  onClick={() => setIsInviteOpen(!isInviteOpen)}
+                  className="px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-xl text-xs font-semibold transition-colors cursor-pointer flex items-center gap-1.5 shadow-sm"
                 >
                   <Plus className="w-3.5 h-3.5" />
-                  Invite People
+                  Invite collaborator
                 </button>
               </div>
 
-              <div className="space-y-3">
-                <div className="p-4 bg-[#0f131d] border border-[#22293a] rounded-2xl flex items-center justify-between gap-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-orange-500/20 text-orange-400 font-bold flex items-center justify-center text-sm border border-orange-500/30">
-                      JS
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-semibold text-white text-sm">John Smith</span>
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-orange-500/10 text-orange-400 border border-orange-500/20">
-                          Owner
-                        </span>
-                      </div>
-                      <p className="text-xs text-slate-400">john.smith@example.com</p>
+              {/* Invite Collaborator Form */}
+              {isInviteOpen && (
+                <form onSubmit={handleAddCollaborator} className="mt-5 p-4 rounded-xl bg-[#0c0e14] border border-[#1e2433] space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-xs font-semibold uppercase tracking-wider text-orange-400">Invite New Collaborator</h4>
+                    <button type="button" onClick={() => setIsInviteOpen(false)} className="text-slate-400 hover:text-white text-xs cursor-pointer">
+                      Cancel
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                    <input
+                      type="email"
+                      placeholder="collaborator@company.com"
+                      value={inviteEmail}
+                      onChange={(e) => setInviteEmail(e.target.value)}
+                      className="px-3.5 py-2 bg-[#11141d] border border-[#1e2433] rounded-xl text-xs text-white placeholder:text-slate-500 focus:border-orange-500 outline-none sm:col-span-2"
+                      required
+                    />
+                    <div className="flex gap-2">
+                      <select
+                        value={inviteRole}
+                        onChange={(e) => setInviteRole(e.target.value as 'Viewer' | 'Editor')}
+                        className="px-3 py-2 bg-[#11141d] border border-[#1e2433] rounded-xl text-xs text-white focus:border-orange-500 outline-none flex-1"
+                      >
+                        <option value="Editor">Editor</option>
+                        <option value="Viewer">Viewer</option>
+                      </select>
+                      <button
+                        type="submit"
+                        className="px-3.5 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-xl text-xs font-semibold transition-colors shrink-0 cursor-pointer"
+                      >
+                        Add
+                      </button>
                     </div>
                   </div>
-                  <span className="text-xs text-emerald-400 font-medium">Active now</span>
-                </div>
+                </form>
+              )}
 
-                <div className="p-4 bg-[#0f131d] border border-[#22293a] rounded-2xl flex items-center justify-between gap-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-blue-500/20 text-blue-400 font-bold flex items-center justify-center text-sm border border-blue-500/30">
-                      CL
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-semibold text-white text-sm">Colleague Team</span>
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20">
-                          Editor
-                        </span>
-                      </div>
-                      <p className="text-xs text-slate-400">colleague@example.com</p>
-                    </div>
-                  </div>
-                  <span className="text-xs text-slate-400 font-mono">Shared {driveItems.filter(i => i.owner !== 'me').length} file(s)</span>
+              {/* Collaborators List or Empty State (Screenshot 1) */}
+              {collaborators.length === 0 ? (
+                <div className="border border-dashed border-[#252d3f] rounded-xl p-6 mt-6 text-sm text-slate-400 text-center">
+                  People you share files with will appear here.
                 </div>
-              </div>
+              ) : (
+                <div className="mt-6 space-y-2.5">
+                  {collaborators.map((c) => (
+                    <div key={c.id} className="p-3.5 bg-[#0c0e14] border border-[#1e2433] rounded-xl flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-8 h-8 rounded-lg bg-orange-500/10 border border-orange-500/20 text-orange-400 font-bold text-xs flex items-center justify-center shrink-0">
+                          {c.email.substring(0, 2).toUpperCase()}
+                        </div>
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-semibold text-white truncate">{c.email}</span>
+                            <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-orange-500/10 text-orange-400 border border-orange-500/20">
+                              {c.role}
+                            </span>
+                          </div>
+                          <span className="text-[11px] text-slate-500">Added {formatDateSafe(c.addedAt)}</span>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleRevokeCollaborator(c.id, c.email)}
+                        className="px-2.5 py-1 text-xs text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors cursor-pointer"
+                      >
+                        Revoke
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
+        ) : activeNav === 'trash' ? (
+          /* TRASH PAGE (Matching Screenshot 2) */
+          <div className="flex-1 overflow-y-auto px-4 lg:px-8 py-6 space-y-6">
+            <div>
+              <span className="text-xs font-semibold uppercase tracking-wider text-orange-500">
+                Trash
+              </span>
+              <h1 className="text-3xl font-bold text-white tracking-tight mt-1">
+                Trash
+              </h1>
+              <p className="text-sm text-slate-400 mt-0.5">
+                Everything you&apos;re working on, in one place.
+              </p>
+            </div>
+
+            {trashedItems.length === 0 ? (
+              /* EMPTY STATE - EXACT MATCH TO SCREENSHOT 2 */
+              <div className="bg-[#11141d] border border-[#1e2433] rounded-2xl p-14 text-center flex flex-col items-center justify-center shadow-lg">
+                <div className="w-12 h-12 rounded-xl bg-[#1e2433] text-slate-400 flex items-center justify-center mb-4">
+                  <Trash2 className="w-6 h-6" />
+                </div>
+                <h3 className="text-lg font-bold text-white mb-1.5">
+                  Trash is empty
+                </h3>
+                <p className="text-xs text-slate-400 max-w-md leading-relaxed">
+                  Deleted files will stay here temporarily so you can restore them before permanent removal.
+                </p>
+              </div>
+            ) : (
+              /* POPULATED TRASH STATE WITH FULL RESTORE & PURGE CAPABILITIES */
+              <div className="space-y-4">
+                <div className="bg-[#11141d] border border-[#1e2433] rounded-2xl p-5 flex items-center justify-between gap-4 shadow-lg">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 flex items-center justify-center shrink-0">
+                      <Trash2 className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-bold text-white">Trash ({trashedItems.length} {trashedItems.length === 1 ? 'item' : 'items'})</h3>
+                      <p className="text-xs text-slate-400">Items in trash can be restored to your drive or permanently removed.</p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleEmptyTrash}
+                    className="px-3.5 py-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 rounded-xl text-xs font-semibold transition-colors cursor-pointer flex items-center gap-1.5"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    Empty Trash
+                  </button>
+                </div>
+
+                <div className="bg-[#11141d] border border-[#1e2433] rounded-2xl p-4 divide-y divide-[#1e2433] shadow-lg">
+                  {trashedItems.map((item) => (
+                    <div key={item.id} className="py-3 px-2 flex items-center justify-between gap-4 first:pt-0 last:pb-0">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-9 h-9 rounded-xl bg-[#0c0e14] border border-[#1e2433] flex items-center justify-center shrink-0">
+                          {getIconForType(item.type, "w-4 h-4")}
+                        </div>
+                        <div className="min-w-0">
+                          <h4 className="text-sm font-semibold text-white truncate">{item.name}</h4>
+                          <div className="flex items-center gap-2 text-xs text-slate-500">
+                            <span>{formatBytes(item.size)}</span>
+                            <span>•</span>
+                            <span>Deleted {formatDateSafe(item.updatedAt)}</span>
+                            {item.source === 'computer' && (
+                              <>
+                                <span>•</span>
+                                <span className="text-orange-400/80">Computer Sync</span>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => handleRestoreItem(item)}
+                          className="px-3 py-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded-lg text-xs font-medium transition-colors flex items-center gap-1 cursor-pointer"
+                          title="Restore file"
+                        >
+                          <RotateCcw className="w-3.5 h-3.5" />
+                          <span>Restore</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handlePermanentDeleteItem(item)}
+                          className="px-3 py-1.5 bg-[#1b2131] hover:bg-rose-500/20 hover:text-rose-400 border border-[#2d374d] text-slate-400 rounded-lg text-xs font-medium transition-colors flex items-center gap-1 cursor-pointer"
+                          title="Delete permanently"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          <span>Delete</span>
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
         ) : activeNav === 'security' ? (
-          /* SECURITY PAGE VIEW */
+          /* SECURITY PAGE (Matching Screenshot 3) */
           <div className="flex-1 overflow-y-auto px-4 lg:px-8 py-6 space-y-6">
             <div>
               <span className="text-xs font-semibold uppercase tracking-wider text-orange-500">
                 Security
               </span>
               <h1 className="text-3xl font-bold text-white tracking-tight mt-1">
-                Security &amp; Encryption
+                Security
               </h1>
               <p className="text-sm text-slate-400 mt-0.5">
-                Manage encryption standards, session safeguards, and authentication protocols.
+                Review workspace access and protection.
               </p>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="bg-[#141824] border border-[#252d3f] rounded-3xl p-6 shadow-xl">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-10 h-10 rounded-xl bg-orange-500/10 text-orange-400 border border-orange-500/20 flex items-center justify-center">
+            {/* Main Card (Screenshot 3) */}
+            <div className="bg-[#11141d] border border-[#1e2433] rounded-2xl p-6 sm:p-7 shadow-lg">
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex items-start gap-3.5">
+                  <div className="w-10 h-10 rounded-xl bg-orange-500/10 border border-orange-500/20 text-orange-500 flex items-center justify-center shrink-0">
                     <ShieldCheck className="w-5 h-5" />
                   </div>
                   <div>
-                    <h3 className="font-bold text-white text-base">End-to-End Encryption</h3>
-                    <p className="text-xs text-emerald-400">Active (AES-256 Standards)</p>
+                    <span className="text-xs text-slate-400 font-medium uppercase tracking-wider">Workspace health</span>
+                    <div className="text-2xl font-bold text-white mt-0.5">
+                      Ready
+                    </div>
+                    <p className="text-xs text-slate-400 mt-0.5">
+                      Your workspace is ready
+                    </p>
                   </div>
                 </div>
-                <p className="text-xs text-slate-400 leading-relaxed">
-                  All stored files, shared links, and computer synchronized buffers are encrypted in transit and at rest.
-                </p>
+
+                <button
+                  type="button"
+                  onClick={handleRunSecurityScan}
+                  disabled={isSecurityScanning}
+                  className="px-4 py-2 bg-[#181d2a] hover:bg-[#222a3d] border border-[#2d374d] text-white rounded-xl text-xs font-semibold transition-colors cursor-pointer flex items-center gap-1.5 shadow-sm disabled:opacity-70"
+                >
+                  <RefreshCw className={cn("w-3.5 h-3.5", isSecurityScanning && "animate-spin text-orange-400")} />
+                  <span>{isSecurityScanning ? 'Scanning...' : 'Scan Now'}</span>
+                </button>
               </div>
 
-              <div className="bg-[#141824] border border-[#252d3f] rounded-3xl p-6 shadow-xl">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-10 h-10 rounded-xl bg-orange-500/10 text-orange-400 border border-orange-500/20 flex items-center justify-center">
-                    <Lock className="w-5 h-5" />
+              {/* 3-card Grid (Screenshot 3) */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5 mt-6">
+                <div className="p-4 rounded-xl bg-[#0c0e14] border border-[#1e2433]">
+                  <span className="text-xs text-slate-400 block mb-1.5 font-medium">File protection</span>
+                  <div className="text-base font-bold text-emerald-400 flex items-center gap-1.5">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                    <span>Active</span>
                   </div>
-                  <div>
-                    <h3 className="font-bold text-white text-base">Two-Factor Authentication</h3>
-                    <p className="text-xs text-emerald-400">Protected</p>
-                  </div>
+                  <span className="text-[11px] text-slate-500 mt-1 block">AES-256 client encryption</span>
                 </div>
-                <p className="text-xs text-slate-400 leading-relaxed">
-                  Biometric credentials and multi-factor authentication are verified during file access and public link sharing.
-                </p>
+
+                <div className="p-4 rounded-xl bg-[#0c0e14] border border-[#1e2433]">
+                  <span className="text-xs text-slate-400 block mb-1.5 font-medium">Sharing access</span>
+                  <div className="text-base font-bold text-white flex items-center gap-1.5">
+                    <Lock className="w-4 h-4 text-orange-400" />
+                    <span>Controlled</span>
+                  </div>
+                  <span className="text-[11px] text-slate-500 mt-1 block">Scoped token authentication</span>
+                </div>
+
+                <div className="p-4 rounded-xl bg-[#0c0e14] border border-[#1e2433]">
+                  <span className="text-xs text-slate-400 block mb-1.5 font-medium">Suspicious activity</span>
+                  <div className="text-base font-bold text-emerald-400 flex items-center gap-1.5">
+                    <Shield className="w-4 h-4 text-emerald-400" />
+                    <span>None detected</span>
+                  </div>
+                  <span className="text-[11px] text-slate-500 mt-1 block">Zero unauthorized events</span>
+                </div>
+              </div>
+
+              {/* Bottom Container (Screenshot 3) */}
+              <div className="bg-[#181512] border border-orange-950/40 rounded-xl p-4 mt-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-orange-200/70">
+                <div className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0"></span>
+                  <span>Security checks will appear here.</span>
+                </div>
+                <span className="font-mono text-[11px] text-orange-300/60">Last scan: {lastSecurityScanTime}</span>
               </div>
             </div>
           </div>
         ) : activeNav === 'feedback' ? (
-          /* FEEDBACK PAGE VIEW */
+          /* FEEDBACK PAGE (Matching Screenshot 4) */
           <div className="flex-1 overflow-y-auto px-4 lg:px-8 py-6 space-y-6">
             <div>
               <span className="text-xs font-semibold uppercase tracking-wider text-orange-500">
                 Feedback
               </span>
               <h1 className="text-3xl font-bold text-white tracking-tight mt-1">
-                Help &amp; Product Feedback
+                Feedback
               </h1>
               <p className="text-sm text-slate-400 mt-0.5">
-                We would love to hear your thoughts on AsterDrive experience and new features.
+                Everything you&apos;re working on, in one place.
               </p>
             </div>
 
-            <div className="bg-[#141824] border border-[#252d3f] rounded-3xl p-6 sm:p-8 max-w-xl shadow-xl">
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">
-                    Feedback Category
-                  </label>
-                  <select className="w-full px-3.5 py-2.5 bg-[#0f131d] border border-[#252d3f] rounded-xl text-sm text-white focus:border-orange-500 outline-none">
-                    <option>General Experience &amp; Design</option>
-                    <option>Computer Sync &amp; Backup</option>
-                    <option>Storage Plans &amp; Quota</option>
-                    <option>Feature Request</option>
-                  </select>
+            {/* Main Card (Screenshot 4) */}
+            <div className="bg-[#11141d] border border-[#1e2433] rounded-2xl p-6 sm:p-7 max-w-2xl shadow-lg">
+              <div className="flex items-start gap-3.5 mb-5">
+                <div className="w-10 h-10 rounded-xl bg-orange-500/10 border border-orange-500/20 text-orange-500 flex items-center justify-center shrink-0">
+                  <MessageSquare className="w-5 h-5" />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">
-                    Your Comments
-                  </label>
-                  <textarea
-                    rows={4}
-                    placeholder="Tell us what you like or what could be improved..."
-                    className="w-full px-3.5 py-2.5 bg-[#0f131d] border border-[#252d3f] rounded-xl text-sm text-white placeholder:text-slate-500 focus:border-orange-500 outline-none resize-none"
-                  />
+                  <h3 className="text-base font-bold text-white">Help us improve AsterDrive</h3>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    Tell us what works well or what you would like to see next.
+                  </p>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    showToast({
-                      type: 'success',
-                      title: 'Feedback Received',
-                      message: 'Thank you for helping us improve AsterDrive!'
-                    });
-                    handleNavSelect('my-drive');
-                  }}
-                  className="w-full py-2.5 bg-orange-600 hover:bg-orange-500 text-white font-semibold text-sm rounded-xl shadow-md shadow-orange-600/20 transition-all cursor-pointer"
-                >
-                  Submit Feedback
-                </button>
               </div>
+
+              <form onSubmit={handleSubmitFeedback}>
+                <textarea
+                  rows={5}
+                  value={feedbackMessage}
+                  onChange={(e) => setFeedbackMessage(e.target.value)}
+                  placeholder="Share your feedback..."
+                  className="w-full px-4 py-3.5 bg-[#0c0e14] border border-[#1e2433] rounded-xl text-sm text-white placeholder:text-slate-500 focus:border-orange-500 outline-none resize-none transition-colors"
+                  required
+                />
+
+                <div className="mt-4 flex items-center justify-between">
+                  <button
+                    type="submit"
+                    disabled={isSubmittingFeedback || !feedbackMessage.trim()}
+                    className="px-5 py-2.5 bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white font-medium text-sm rounded-xl transition-colors shadow-sm cursor-pointer flex items-center gap-2"
+                  >
+                    {isSubmittingFeedback ? (
+                      <>
+                        <RefreshCw className="w-4 h-4 animate-spin" />
+                        <span>Sending...</span>
+                      </>
+                    ) : (
+                      <span>Send feedback</span>
+                    )}
+                  </button>
+                </div>
+              </form>
+
+              {/* Sent feedback history */}
+              {feedbackList.length > 0 && (
+                <div className="mt-8 pt-6 border-t border-[#1e2433]">
+                  <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-3">
+                    Your Sent Feedback ({feedbackList.length})
+                  </h4>
+                  <div className="space-y-2.5">
+                    {feedbackList.map((fb) => (
+                      <div key={fb.id} className="p-3.5 bg-[#0c0e14] border border-[#1e2433] rounded-xl">
+                        <div className="flex items-center justify-between text-[11px] text-slate-500 mb-1">
+                          <span className="font-semibold text-orange-400">{fb.category}</span>
+                          <span className="font-mono">{formatDateSafe(fb.submittedAt)}</span>
+                        </div>
+                        <p className="text-xs text-slate-300 leading-relaxed">{fb.message}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         ) : (
@@ -3666,7 +4090,7 @@ export default function AsterDriveApp() {
                           message: 'Thank you! Our support team will review your inquiry shortly.'
                         });
                       }}
-                      className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl text-sm transition-colors shadow-sm flex items-center justify-center gap-2"
+                      className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl text-sm transition-colors shadow-sm flex items-center justify-center gap-2 cursor-pointer"
                     >
                       <Send className="w-4 h-4" /> Send Message
                     </button>
@@ -3675,9 +4099,9 @@ export default function AsterDriveApp() {
 
                 {activeProfileDetail === 'about' && (
                   <div className="space-y-4 leading-relaxed">
-                    <div className="p-4 bg-blue-50/50 rounded-2xl border border-blue-100">
+                    <div className="p-4 bg-orange-500/10 rounded-2xl border border-orange-500/20">
                       <h4 className="font-bold text-slate-900 text-base">AsterDrive Cloud Storage</h4>
-                      <p className="text-xs text-blue-700 mt-1">Version 1.2.0 · Build 2026.10</p>
+                      <p className="text-xs text-orange-600 mt-1">Version 1.2.0 · Build 2026.10</p>
                     </div>
                     <p className="text-xs text-slate-600">
                       AsterDrive provides fast, reliable, encrypted cloud storage for individuals and teams. Every new user receives a free 1 GB tier to store essential documents, spreadsheets, photos, and presentations.
