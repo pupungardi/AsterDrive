@@ -57,7 +57,10 @@ import {
   ZoomIn,
   ZoomOut,
   RotateCw,
-  Eye
+  Eye,
+  ArrowLeft,
+  ChevronLeft,
+  Printer
 } from 'lucide-react';
 import { StorageAnalyticsChart, StorageAnalyticsItem } from '@/components/StorageAnalyticsChart';
 import { saveFileBlob, getFileBlob, deleteFileBlob } from '@/lib/db';
@@ -80,113 +83,36 @@ export interface DriveItem {
   folderPath?: string;
 }
 
-const INITIAL_ITEMS: DriveItem[] = [
-  {
-    id: 'f1',
-    parentId: 'root',
-    name: 'Designs & Assets',
-    type: 'folder',
-    updatedAt: '2026-10-26T10:30:00Z',
-    owner: 'Alex Driver',
-    starred: true
-  },
-  {
-    id: 'f2',
-    parentId: 'root',
-    name: 'Client Presentations',
-    type: 'folder',
-    updatedAt: '2026-10-25T14:15:00Z',
-    owner: 'Alex Driver'
-  },
-  {
-    id: 'f3',
-    parentId: 'root',
-    name: 'Quarterly Reports 2026',
-    type: 'folder',
-    updatedAt: '2026-10-24T09:00:00Z',
-    owner: 'Alex Driver'
-  },
-  {
-    id: 'doc1',
-    parentId: 'root',
-    name: 'AsterDrive_Architecture_Overview.pdf',
-    type: 'document',
-    size: 2450000,
-    updatedAt: '2026-10-27T04:20:00Z',
-    owner: 'Alex Driver',
-    starred: true
-  },
-  {
-    id: 'img1',
-    parentId: 'root',
-    name: 'Hero_Design_Concept_v3.png',
-    type: 'image',
-    size: 4890000,
-    previewUrl: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=1600&q=80',
-    thumbnailUrl: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=400&q=80',
-    updatedAt: '2026-10-26T18:45:00Z',
-    owner: 'Sarah Connor',
-    starred: true
-  },
-  {
-    id: 'vid1',
-    parentId: 'root',
-    name: 'Product_Demo_Walkthrough.mp4',
-    type: 'video',
-    size: 48200000,
-    videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
-    thumbnailUrl: 'https://images.unsplash.com/photo-1536240478700-b869070f9279?auto=format&fit=crop&w=400&q=80',
-    updatedAt: '2026-10-25T11:10:00Z',
-    owner: 'Alex Driver',
-    starred: true
-  },
-  {
-    id: 'img2',
-    parentId: 'root',
-    name: 'AsterDrive_Mobile_UI.jpg',
-    type: 'image',
-    size: 3200000,
-    previewUrl: 'https://images.unsplash.com/photo-1551650975-87deedd944c3?auto=format&fit=crop&w=1600&q=80',
-    thumbnailUrl: 'https://images.unsplash.com/photo-1551650975-87deedd944c3?auto=format&fit=crop&w=400&q=80',
-    updatedAt: '2026-10-26T14:20:00Z',
-    owner: 'Sarah Connor'
-  },
-  {
-    id: 'vid2',
-    parentId: 'root',
-    name: 'Cloud_Sync_Engine_Teaser.mp4',
-    type: 'video',
-    size: 15800000,
-    videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
-    thumbnailUrl: 'https://images.unsplash.com/photo-1574717024653-61fd2cf4d44d?auto=format&fit=crop&w=400&q=80',
-    updatedAt: '2026-10-25T16:30:00Z',
-    owner: 'Alex Driver'
-  },
-  {
-    id: 'sheet1',
-    parentId: 'root',
-    name: 'Q4_Cloud_Budget_Allocation.xlsx',
-    type: 'spreadsheet',
-    size: 890000,
-    updatedAt: '2026-10-24T16:00:00Z',
-    owner: 'Alex Driver'
-  },
-  {
-    id: 'comp1',
-    parentId: 'comp_root',
-    name: 'Local_Project_Backup.zip',
-    type: 'archive',
-    size: 15400000,
-    updatedAt: '2026-10-26T08:20:00Z',
-    owner: 'Alex Driver',
-    source: 'computer',
-    computerDevice: 'MacBook Pro 16"'
-  }
-];
+export interface ActivityItem {
+  id: string;
+  action: string;
+  item: string;
+  time: string;
+  user: string;
+}
+
+const INITIAL_ITEMS: DriveItem[] = [];
 
 export default function Page() {
   const [activeTab, setActiveTab] = useState<'mydrive' | 'computers' | 'shared' | 'recent' | 'starred' | 'storage' | 'activity' | 'people' | 'trash' | 'security' | 'feedback'>('mydrive');
-  const [items, setItems] = useState<DriveItem[]>(INITIAL_ITEMS);
+  const [items, setItems] = useState<DriveItem[]>(() => {
+    if (typeof window === 'undefined') return [];
+    try {
+      localStorage.removeItem('asterdrive_items');
+      localStorage.removeItem('asterdrive_items_demo');
+      const savedItems = localStorage.getItem('asterdrive_items_v2');
+      if (savedItems) {
+        const parsed = JSON.parse(savedItems) as DriveItem[];
+        return parsed.filter(
+          (it) => it.id && (it.id.startsWith('file_') || it.id.startsWith('f_'))
+        );
+      }
+    } catch {
+      // ignore
+    }
+    return [];
+  });
+  const [activities, setActivities] = useState<ActivityItem[]>([]);
   const [currentFolderId, setCurrentFolderId] = useState<string>('root');
   const [folderHistory, setFolderHistory] = useState<{ id: string; name: string }[]>([{ id: 'root', name: 'My Drive' }]);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
@@ -198,18 +124,35 @@ export default function Page() {
   // Menus & Modals
   const [newMenuOpen, setNewMenuOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [settingsMenuOpen, setSettingsMenuOpen] = useState(false);
+  const [settingsModalOpen, setSettingsModalOpen] = useState(false);
+  const [settingsTab, setSettingsTab] = useState<'general' | 'storage' | 'notifications' | 'shortcuts'>('general');
+  const [density, setDensity] = useState<'comfortable' | 'compact'>(() => {
+    if (typeof window === 'undefined') return 'comfortable';
+    try {
+      const saved = localStorage.getItem('asterdrive_density');
+      if (saved === 'compact' || saved === 'comfortable') return saved;
+    } catch {
+      // ignore
+    }
+    return 'comfortable';
+  });
+  const [autoSync, setAutoSync] = useState(true);
+  const [offlineAccess, setOfflineAccess] = useState(true);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [profileModalOpen, setProfileModalOpen] = useState(false);
   const [previewItem, setPreviewItem] = useState<DriveItem | null>(null);
   const [shareItem, setShareItem] = useState<DriveItem | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  // Media Preview States
+  // Media Preview States (Google Drive Style)
   const [activeMediaUrl, setActiveMediaUrl] = useState<string | null>(null);
   const [isLoadingMedia, setIsLoadingMedia] = useState<boolean>(false);
   const [imageZoom, setImageZoom] = useState<number>(1);
   const [imageRotation, setImageRotation] = useState<number>(0);
-  const [previewTab, setPreviewTab] = useState<'preview' | 'details'>('preview');
+  const [showPreviewInfo, setShowPreviewInfo] = useState<boolean>(false);
+  const [previewTab, setPreviewTab] = useState<'details' | 'activity'>('details');
+  const [docPage, setDocPage] = useState<number>(1);
   const videoRef = useRef<HTMLVideoElement>(null);
 
   // People & Collaborators State
@@ -232,13 +175,33 @@ export default function Page() {
   // Refs for clicking outside
   const newMenuRef = useRef<HTMLDivElement>(null);
   const notifRef = useRef<HTMLDivElement>(null);
+  const settingsMenuRef = useRef<HTMLDivElement>(null);
   const userMenuRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 3000);
   };
+
+  // Save items when updated
+  useEffect(() => {
+    try {
+      localStorage.setItem('asterdrive_items_v2', JSON.stringify(items));
+    } catch (e) {
+      console.error('Failed to save items to local storage:', e);
+    }
+  }, [items]);
+
+  // Save density when updated
+  useEffect(() => {
+    try {
+      localStorage.setItem('asterdrive_density', density);
+    } catch (e) {
+      console.error('Failed to save density to local storage:', e);
+    }
+  }, [density]);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -248,6 +211,9 @@ export default function Page() {
       }
       if (notifRef.current && !notifRef.current.contains(target)) {
         setNotificationsOpen(false);
+      }
+      if (settingsMenuRef.current && !settingsMenuRef.current.contains(target)) {
+        setSettingsMenuOpen(false);
       }
       if (userMenuRef.current && !userMenuRef.current.contains(target)) {
         setUserMenuOpen(false);
@@ -260,7 +226,7 @@ export default function Page() {
   const handleOpenPreview = (item: DriveItem) => {
     setImageZoom(1);
     setImageRotation(0);
-    setPreviewTab('preview');
+    setDocPage(1);
     if (item.type === 'video' && item.videoUrl) {
       setActiveMediaUrl(item.videoUrl);
       setIsLoadingMedia(false);
@@ -304,11 +270,7 @@ export default function Page() {
       }
 
       if (isMounted && previewItem) {
-        if (previewItem.type === 'video') {
-          setActiveMediaUrl('https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4');
-        } else if (previewItem.type === 'image') {
-          setActiveMediaUrl('https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=1600&q=80');
-        }
+        setActiveMediaUrl(null);
         setIsLoadingMedia(false);
       }
     }
@@ -357,6 +319,128 @@ export default function Page() {
     });
   }, [items, activeTab, currentFolderId, searchQuery]);
 
+  // Google Drive file navigation list (excluding folders)
+  const previewableFiles = useMemo(() => {
+    return currentItems.filter((it) => it.type !== 'folder');
+  }, [currentItems]);
+
+  const currentPreviewIndex = useMemo(() => {
+    if (!previewItem) return -1;
+    return previewableFiles.findIndex((it) => it.id === previewItem.id);
+  }, [previewItem, previewableFiles]);
+
+  const hasPrevPreview = currentPreviewIndex > 0;
+  const hasNextPreview = currentPreviewIndex >= 0 && currentPreviewIndex < previewableFiles.length - 1;
+
+  const handlePrevPreview = () => {
+    if (hasPrevPreview) {
+      handleOpenPreview(previewableFiles[currentPreviewIndex - 1]);
+    }
+  };
+
+  const handleNextPreview = () => {
+    if (hasNextPreview) {
+      handleOpenPreview(previewableFiles[currentPreviewIndex + 1]);
+    }
+  };
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const activeEl = document.activeElement;
+      const isInput =
+        activeEl &&
+        (activeEl.tagName === 'INPUT' ||
+          activeEl.tagName === 'TEXTAREA' ||
+          (activeEl as HTMLElement).isContentEditable);
+
+      // 1. ESC: close any open modal or preview
+      if (e.key === 'Escape') {
+        if (previewItem) {
+          handleClosePreview();
+          return;
+        }
+        if (settingsModalOpen) {
+          setSettingsModalOpen(false);
+          return;
+        }
+        if (profileModalOpen) {
+          setProfileModalOpen(false);
+          return;
+        }
+        if (shareItem) {
+          setShareItem(null);
+          return;
+        }
+        if (showInviteModal) {
+          setShowInviteModal(false);
+          return;
+        }
+        setSettingsMenuOpen(false);
+        setUserMenuOpen(false);
+        setNewMenuOpen(false);
+        setNotificationsOpen(false);
+        return;
+      }
+
+      // 2. Preview navigation
+      if (previewItem) {
+        if (e.key === 'ArrowLeft') {
+          if (currentPreviewIndex > 0) {
+            handleOpenPreview(previewableFiles[currentPreviewIndex - 1]);
+          }
+        } else if (e.key === 'ArrowRight') {
+          if (currentPreviewIndex >= 0 && currentPreviewIndex < previewableFiles.length - 1) {
+            handleOpenPreview(previewableFiles[currentPreviewIndex + 1]);
+          }
+        }
+        return;
+      }
+
+      // 3. Global shortcuts (only when not typing in form inputs)
+      if (isInput) return;
+
+      // ⌘K or / to focus search
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+        return;
+      }
+      if (e.key === '/') {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+        return;
+      }
+
+      // 'v' or 'V' to toggle view mode
+      if (e.key.toLowerCase() === 'v') {
+        e.preventDefault();
+        setViewMode((prev) => (prev === 'grid' ? 'list' : 'grid'));
+        showToast(`Tampilan diubah ke ${viewMode === 'grid' ? 'List' : 'Grid'}`);
+        return;
+      }
+
+      // '?' to open Keyboard Shortcuts in Settings
+      if (e.key === '?') {
+        e.preventDefault();
+        setSettingsTab('shortcuts');
+        setSettingsModalOpen(true);
+        return;
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [
+    previewItem,
+    currentPreviewIndex,
+    previewableFiles,
+    settingsModalOpen,
+    profileModalOpen,
+    shareItem,
+    showInviteModal,
+    viewMode
+  ]);
+
   // Actions
   const handleUploadClick = () => {
     fileInputRef.current?.click();
@@ -396,6 +480,17 @@ export default function Page() {
       };
 
       setItems((prev) => [newItem, ...prev]);
+
+      setActivities((prev) => [
+        {
+          id: 'act_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
+          action: 'Uploaded file',
+          item: file.name,
+          time: 'Baru saja',
+          user: 'Alex Driver'
+        },
+        ...prev
+      ]);
     });
 
     showToast(`Uploaded ${files.length} file(s) to AsterDrive`);
@@ -415,6 +510,16 @@ export default function Page() {
       owner: 'Alex Driver'
     };
     setItems((prev) => [newFolder, ...prev]);
+    setActivities((prev) => [
+      {
+        id: 'act_' + Date.now(),
+        action: 'Created folder',
+        item: name,
+        time: 'Baru saja',
+        user: 'Alex Driver'
+      },
+      ...prev
+    ]);
     setNewMenuOpen(false);
     showToast(`Created folder "${name}"`);
   };
@@ -428,6 +533,19 @@ export default function Page() {
 
   const handleTrashItem = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
+    const targetItem = items.find((it) => it.id === id);
+    if (targetItem) {
+      setActivities((prev) => [
+        {
+          id: 'act_' + Date.now(),
+          action: 'Moved to trash',
+          item: targetItem.name,
+          time: 'Baru saja',
+          user: 'Alex Driver'
+        },
+        ...prev
+      ]);
+    }
     setItems((prev) =>
       prev.map((it) => (it.id === id ? { ...it, trashed: true } : it))
     );
@@ -436,6 +554,19 @@ export default function Page() {
 
   const handleRestoreItem = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
+    const targetItem = items.find((it) => it.id === id);
+    if (targetItem) {
+      setActivities((prev) => [
+        {
+          id: 'act_' + Date.now(),
+          action: 'Restored from trash',
+          item: targetItem.name,
+          time: 'Baru saja',
+          user: 'Alex Driver'
+        },
+        ...prev
+      ]);
+    }
     setItems((prev) =>
       prev.map((it) => (it.id === id ? { ...it, trashed: false } : it))
     );
@@ -444,6 +575,19 @@ export default function Page() {
 
   const handleDeletePermanent = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
+    const targetItem = items.find((it) => it.id === id);
+    if (targetItem) {
+      setActivities((prev) => [
+        {
+          id: 'act_' + Date.now(),
+          action: 'Deleted permanently',
+          item: targetItem.name,
+          time: 'Baru saja',
+          user: 'Alex Driver'
+        },
+        ...prev
+      ]);
+    }
     deleteFileBlob(id);
     setItems((prev) => prev.filter((it) => it.id !== id));
     showToast('Deleted forever');
@@ -453,6 +597,16 @@ export default function Page() {
     const trashed = items.filter((it) => it.trashed);
     trashed.forEach((it) => deleteFileBlob(it.id));
     setItems((prev) => prev.filter((it) => !it.trashed));
+    setActivities((prev) => [
+      {
+        id: 'act_' + Date.now(),
+        action: 'Emptied trash',
+        item: `${trashed.length} item(s)`,
+        time: 'Baru saja',
+        user: 'Alex Driver'
+      },
+      ...prev
+    ]);
     showToast('Trash emptied');
   };
 
@@ -611,10 +765,11 @@ export default function Page() {
             <div className="relative flex-1 max-w-xs md:max-w-sm lg:max-w-md ml-3 sm:ml-4 lg:ml-6 hidden sm:flex items-center">
               <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 pointer-events-none" />
               <input
+                ref={searchInputRef}
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search files, folders, or docs..."
+                placeholder="Search files, folders, or docs... (Press / to focus)"
                 className="w-full h-8 pl-8 pr-12 bg-slate-900/90 border border-slate-700/60 rounded-md text-xs text-slate-200 placeholder-slate-400 focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500/40 transition-all"
               />
               {searchQuery ? (
@@ -731,6 +886,60 @@ export default function Page() {
                         <p className="text-slate-400 text-[10px]">Sarah shared &quot;Roadmap_2026.pdf&quot;</p>
                       </div>
                     </div>
+                  </div>
+                )}
+              </div>
+
+              {/* SETTINGS ICON BUTTON (Google Drive standard) */}
+              <div className="relative" ref={settingsMenuRef}>
+                <button
+                  type="button"
+                  onClick={() => setSettingsMenuOpen(!settingsMenuOpen)}
+                  title="Settings / Setelan"
+                  aria-label="Settings"
+                  className="p-1.5 rounded-md text-slate-400 hover:text-white hover:bg-slate-800/60 focus:outline-none transition-colors shrink-0"
+                >
+                  <Settings className="w-4 h-4" />
+                </button>
+
+                {settingsMenuOpen && (
+                  <div className="absolute right-0 mt-2 w-52 bg-[#121620] border border-[#1e2433] rounded-lg shadow-xl py-1.5 z-50 text-xs">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSettingsTab('general');
+                        setSettingsModalOpen(true);
+                        setSettingsMenuOpen(false);
+                      }}
+                      className="w-full px-3 py-2 text-left flex items-center gap-2.5 text-slate-200 hover:bg-slate-800/70 hover:text-white"
+                    >
+                      <Settings className="w-4 h-4 text-orange-400" />
+                      <span>Settings</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSettingsTab('shortcuts');
+                        setSettingsModalOpen(true);
+                        setSettingsMenuOpen(false);
+                      }}
+                      className="w-full px-3 py-2 text-left flex items-center gap-2.5 text-slate-200 hover:bg-slate-800/70 hover:text-white"
+                    >
+                      <Key className="w-4 h-4 text-amber-400" />
+                      <span>Keyboard shortcuts</span>
+                    </button>
+                    <div className="my-1 border-t border-[#1e2433]" />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        showToast('AsterDrive Desktop Client v2.4 (Terpasang)');
+                        setSettingsMenuOpen(false);
+                      }}
+                      className="w-full px-3 py-2 text-left flex items-center gap-2.5 text-slate-200 hover:bg-slate-800/70 hover:text-white"
+                    >
+                      <Laptop className="w-4 h-4 text-blue-400" />
+                      <span>Get AsterDrive for Desktop</span>
+                    </button>
                   </div>
                 )}
               </div>
@@ -1058,6 +1267,18 @@ export default function Page() {
               <MessageSquare className={`w-4 h-4 ${activeTab === 'feedback' ? 'text-orange-500' : 'text-slate-400'}`} />
               <span>Feedback</span>
             </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setSettingsModalOpen(true);
+                setSidebarOpen(false);
+              }}
+              className="w-full flex items-center gap-3 px-3 py-2 rounded-lg font-medium transition-colors text-slate-400 hover:text-slate-200 hover:bg-slate-900/60"
+            >
+              <Settings className="w-4 h-4 text-slate-400" />
+              <span>Settings</span>
+            </button>
           </nav>
 
           {/* Footer links from screenshot */}
@@ -1190,20 +1411,28 @@ export default function Page() {
                   </button>
                 </div>
               ) : viewMode === 'grid' ? (
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3.5">
+                <div
+                  className={
+                    density === 'compact'
+                      ? 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2.5'
+                      : 'grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3.5'
+                  }
+                >
                   {currentItems.map((item) => (
                     <div
                       key={item.id}
                       onClick={() => (item.type === 'folder' ? handleFolderClick(item) : handleOpenPreview(item))}
-                      className="bg-[#11141d] hover:bg-[#151924] border border-[#1e2433] hover:border-slate-700/80 rounded-xl p-3.5 transition-all cursor-pointer group flex flex-col justify-between"
+                      className={`bg-[#11141d] hover:bg-[#151924] border border-[#1e2433] hover:border-slate-700/80 rounded-xl transition-all cursor-pointer group flex flex-col justify-between ${
+                        density === 'compact' ? 'p-2.5' : 'p-3.5'
+                      }`}
                     >
                       <div>
                         <div className="flex items-start justify-between gap-2">
                           <div className="flex items-center gap-2.5 truncate">
-                            <div className="p-2 rounded-lg bg-slate-800/60 shrink-0">
+                            <div className={`rounded-lg bg-slate-800/60 shrink-0 ${density === 'compact' ? 'p-1.5' : 'p-2'}`}>
                               {getItemIcon(item.type)}
                             </div>
-                            <span className="text-xs font-semibold text-slate-200 truncate group-hover:text-white">
+                            <span className={`${density === 'compact' ? 'text-[11px]' : 'text-xs'} font-semibold text-slate-200 truncate group-hover:text-white`}>
                               {item.name}
                             </span>
                           </div>
@@ -1218,7 +1447,7 @@ export default function Page() {
 
                         {/* Image Preview Thumbnail */}
                         {item.type === 'image' && (item.thumbnailUrl || item.previewUrl) && (
-                          <div className="mt-3 relative w-full h-28 rounded-lg overflow-hidden bg-black/40 border border-[#1e2433]/70 group-hover:border-orange-500/40 transition-all">
+                          <div className={`mt-2.5 relative w-full ${density === 'compact' ? 'h-20' : 'h-28'} rounded-lg overflow-hidden bg-black/40 border border-[#1e2433]/70 group-hover:border-orange-500/40 transition-all`}>
                             {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img
                               src={item.thumbnailUrl || item.previewUrl}
@@ -1237,7 +1466,7 @@ export default function Page() {
 
                         {/* Video Preview Card */}
                         {item.type === 'video' && (
-                          <div className="mt-3 relative w-full h-28 rounded-lg overflow-hidden bg-slate-950 border border-[#1e2433]/70 group-hover:border-orange-500/40 transition-all flex items-center justify-center">
+                          <div className={`mt-2.5 relative w-full ${density === 'compact' ? 'h-20' : 'h-28'} rounded-lg overflow-hidden bg-slate-950 border border-[#1e2433]/70 group-hover:border-orange-500/40 transition-all flex items-center justify-center`}>
                             {item.thumbnailUrl ? (
                               /* eslint-disable-next-line @next/next/no-img-element */
                               <img
@@ -1264,7 +1493,7 @@ export default function Page() {
                         )}
                       </div>
 
-                      <div className="mt-3 pt-2 border-t border-[#1e2433]/60 flex items-center justify-between text-[11px] text-slate-400">
+                      <div className={`${density === 'compact' ? 'mt-2 pt-1.5 text-[10px]' : 'mt-3 pt-2 text-[11px]'} border-t border-[#1e2433]/60 flex items-center justify-between text-slate-400`}>
                         <span>{formatFileSize(item.size)}</span>
                         <div className="flex items-center gap-1">
                           <button
@@ -1294,12 +1523,12 @@ export default function Page() {
               ) : (
                 <div className="bg-[#11141d] border border-[#1e2433] rounded-xl overflow-hidden">
                   <table className="w-full text-left text-xs text-slate-300">
-                    <thead className="bg-slate-900/60 text-slate-400 text-[11px] uppercase tracking-wider border-b border-[#1e2433]">
+                    <thead className={`bg-slate-900/60 text-slate-400 ${density === 'compact' ? 'text-[10px]' : 'text-[11px]'} uppercase tracking-wider border-b border-[#1e2433]`}>
                       <tr>
-                        <th className="px-4 py-2.5 font-medium">Name</th>
-                        <th className="px-4 py-2.5 font-medium hidden sm:table-cell">Owner</th>
-                        <th className="px-4 py-2.5 font-medium hidden md:table-cell">Size</th>
-                        <th className="px-4 py-2.5 font-medium text-right">Actions</th>
+                        <th className={`${density === 'compact' ? 'px-3 py-1.5' : 'px-4 py-2.5'} font-medium`}>Name</th>
+                        <th className={`${density === 'compact' ? 'px-3 py-1.5' : 'px-4 py-2.5'} font-medium hidden sm:table-cell`}>Owner</th>
+                        <th className={`${density === 'compact' ? 'px-3 py-1.5' : 'px-4 py-2.5'} font-medium hidden md:table-cell`}>Size</th>
+                        <th className={`${density === 'compact' ? 'px-3 py-1.5' : 'px-4 py-2.5'} font-medium text-right`}>Actions</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-[#1e2433]/60">
@@ -1309,13 +1538,13 @@ export default function Page() {
                           onClick={() => (item.type === 'folder' ? handleFolderClick(item) : handleOpenPreview(item))}
                           className="hover:bg-slate-800/40 cursor-pointer transition-colors"
                         >
-                          <td className="px-4 py-2.5 flex items-center gap-2.5 truncate max-w-xs">
+                          <td className={`${density === 'compact' ? 'px-3 py-1.5' : 'px-4 py-2.5'} flex items-center gap-2.5 truncate max-w-xs`}>
                             {getItemIcon(item.type)}
                             <span className="font-medium text-slate-200 truncate">{item.name}</span>
                           </td>
-                          <td className="px-4 py-2.5 text-slate-400 hidden sm:table-cell">{item.owner}</td>
-                          <td className="px-4 py-2.5 text-slate-400 hidden md:table-cell">{formatFileSize(item.size)}</td>
-                          <td className="px-4 py-2.5 text-right space-x-1">
+                          <td className={`${density === 'compact' ? 'px-3 py-1.5' : 'px-4 py-2.5'} text-slate-400 hidden sm:table-cell`}>{item.owner}</td>
+                          <td className={`${density === 'compact' ? 'px-3 py-1.5' : 'px-4 py-2.5'} text-slate-400 hidden md:table-cell`}>{formatFileSize(item.size)}</td>
+                          <td className={`${density === 'compact' ? 'px-3 py-1.5' : 'px-4 py-2.5'} text-right space-x-1`}>
                             <button
                               type="button"
                               onClick={(e) => handleToggleStar(item.id, e)}
@@ -1476,28 +1705,29 @@ export default function Page() {
                 <div className="text-xs font-semibold text-slate-300 uppercase tracking-wider pb-2 border-b border-[#1e2433]">
                   Event History
                 </div>
-                {[
-                  { action: 'Uploaded file', item: 'AsterDrive_Architecture_Overview.pdf', time: '10 minutes ago', user: 'Alex Driver' },
-                  { action: 'Shared with viewer', item: 'Hero_Design_Concept_v3.png', time: '1 hour ago', user: 'Sarah Connor' },
-                  { action: 'Synced from MacBook', item: 'Local_Project_Backup.zip', time: '3 hours ago', user: 'Alex Driver' },
-                  { action: 'Created folder', item: 'Designs & Assets', time: 'Yesterday', user: 'Alex Driver' }
-                ].map((act, idx) => (
-                  <div key={idx} className="flex items-center justify-between pb-3 border-b border-[#1e2433] last:border-none last:pb-0 text-xs">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-lg bg-slate-800/70 flex items-center justify-center text-orange-400">
-                        <Activity className="w-4 h-4" />
-                      </div>
-                      <div>
-                        <p className="text-slate-200 font-medium">
-                          <span className="text-white font-semibold">{act.user}</span> {act.action}{' '}
-                          <span className="text-orange-400 font-medium">&quot;{act.item}&quot;</span>
-                        </p>
-                        <p className="text-slate-500 text-[11px]">{act.time}</p>
-                      </div>
-                    </div>
-                    <span className="text-[10px] bg-slate-800 text-slate-300 px-2 py-0.5 rounded">Success</span>
+                {activities.length === 0 ? (
+                  <div className="py-8 text-center text-slate-500 text-xs">
+                    Belum ada riwayat aktivitas. Unggah berkas atau buat folder untuk mulai mencatat riwayat aktivitas.
                   </div>
-                ))}
+                ) : (
+                  activities.map((act) => (
+                    <div key={act.id} className="flex items-center justify-between pb-3 border-b border-[#1e2433] last:border-none last:pb-0 text-xs">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-lg bg-slate-800/70 flex items-center justify-center text-orange-400">
+                          <Activity className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <p className="text-slate-200 font-medium">
+                            <span className="text-white font-semibold">{act.user}</span> {act.action}{' '}
+                            <span className="text-orange-400 font-medium">&quot;{act.item}&quot;</span>
+                          </p>
+                          <p className="text-slate-500 text-[11px]">{act.time}</p>
+                        </div>
+                      </div>
+                      <span className="text-[10px] bg-slate-800 text-slate-300 px-2 py-0.5 rounded">Success</span>
+                    </div>
+                  ))
+                )}
               </div>
             </div>
           )}
@@ -1888,6 +2118,268 @@ export default function Page() {
         </div>
       )}
 
+      {/* ===================================================================
+        MODAL: GOOGLE DRIVE STYLE ASTERDRIVE SETTINGS MODAL
+        =================================================================== */}
+      {settingsModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="w-full max-w-2xl bg-[#11141d] border border-[#1e2433] rounded-2xl shadow-2xl overflow-hidden text-slate-100 animate-in fade-in zoom-in-95 duration-150 flex flex-col max-h-[85vh]">
+            {/* Modal Header */}
+            <div className="px-6 py-4 border-b border-[#1e2433] flex items-center justify-between bg-[#151924]/60">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-orange-500/20 text-orange-400 flex items-center justify-center">
+                  <Settings className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-base text-white">Settings</h3>
+                  <p className="text-xs text-slate-400">Manage AsterDrive preferences, storage, and shortcuts</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSettingsModalOpen(false)}
+                className="p-1 rounded-md text-slate-400 hover:text-white hover:bg-slate-800/60 transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Modal Navigation Tabs */}
+            <div className="flex border-b border-[#1e2433] bg-[#0c0e14]/50 px-6 text-xs font-medium">
+              {[
+                { id: 'general', label: 'General' },
+                { id: 'storage', label: 'Storage' },
+                { id: 'notifications', label: 'Notifications' },
+                { id: 'shortcuts', label: 'Keyboard Shortcuts' }
+              ].map((tab) => (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setSettingsTab(tab.id as typeof settingsTab)}
+                  className={`py-3 px-3 border-b-2 font-medium transition-colors ${
+                    settingsTab === tab.id
+                      ? 'border-orange-500 text-orange-400'
+                      : 'border-transparent text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6 overflow-y-auto space-y-6 text-xs flex-1">
+              {/* TAB: GENERAL */}
+              {settingsTab === 'general' && (
+                <div className="space-y-6">
+                  {/* Density Setting */}
+                  <div className="space-y-2">
+                    <label className="text-slate-200 font-semibold block text-xs">
+                      Density (Tampilan Berkas)
+                    </label>
+                    <p className="text-slate-400 text-[11px]">
+                      Choose how compact list and grid items appear across AsterDrive.
+                    </p>
+                    <div className="grid grid-cols-2 gap-3 pt-1">
+                      <button
+                        type="button"
+                        onClick={() => setDensity('comfortable')}
+                        className={`p-3 rounded-xl border text-left transition-all ${
+                          density === 'comfortable'
+                            ? 'border-orange-500 bg-orange-500/10 text-white'
+                            : 'border-[#1e2433] bg-[#0c0e14]/60 text-slate-400 hover:border-slate-700'
+                        }`}
+                      >
+                        <div className="font-semibold text-slate-200 flex items-center justify-between">
+                          <span>Comfortable</span>
+                          {density === 'comfortable' && <Check className="w-3.5 h-3.5 text-orange-500" />}
+                        </div>
+                        <p className="text-[11px] text-slate-400 mt-1">Default spacious layout with clear file cards</p>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setDensity('compact')}
+                        className={`p-3 rounded-xl border text-left transition-all ${
+                          density === 'compact'
+                            ? 'border-orange-500 bg-orange-500/10 text-white'
+                            : 'border-[#1e2433] bg-[#0c0e14]/60 text-slate-400 hover:border-slate-700'
+                        }`}
+                      >
+                        <div className="font-semibold text-slate-200 flex items-center justify-between">
+                          <span>Compact</span>
+                          {density === 'compact' && <Check className="w-3.5 h-3.5 text-orange-500" />}
+                        </div>
+                        <p className="text-[11px] text-slate-400 mt-1">Dense view showing maximum files on screen</p>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Sync & Offline Toggles */}
+                  <div className="space-y-3 pt-4 border-t border-[#1e2433]">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="font-medium text-slate-200">Automatic Cloud Sync</p>
+                        <p className="text-[11px] text-slate-400">Instantly save uploaded items to your secure IndexedDB vault</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setAutoSync(!autoSync)}
+                        className={`w-10 h-5 rounded-full transition-colors p-0.5 ${autoSync ? 'bg-orange-500' : 'bg-slate-800'}`}
+                      >
+                        <div className={`w-4 h-4 rounded-full bg-white transition-transform ${autoSync ? 'translate-x-5' : 'translate-x-0'}`} />
+                      </button>
+                    </div>
+
+                    <div className="flex items-center justify-between pt-2">
+                      <div>
+                        <p className="font-medium text-slate-200">Offline File Cache</p>
+                        <p className="text-[11px] text-slate-400">Keep recent documents accessible without an active internet connection</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setOfflineAccess(!offlineAccess)}
+                        className={`w-10 h-5 rounded-full transition-colors p-0.5 ${offlineAccess ? 'bg-orange-500' : 'bg-slate-800'}`}
+                      >
+                        <div className={`w-4 h-4 rounded-full bg-white transition-transform ${offlineAccess ? 'translate-x-5' : 'translate-x-0'}`} />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* TAB: STORAGE */}
+              {settingsTab === 'storage' && (
+                <div className="space-y-5">
+                  <div className="p-4 rounded-xl bg-[#0c0e14]/60 border border-[#1e2433] space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="font-medium text-slate-300">Penyimpanan Terpakai</span>
+                      <span className="font-mono font-semibold text-orange-400">
+                        {formatFileSize(items.reduce((acc, it) => acc + (it.size || 0), 0))} / 15 GB
+                      </span>
+                    </div>
+                    <div className="w-full h-2 bg-slate-800 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-gradient-to-r from-orange-500 to-amber-500 rounded-full"
+                        style={{
+                          width: `${Math.min(
+                            100,
+                            (items.reduce((acc, it) => acc + (it.size || 0), 0) / (1024 * 1024 * 1024)) * 100
+                          )}%`
+                        }}
+                      />
+                    </div>
+                    <p className="text-[11px] text-slate-500">
+                      AsterDrive Vault memberikan 15 GB penyimpanan lokal berkecepatan tinggi terenkripsi AES-256-GCM.
+                    </p>
+                  </div>
+
+                  <div className="flex items-center justify-between p-3.5 bg-slate-900/40 border border-[#1e2433] rounded-xl">
+                    <div>
+                      <p className="font-medium text-slate-200">Bersihkan Sampah</p>
+                      <p className="text-[11px] text-slate-400">Kosongkan berkas yang telah dihapus permanen untuk menghemat ruang</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        handleEmptyTrash();
+                        showToast('Sampah berhasil dikosongkan');
+                      }}
+                      className="px-3 py-1.5 text-xs text-rose-400 hover:text-rose-300 bg-rose-500/10 hover:bg-rose-500/20 rounded-md border border-rose-500/20 transition-colors"
+                    >
+                      Kosongkan Sekarang
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* TAB: NOTIFICATIONS */}
+              {settingsTab === 'notifications' && (
+                <div className="space-y-4">
+                  <p className="text-slate-400 text-[11px]">
+                    Atur pemberitahuan untuk aktivitas berkas dan update keamanan di AsterDrive.
+                  </p>
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between p-3 bg-[#0c0e14]/60 border border-[#1e2433] rounded-xl">
+                      <div>
+                        <p className="font-medium text-slate-200">Notifikasi Unggahan Berkas</p>
+                        <p className="text-[11px] text-slate-400">Tampilkan notifikasi saat berkas selesai diunggah</p>
+                      </div>
+                      <input type="checkbox" defaultChecked className="accent-orange-500 w-4 h-4 cursor-pointer" />
+                    </div>
+
+                    <div className="flex items-center justify-between p-3 bg-[#0c0e14]/60 border border-[#1e2433] rounded-xl">
+                      <div>
+                        <p className="font-medium text-slate-200">Pemberitahuan Kolaborasi</p>
+                        <p className="text-[11px] text-slate-400">Tampilkan notifikasi saat rekan membagikan dokumen</p>
+                      </div>
+                      <input type="checkbox" defaultChecked className="accent-orange-500 w-4 h-4 cursor-pointer" />
+                    </div>
+
+                    <div className="flex items-center justify-between p-3 bg-[#0c0e14]/60 border border-[#1e2433] rounded-xl">
+                      <div>
+                        <p className="font-medium text-slate-200">Peringatan Keamanan</p>
+                        <p className="text-[11px] text-slate-400">Notifikasi saat pemindaian integritas enkripsi berkas selesai</p>
+                      </div>
+                      <input type="checkbox" defaultChecked className="accent-orange-500 w-4 h-4 cursor-pointer" />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* TAB: SHORTCUTS */}
+              {settingsTab === 'shortcuts' && (
+                <div className="space-y-4">
+                  <p className="text-slate-400 text-[11px]">
+                    Gunakan pintasan keyboard untuk mempercepat navigasi dan manajemen berkas:
+                  </p>
+                  <div className="border border-[#1e2433] rounded-xl overflow-hidden divide-y divide-[#1e2433]">
+                    {[
+                      { key: 'Space', desc: 'Buka pratinjau berkas / media lightbox' },
+                      { key: '← / →', desc: 'Navigasi ke berkas sebelumnya / berikutnya di viewer' },
+                      { key: 'Esc', desc: 'Tutup pratinjau atau jendela modal' },
+                      { key: '⌘K / /', desc: 'Fokus ke kolom pencarian berkas' },
+                      { key: 'Del / Backspace', desc: 'Pindahkan berkas terpilih ke Sampah' }
+                    ].map((sc, i) => (
+                      <div key={i} className="p-3 flex items-center justify-between bg-[#0c0e14]/40">
+                        <span className="text-slate-300 font-medium">{sc.desc}</span>
+                        <kbd className="px-2 py-0.5 bg-slate-800 text-slate-200 font-mono rounded border border-slate-700 text-[11px]">
+                          {sc.key}
+                        </kbd>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="px-6 py-3.5 bg-[#151924]/60 border-t border-[#1e2433] flex items-center justify-between">
+              <span className="text-[11px] text-slate-500">AsterDrive v2.4.0 • Obsidian Dark</span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setSettingsModalOpen(false)}
+                  className="px-3 py-1.5 text-xs text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 rounded-md transition-colors"
+                >
+                  Tutup
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSettingsModalOpen(false);
+                    showToast('Setelan berhasil disimpan');
+                  }}
+                  className="px-3.5 py-1.5 text-xs font-medium bg-orange-500 hover:bg-orange-600 text-white rounded-md shadow-sm transition-colors"
+                >
+                  Simpan Perubahan
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* MODAL: INVITE COLLABORATOR */}
       {showInviteModal && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
@@ -1941,460 +2433,571 @@ export default function Page() {
         </div>
       )}
 
-      {/* MODAL: PREVIEW ITEM (Full Media Player & File Viewer) */}
+      {/* MODAL: GOOGLE DRIVE STYLE FULLSCREEN MEDIA & FILE VIEWER */}
       {previewItem && (
-        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-5 overflow-y-auto">
-          <div className="w-full max-w-4xl bg-[#11141d] border border-[#1e2433] rounded-2xl shadow-2xl flex flex-col overflow-hidden text-slate-100 max-h-[92vh]">
-            {/* Header */}
-            <div className="px-5 py-3.5 bg-[#151924]/80 border-b border-[#1e2433] flex items-center justify-between gap-3">
+        <div className="fixed inset-0 z-50 bg-[#090b10]/95 backdrop-blur-md flex flex-col text-slate-100 select-none overflow-hidden animate-in fade-in duration-200">
+          {/* 1. Google Drive Top Bar */}
+          <div className="h-14 px-4 bg-[#10131c]/90 border-b border-[#1e2433] flex items-center justify-between shrink-0 z-30">
+            {/* Left: Back Arrow, Type Icon, File Name, Star */}
+            <div className="flex items-center gap-3 min-w-0 mr-4">
+              <button
+                type="button"
+                onClick={handleClosePreview}
+                className="p-2 -ml-1 text-slate-300 hover:text-white hover:bg-slate-800/80 rounded-full transition-colors"
+                title="Tutup (Esc)"
+              >
+                <ArrowLeft className="w-5 h-5" />
+              </button>
+
               <div className="flex items-center gap-2.5 min-w-0">
                 <div className="p-1.5 rounded-lg bg-slate-800/80 shrink-0">
                   {getItemIcon(previewItem.type)}
                 </div>
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
-                    <span className="font-semibold text-sm text-white truncate max-w-xs sm:max-w-md">
+                    <span className="font-semibold text-sm text-white truncate max-w-[200px] sm:max-w-md lg:max-w-xl">
                       {previewItem.name}
                     </span>
                     <button
                       type="button"
                       onClick={(e) => handleToggleStar(previewItem.id, e)}
-                      className="text-slate-400 hover:text-amber-400"
-                      title={previewItem.starred ? 'Starred' : 'Add star'}
+                      className="text-slate-400 hover:text-amber-400 p-1"
+                      title={previewItem.starred ? 'Berbintang' : 'Beri bintang'}
                     >
-                      <Star className={`w-3.5 h-3.5 ${previewItem.starred ? 'text-amber-400 fill-amber-400' : ''}`} />
+                      <Star className={`w-4 h-4 ${previewItem.starred ? 'text-amber-400 fill-amber-400' : ''}`} />
                     </button>
                   </div>
-                  <div className="flex items-center gap-2 text-[11px] text-slate-400">
-                    <span className="uppercase text-[10px] font-semibold tracking-wider px-1.5 py-0.5 bg-slate-800 text-orange-400 rounded">
+                  <div className="text-[11px] text-slate-400 flex items-center gap-1.5 hidden sm:flex">
+                    <span className="uppercase font-semibold tracking-wider text-[10px] text-orange-400">
                       {previewItem.type}
                     </span>
                     <span>•</span>
                     <span>{formatFileSize(previewItem.size)}</span>
                     <span>•</span>
-                    <span>{new Date(previewItem.updatedAt).toLocaleDateString('id-ID')}</span>
+                    <span>AsterDrive Cloud</span>
                   </div>
                 </div>
-              </div>
-
-              {/* Header Right Actions */}
-              <div className="flex items-center gap-2 shrink-0">
-                {/* Tabs switcher: Preview vs Details */}
-                <div className="flex items-center bg-[#0c0e14] border border-[#1e2433] rounded-lg p-0.5">
-                  <button
-                    type="button"
-                    onClick={() => setPreviewTab('preview')}
-                    className={`px-2.5 py-1 text-xs rounded-md transition-colors flex items-center gap-1.5 ${
-                      previewTab === 'preview' ? 'bg-orange-500 text-white font-medium' : 'text-slate-400 hover:text-white'
-                    }`}
-                  >
-                    <Eye className="w-3.5 h-3.5" />
-                    <span className="hidden sm:inline">Preview</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setPreviewTab('details')}
-                    className={`px-2.5 py-1 text-xs rounded-md transition-colors flex items-center gap-1.5 ${
-                      previewTab === 'details' ? 'bg-orange-500 text-white font-medium' : 'text-slate-400 hover:text-white'
-                    }`}
-                  >
-                    <Info className="w-3.5 h-3.5" />
-                    <span className="hidden sm:inline">Details</span>
-                  </button>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => handleDownloadItem(previewItem)}
-                  className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white rounded-lg border border-slate-700 transition-colors"
-                  title="Download File"
-                >
-                  <Download className="w-3.5 h-3.5 text-orange-400" />
-                  <span>Download</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handleClosePreview}
-                  className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/80 transition-colors"
-                  aria-label="Close Preview"
-                >
-                  <X className="w-5 h-5" />
-                </button>
               </div>
             </div>
 
-            {/* Modal Body */}
-            <div className="p-4 sm:p-6 overflow-y-auto flex-1">
-              {previewTab === 'details' ? (
-                /* Metadata Details View */
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between pb-3 border-b border-[#1e2433]">
-                    <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-300">File Properties</h4>
-                    <span className="text-[10px] bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded font-medium">
-                      Encrypted AES-256
-                    </span>
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-                    <div className="p-3 bg-[#0c0e14] border border-[#1e2433] rounded-xl space-y-1">
-                      <span className="text-[11px] text-slate-400 font-medium">File Name</span>
-                      <p className="text-slate-200 font-semibold break-all">{previewItem.name}</p>
-                    </div>
-                    <div className="p-3 bg-[#0c0e14] border border-[#1e2433] rounded-xl space-y-1">
-                      <span className="text-[11px] text-slate-400 font-medium">Content Type</span>
-                      <p className="text-slate-200 capitalize font-medium">{previewItem.type} file</p>
-                    </div>
-                    <div className="p-3 bg-[#0c0e14] border border-[#1e2433] rounded-xl space-y-1">
-                      <span className="text-[11px] text-slate-400 font-medium">Exact Size</span>
-                      <p className="text-slate-200 font-medium">{previewItem.size ? `${previewItem.size.toLocaleString()} bytes (${formatFileSize(previewItem.size)})` : 'Folder / Dynamic'}</p>
-                    </div>
-                    <div className="p-3 bg-[#0c0e14] border border-[#1e2433] rounded-xl space-y-1">
-                      <span className="text-[11px] text-slate-400 font-medium">Owner</span>
-                      <p className="text-slate-200 font-medium">{previewItem.owner}</p>
-                    </div>
-                    <div className="p-3 bg-[#0c0e14] border border-[#1e2433] rounded-xl space-y-1">
-                      <span className="text-[11px] text-slate-400 font-medium">Last Modified</span>
-                      <p className="text-slate-200 font-medium">{new Date(previewItem.updatedAt).toLocaleString('id-ID')}</p>
-                    </div>
-                    <div className="p-3 bg-[#0c0e14] border border-[#1e2433] rounded-xl space-y-1">
-                      <span className="text-[11px] text-slate-400 font-medium">Storage Location</span>
-                      <p className="text-slate-200 font-medium">{previewItem.source === 'computer' ? `Synced from ${previewItem.computerDevice || 'Local PC'}` : 'AsterDrive Cloud Vault'}</p>
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                /* Interactive Preview View */
-                <div>
-                  {/* VIDEO PLAYER */}
-                  {previewItem.type === 'video' && (
-                    <div className="space-y-3">
-                      <div className="relative bg-black rounded-xl overflow-hidden border border-[#1e2433] flex flex-col items-center justify-center min-h-[320px] max-h-[60vh] shadow-2xl">
-                        {isLoadingMedia ? (
-                          <div className="flex flex-col items-center gap-3 text-slate-400 py-16">
-                            <div className="w-8 h-8 border-2 border-orange-500 border-t-transparent rounded-full animate-spin" />
-                            <span className="text-xs">Memuat streaming video AsterDrive...</span>
-                          </div>
-                        ) : activeMediaUrl ? (
-                          <video
-                            ref={videoRef}
-                            key={activeMediaUrl}
-                            src={activeMediaUrl}
-                            controls
-                            autoPlay
-                            playsInline
-                            className="w-full max-h-[56vh] object-contain bg-black outline-none"
-                          >
-                            Browser Anda tidak mendukung tag video HTML5.
-                          </video>
-                        ) : (
-                          <div className="text-center py-12">
-                            <AlertCircle className="w-10 h-10 text-amber-500 mx-auto mb-2" />
-                            <p className="text-sm font-medium text-slate-300">Sumber video tidak tersedia</p>
-                          </div>
-                        )}
-                      </div>
+            {/* Center: "Buka dengan..." / Action Chip */}
+            <div className="hidden md:flex items-center">
+              <div className="px-3.5 py-1.5 bg-[#181d2a] hover:bg-[#202738] border border-[#23293a] text-slate-200 hover:text-white rounded-lg text-xs font-medium flex items-center gap-2 cursor-pointer transition-colors shadow-sm">
+                <div className="w-2 h-2 rounded-full bg-orange-500" />
+                <span>
+                  {previewItem.type === 'video'
+                    ? 'Buka dengan AsterDrive Video Player'
+                    : previewItem.type === 'image'
+                    ? 'Buka dengan AsterDrive Image Viewer'
+                    : previewItem.type === 'spreadsheet'
+                    ? 'Buka dengan AsterDrive Sheets'
+                    : 'Buka dengan AsterDrive Docs'}
+                </span>
+                <ChevronRight className="w-3.5 h-3.5 text-slate-400 rotate-90 ml-1" />
+              </div>
+            </div>
 
-                      {/* Video Bar Controls */}
-                      <div className="flex flex-wrap items-center justify-between gap-2 bg-[#0c0e14] p-3 rounded-xl border border-[#1e2433] text-xs">
-                        <div className="flex items-center gap-2">
-                          <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                          <span className="text-slate-300 font-medium">Direct Video Streaming</span>
-                          <span className="text-slate-600 hidden sm:inline">•</span>
-                          <span className="text-slate-400 hidden sm:inline">1080p Full HD • AAC Audio</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-[11px] text-slate-400 mr-1 hidden sm:inline">Kecepatan:</span>
-                          {[0.75, 1, 1.25, 1.5, 2].map((speed) => (
-                            <button
-                              key={speed}
-                              type="button"
-                              onClick={() => {
-                                if (videoRef.current) {
-                                  videoRef.current.playbackRate = speed;
-                                  showToast(`Kecepatan: ${speed}x`);
-                                }
-                              }}
-                              className="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-[11px] transition-colors"
-                            >
-                              {speed}x
-                            </button>
-                          ))}
-                          <button
-                            type="button"
-                            onClick={() => {
-                              if (videoRef.current) {
-                                if (videoRef.current.requestFullscreen) {
-                                  videoRef.current.requestFullscreen();
-                                }
-                              }
-                            }}
-                            className="ml-2 px-2.5 py-1 rounded bg-orange-500/20 text-orange-400 hover:bg-orange-500/30 flex items-center gap-1 text-[11px] font-medium transition-colors"
-                            title="Layar Penuh"
-                          >
-                            <Maximize2 className="w-3.5 h-3.5" />
-                            <span>Layar Penuh</span>
-                          </button>
-                        </div>
-                      </div>
+            {/* Right: Print, Share, Download, Info Sidebar Toggle, Close */}
+            <div className="flex items-center gap-1 sm:gap-2 shrink-0">
+              {previewItem.type === 'document' && (
+                <button
+                  type="button"
+                  onClick={() => window.print()}
+                  className="p-2 text-slate-300 hover:text-white hover:bg-slate-800/80 rounded-full transition-colors hidden sm:inline-flex"
+                  title="Cetak Berkas"
+                >
+                  <Printer className="w-4 h-4" />
+                </button>
+              )}
+
+              <button
+                type="button"
+                onClick={() => {
+                  const toShare = previewItem;
+                  setShareItem(toShare);
+                }}
+                className="p-2 text-slate-300 hover:text-white hover:bg-slate-800/80 rounded-full transition-colors"
+                title="Bagi Tautan"
+              >
+                <Share2 className="w-4 h-4" />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleDownloadItem(previewItem)}
+                className="p-2 text-slate-300 hover:text-white hover:bg-slate-800/80 rounded-full transition-colors"
+                title="Unduh Berkas"
+              >
+                <Download className="w-4 h-4 text-orange-400" />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setShowPreviewInfo(!showPreviewInfo)}
+                className={`p-2 rounded-full transition-colors ${
+                  showPreviewInfo ? 'bg-orange-500/20 text-orange-400' : 'text-slate-300 hover:text-white hover:bg-slate-800/80'
+                }`}
+                title="Rincian Berkas (Info)"
+              >
+                <Info className="w-4 h-4" />
+              </button>
+
+              <button
+                type="button"
+                onClick={handleClosePreview}
+                className="p-2 text-slate-400 hover:text-white hover:bg-slate-800/80 rounded-full transition-colors ml-1"
+                title="Tutup (Esc)"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+          </div>
+
+          {/* 2. Main Stage with Left & Right Navigation Chevrons */}
+          <div className="flex-1 flex overflow-hidden relative">
+            {/* Left Chevron (Previous File) */}
+            {hasPrevPreview && (
+              <button
+                type="button"
+                onClick={handlePrevPreview}
+                className="absolute left-3 sm:left-6 top-1/2 -translate-y-1/2 z-30 w-11 h-11 rounded-full bg-black/60 hover:bg-black/90 text-white flex items-center justify-center border border-white/10 shadow-2xl backdrop-blur-sm transition-all hover:scale-105 active:scale-95"
+                title={`Sebelumnya: ${previewableFiles[currentPreviewIndex - 1]?.name}`}
+              >
+                <ChevronLeft className="w-6 h-6" />
+              </button>
+            )}
+
+            {/* Right Chevron (Next File) */}
+            {hasNextPreview && (
+              <button
+                type="button"
+                onClick={handleNextPreview}
+                className="absolute right-3 sm:right-6 top-1/2 -translate-y-1/2 z-30 w-11 h-11 rounded-full bg-black/60 hover:bg-black/90 text-white flex items-center justify-center border border-white/10 shadow-2xl backdrop-blur-sm transition-all hover:scale-105 active:scale-95"
+                title={`Berikutnya: ${previewableFiles[currentPreviewIndex + 1]?.name}`}
+              >
+                <ChevronRight className="w-6 h-6" />
+              </button>
+            )}
+
+            {/* Viewer Stage */}
+            <div className="flex-1 flex items-center justify-center p-3 sm:p-6 overflow-auto relative">
+              {/* VIDEO VIEWER (Google Drive Style) */}
+              {previewItem.type === 'video' && (
+                <div className="w-full max-w-5xl h-full max-h-[82vh] flex flex-col items-center justify-center relative">
+                  {isLoadingMedia ? (
+                    <div className="flex flex-col items-center gap-3 text-slate-400">
+                      <div className="w-10 h-10 border-3 border-orange-500 border-t-transparent rounded-full animate-spin" />
+                      <span className="text-sm">Menyiapkan pemutaran video langsung...</span>
                     </div>
-                  )}
-
-                  {/* IMAGE / PHOTO VIEWER */}
-                  {previewItem.type === 'image' && (
-                    <div className="space-y-3">
-                      {/* Image toolbar */}
-                      <div className="flex items-center justify-between bg-[#0c0e14] px-4 py-2 rounded-xl border border-[#1e2433] text-xs">
-                        <span className="text-slate-400 text-[11px]">
-                          Zoom: <span className="text-white font-medium">{Math.round(imageZoom * 100)}%</span> • Rotasi: <span className="text-white font-medium">{imageRotation}°</span>
-                        </span>
-                        <div className="flex items-center gap-1.5">
-                          <button
-                            type="button"
-                            onClick={() => setImageZoom((z) => Math.max(0.5, +(z - 0.25).toFixed(2)))}
-                            title="Perkecil (-)"
-                            className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors"
-                          >
-                            <ZoomOut className="w-4 h-4" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setImageZoom((z) => Math.min(3, +(z + 0.25).toFixed(2)))}
-                            title="Perbesar (+)"
-                            className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors"
-                          >
-                            <ZoomIn className="w-4 h-4" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setImageRotation((r) => (r + 90) % 360)}
-                            title="Putar 90°"
-                            className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors"
-                          >
-                            <RotateCw className="w-4 h-4" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setImageZoom(1);
-                              setImageRotation(0);
-                            }}
-                            title="Reset"
-                            className="px-2 py-1 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg text-[11px] transition-colors"
-                          >
-                            Reset
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* Image Viewer Container */}
-                      <div className="relative bg-[#07090e] rounded-xl border border-[#1e2433] p-4 flex items-center justify-center min-h-[320px] max-h-[60vh] overflow-hidden shadow-2xl">
-                        {isLoadingMedia ? (
-                          <div className="flex flex-col items-center gap-3 text-slate-400 py-16">
-                            <div className="w-8 h-8 border-2 border-orange-500 border-t-transparent rounded-full animate-spin" />
-                            <span className="text-xs">Memuat foto...</span>
-                          </div>
-                        ) : activeMediaUrl || previewItem.previewUrl ? (
-                          <div className="w-full h-full flex items-center justify-center overflow-auto">
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img
-                              src={activeMediaUrl || previewItem.previewUrl}
-                              alt={previewItem.name}
-                              className="max-h-[54vh] max-w-full object-contain rounded-lg shadow-2xl transition-transform duration-200"
-                              style={{
-                                transform: `scale(${imageZoom}) rotate(${imageRotation}deg)`
-                              }}
-                            />
-                          </div>
-                        ) : (
-                          <div className="text-center py-12">
-                            <ImageIcon className="w-10 h-10 text-slate-600 mx-auto mb-2" />
-                            <p className="text-sm font-medium text-slate-300">Foto tidak dapat dimuat</p>
-                          </div>
-                        )}
+                  ) : activeMediaUrl ? (
+                    <div className="w-full h-full flex flex-col items-center justify-center bg-black/90 rounded-2xl overflow-hidden border border-[#1e2433] shadow-2xl relative group">
+                      <video
+                        ref={videoRef}
+                        key={activeMediaUrl}
+                        src={activeMediaUrl}
+                        controls
+                        autoPlay
+                        playsInline
+                        className="w-full h-full max-h-[76vh] object-contain bg-black outline-none"
+                      >
+                        Browser Anda tidak mendukung tag video HTML5.
+                      </video>
+                      <div className="absolute top-3 left-3 bg-black/70 backdrop-blur-sm px-2.5 py-1 rounded-md text-[11px] text-white/90 flex items-center gap-1.5 border border-white/10 pointer-events-none">
+                        <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                        <span>Google Drive Playback Engine • 1080p HD</span>
                       </div>
                     </div>
-                  )}
-
-                  {/* DOCUMENT (PDF / DOC) READER */}
-                  {previewItem.type === 'document' && (
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between bg-[#0c0e14] px-4 py-2 rounded-xl border border-[#1e2433] text-xs">
-                        <div className="flex items-center gap-2 text-slate-300">
-                          <FileText className="w-4 h-4 text-orange-400" />
-                          <span className="font-medium">AsterDrive PDF Document Reader</span>
-                        </div>
-                        <span className="text-slate-400 text-[11px]">Halaman 1 dari 4 • Mode Baca</span>
-                      </div>
-
-                      <div className="bg-[#151924] border border-[#23293a] rounded-xl p-6 sm:p-8 space-y-5 text-slate-200 shadow-xl max-h-[56vh] overflow-y-auto">
-                        <div className="border-b border-[#23293a] pb-4">
-                          <div className="text-[11px] font-semibold text-orange-400 uppercase tracking-widest">
-                            Whitepaper Teknis
-                          </div>
-                          <h2 className="text-xl font-bold text-white mt-1">
-                            AsterDrive: Arsitektur Cloud Storage Terdesentralisasi & Enkripsi Zero-Knowledge
-                          </h2>
-                          <p className="text-xs text-slate-400 mt-1">
-                            Disusun oleh Tim Arsitektur AsterDrive • Tanggal rilis: Oktober 2026
-                          </p>
-                        </div>
-
-                        <div className="space-y-3 text-xs leading-relaxed text-slate-300">
-                          <h3 className="text-sm font-semibold text-white">1. Ringkasan Eksekutif</h3>
-                          <p>
-                            AsterDrive menyediakan penyimpanan awan dengan standar keamanan militer AES-256-GCM. Berkas Anda dipecah menjadi blok terenkripsi sebelum meninggalkan perangkat, memastikan bahwa tidak ada pihak ketiga yang dapat membaca data Anda.
-                          </p>
-
-                          <h3 className="text-sm font-semibold text-white mt-4">2. Mesin Streaming Media Definisi Tinggi</h3>
-                          <p>
-                            Fitur pemutaran video langsung (Direct Playback) memanfaatkan pipeline HTTP Live Streaming (HLS) dan kontainer MP4 terindeks byte-range, memungkinkan pengguna memutar video 1080p/4K tanpa perlu mengunduh keseluruhan berkas terlebih dahulu.
-                          </p>
-
-                          <h3 className="text-sm font-semibold text-white mt-4">3. Sinkronisasi Antar Perangkat</h3>
-                          <p>
-                            Koneksi peer-to-peer terenkripsi memastikan sinkronisasi instan antara komputer desktop (macOS / Windows / Linux) dan cloud vault dengan verifikasi integritas checksum SHA-256.
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* SPREADSHEET VIEWER */}
-                  {previewItem.type === 'spreadsheet' && (
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between bg-[#0c0e14] px-4 py-2 rounded-xl border border-[#1e2433] text-xs">
-                        <div className="flex items-center gap-2 text-slate-300">
-                          <FileSpreadsheet className="w-4 h-4 text-emerald-400" />
-                          <span className="font-medium">Data Spreadsheet: Alokasi Anggaran Q4</span>
-                        </div>
-                        <span className="text-[11px] bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded font-mono">
-                          5 Baris Terindeks
-                        </span>
-                      </div>
-
-                      <div className="bg-[#0c0e14] border border-[#1e2433] rounded-xl overflow-hidden shadow-xl">
-                        <table className="w-full text-left text-xs text-slate-300">
-                          <thead className="bg-[#151924] text-slate-400 text-[11px] uppercase tracking-wider border-b border-[#1e2433]">
-                            <tr>
-                              <th className="px-4 py-2.5 font-medium">Pos Anggaran</th>
-                              <th className="px-4 py-2.5 font-medium">Kapasitas</th>
-                              <th className="px-4 py-2.5 font-medium">Estimasi (USD)</th>
-                              <th className="px-4 py-2.5 font-medium">Status</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-[#1e2433]">
-                            <tr>
-                              <td className="px-4 py-2.5 font-medium text-white">Edge Storage Nodes (Multi-Region S3)</td>
-                              <td className="px-4 py-2.5 text-slate-400">100 TB</td>
-                              <td className="px-4 py-2.5 font-mono text-emerald-400">$1,450.00</td>
-                              <td className="px-4 py-2.5"><span className="text-[10px] bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded">Disetujui</span></td>
-                            </tr>
-                            <tr>
-                              <td className="px-4 py-2.5 font-medium text-white">Video Transcoding GPU Fleet</td>
-                              <td className="px-4 py-2.5 text-slate-400">8x A100 Nodes</td>
-                              <td className="px-4 py-2.5 font-mono text-emerald-400">$3,200.00</td>
-                              <td className="px-4 py-2.5"><span className="text-[10px] bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded">Aktif</span></td>
-                            </tr>
-                            <tr>
-                              <td className="px-4 py-2.5 font-medium text-white">Global CDN Bandwidth Band</td>
-                              <td className="px-4 py-2.5 text-slate-400">50 TB Egress</td>
-                              <td className="px-4 py-2.5 font-mono text-emerald-400">$850.00</td>
-                              <td className="px-4 py-2.5"><span className="text-[10px] bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded">Aktif</span></td>
-                            </tr>
-                            <tr>
-                              <td className="px-4 py-2.5 font-medium text-white">KMS Hardware Security Modules (HSM)</td>
-                              <td className="px-4 py-2.5 text-slate-400">Dedicated</td>
-                              <td className="px-4 py-2.5 font-mono text-emerald-400">$420.00</td>
-                              <td className="px-4 py-2.5"><span className="text-[10px] bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded">Tervalidasi</span></td>
-                            </tr>
-                          </tbody>
-                          <tfoot className="bg-[#151924]/60 font-semibold text-white border-t border-[#1e2433]">
-                            <tr>
-                              <td className="px-4 py-2.5" colSpan={2}>Total Anggaran</td>
-                              <td className="px-4 py-2.5 font-mono text-orange-400" colSpan={2}>$5,920.00 USD</td>
-                            </tr>
-                          </tfoot>
-                        </table>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* ARCHIVE (ZIP) VIEWER */}
-                  {previewItem.type === 'archive' && (
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between bg-[#0c0e14] px-4 py-2 rounded-xl border border-[#1e2433] text-xs">
-                        <div className="flex items-center gap-2 text-slate-300">
-                          <FileArchive className="w-4 h-4 text-purple-400" />
-                          <span className="font-medium">Struktur Arsip Cadangan (ZIP)</span>
-                        </div>
-                        <span className="text-[11px] bg-purple-500/20 text-purple-400 px-2 py-0.5 rounded font-mono">
-                          Kompresi 62%
-                        </span>
-                      </div>
-
-                      <div className="bg-[#0c0e14] border border-[#1e2433] rounded-xl p-4 divide-y divide-[#1e2433] text-xs">
-                        {[
-                          { name: 'src/storage/engine.ts', size: '24.5 KB', type: 'TypeScript' },
-                          { name: 'src/video/h264_streamer.ts', size: '18.2 KB', type: 'TypeScript' },
-                          { name: 'public/brand/logo.svg', size: '4.8 KB', type: 'Vector SVG' },
-                          { name: 'database/asterdrive_dump.sql', size: '15.1 MB', type: 'SQL Backup' },
-                          { name: 'package.json', size: '1.2 KB', type: 'Config' }
-                        ].map((f, i) => (
-                          <div key={i} className="py-2.5 flex items-center justify-between first:pt-0 last:pb-0">
-                            <div className="flex items-center gap-2 text-slate-300">
-                              <FileText className="w-3.5 h-3.5 text-purple-400" />
-                              <span className="font-mono text-[11px]">{f.name}</span>
-                            </div>
-                            <div className="flex items-center gap-3 text-slate-500 text-[11px]">
-                              <span>{f.type}</span>
-                              <span className="font-mono text-slate-300">{f.size}</span>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
+                  ) : (
+                    <div className="text-center p-8 bg-[#11141d] rounded-2xl border border-[#1e2433]">
+                      <AlertCircle className="w-12 h-12 text-amber-500 mx-auto mb-3" />
+                      <h4 className="text-base font-semibold text-white">Video tidak dapat dimuat</h4>
+                      <p className="text-xs text-slate-400 mt-1">Berkas video ini mungkin memerlukan format MP4 atau H.264.</p>
                     </div>
                   )}
                 </div>
               )}
+
+              {/* PHOTO / IMAGE VIEWER (Google Drive Style) */}
+              {previewItem.type === 'image' && (
+                <div className="w-full h-full flex items-center justify-center relative">
+                  {isLoadingMedia ? (
+                    <div className="flex flex-col items-center gap-3 text-slate-400">
+                      <div className="w-10 h-10 border-3 border-orange-500 border-t-transparent rounded-full animate-spin" />
+                      <span className="text-sm">Memuat foto resolusi penuh...</span>
+                    </div>
+                  ) : activeMediaUrl || previewItem.previewUrl ? (
+                    <div className="w-full h-full flex items-center justify-center overflow-auto p-4">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={activeMediaUrl || previewItem.previewUrl}
+                        alt={previewItem.name}
+                        className="max-h-[78vh] max-w-full object-contain drop-shadow-2xl transition-transform duration-200 select-none cursor-grab active:cursor-grabbing"
+                        style={{
+                          transform: `scale(${imageZoom}) rotate(${imageRotation}deg)`
+                        }}
+                      />
+                    </div>
+                  ) : (
+                    <div className="text-center p-8 bg-[#11141d] rounded-2xl border border-[#1e2433]">
+                      <ImageIcon className="w-12 h-12 text-slate-600 mx-auto mb-3" />
+                      <h4 className="text-base font-semibold text-white">Foto tidak dapat ditampilkan</h4>
+                    </div>
+                  )}
+
+                  {/* Google Drive Floating Bottom Toolbar for Images */}
+                  <div className="absolute bottom-5 left-1/2 -translate-x-1/2 z-20 bg-[#121620]/90 backdrop-blur-md border border-white/10 rounded-full px-4 py-2 flex items-center gap-3 shadow-2xl text-white text-xs">
+                    <button
+                      type="button"
+                      onClick={() => setImageZoom((z) => Math.max(0.5, +(z - 0.25).toFixed(2)))}
+                      className="p-1 text-slate-300 hover:text-white hover:bg-slate-800 rounded-full"
+                      title="Perkecil (-)"
+                    >
+                      <ZoomOut className="w-4 h-4" />
+                    </button>
+                    <span className="text-xs font-mono font-medium text-slate-200 min-w-[42px] text-center">
+                      {Math.round(imageZoom * 100)}%
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setImageZoom((z) => Math.min(3, +(z + 0.25).toFixed(2)))}
+                      className="p-1 text-slate-300 hover:text-white hover:bg-slate-800 rounded-full"
+                      title="Perbesar (+)"
+                    >
+                      <ZoomIn className="w-4 h-4" />
+                    </button>
+                    <div className="w-px h-4 bg-slate-700 mx-1" />
+                    <button
+                      type="button"
+                      onClick={() => setImageRotation((r) => (r + 90) % 360)}
+                      className="p-1 text-slate-300 hover:text-white hover:bg-slate-800 rounded-full"
+                      title="Putar 90° (R)"
+                    >
+                      <RotateCw className="w-4 h-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setImageZoom(1);
+                        setImageRotation(0);
+                      }}
+                      className="px-2 py-0.5 text-[11px] text-slate-300 hover:text-white hover:bg-slate-800 rounded"
+                      title="Sesuaikan dengan Layar"
+                    >
+                      Sesuaikan
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* PDF / DOCUMENT VIEWER (Google Drive Style) */}
+              {previewItem.type === 'document' && (
+                <div className="w-full max-w-4xl h-full max-h-[82vh] overflow-y-auto flex flex-col items-center">
+                  {/* Top document pagination */}
+                  <div className="sticky top-0 z-20 bg-[#121620]/90 backdrop-blur-md border border-white/10 rounded-full px-4 py-1.5 mb-4 flex items-center gap-3 text-xs text-slate-200 shadow-xl">
+                    <button
+                      type="button"
+                      disabled={docPage <= 1}
+                      onClick={() => setDocPage((p) => Math.max(1, p - 1))}
+                      className="p-1 hover:text-white disabled:opacity-30"
+                    >
+                      <ChevronLeft className="w-4 h-4" />
+                    </button>
+                    <span>Halaman {docPage} dari 4</span>
+                    <button
+                      type="button"
+                      disabled={docPage >= 4}
+                      onClick={() => setDocPage((p) => Math.min(4, p + 1))}
+                      className="p-1 hover:text-white disabled:opacity-30"
+                    >
+                      <ChevronRight className="w-4 h-4" />
+                    </button>
+                  </div>
+
+                  {/* Document Paper Sheet */}
+                  <div className="w-full max-w-3xl bg-white text-slate-900 rounded-lg shadow-2xl p-8 sm:p-14 space-y-6 my-2">
+                    <div className="border-b-2 border-slate-900/10 pb-5">
+                      <div className="text-xs uppercase font-bold tracking-widest text-orange-600">
+                        AsterDrive Dokumen Teknis
+                      </div>
+                      <h1 className="text-2xl font-extrabold text-slate-950 mt-1 tracking-tight">
+                        Arsitektur Sistem Cloud Storage AsterDrive & Keamanan Zero-Knowledge
+                      </h1>
+                      <p className="text-xs text-slate-500 mt-1.5">
+                        Versi 3.4 • Diperbarui pada 27 Oktober 2026 • Tim Riset & Infrastruktur
+                      </p>
+                    </div>
+
+                    {docPage === 1 && (
+                      <div className="space-y-4 text-xs sm:text-sm text-slate-700 leading-relaxed font-serif">
+                        <h3 className="text-base font-bold text-slate-950 font-sans">1. Ikhtisar & Arsitektur Utama</h3>
+                        <p>
+                          AsterDrive dirancang untuk memberikan pengalaman cloud drive setara standar industri global seperti Google Drive, dengan lapisan privasi terdesentralisasi. Berkas disimpan dalam blok penyimpanan aman dan diindeks secara instan untuk pemutaran multimedia tanpa hambatan.
+                        </p>
+                        <h3 className="text-base font-bold text-slate-950 font-sans mt-4">2. Enkripsi AES-256-GCM</h3>
+                        <p>
+                          Setiap berkas dienkripsi menggunakan kunci enkripsi individual yang dikelola melalui modul keamanan berbasis perangkat keras (HSM). Metadata dan konten dilindungi dari akses pihak ketiga yang tidak berwenang.
+                        </p>
+                      </div>
+                    )}
+
+                    {docPage === 2 && (
+                      <div className="space-y-4 text-xs sm:text-sm text-slate-700 leading-relaxed font-serif">
+                        <h3 className="text-base font-bold text-slate-950 font-sans">3. Mesin Streaming Media Definisi Tinggi</h3>
+                        <p>
+                          Pemutaran video instan menggunakan transmisi stream HTTP Live Streaming (HLS) dengan dukungan multi-bitrate adaptif (1080p, 720p, 480p). Sistem mengoptimalkan buffer untuk menghilangkan jeda pemutaran (zero-buffering latency).
+                        </p>
+                      </div>
+                    )}
+
+                    {docPage >= 3 && (
+                      <div className="space-y-4 text-xs sm:text-sm text-slate-700 leading-relaxed font-serif">
+                        <h3 className="text-base font-bold text-slate-950 font-sans">4. Sinkronisasi Multi-Perangkat</h3>
+                        <p>
+                          Sinkronisasi dua arah secara berkala memverifikasi berkas di komputer pengguna menggunakan hash SHA-256, menjaga konsistensi data di semua titik akses.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* SPREADSHEET VIEWER (Google Drive Style) */}
+              {previewItem.type === 'spreadsheet' && (
+                <div className="w-full max-w-4xl h-full max-h-[82vh] overflow-y-auto bg-[#0f121a] border border-[#1e2433] rounded-2xl shadow-2xl p-6">
+                  <div className="flex items-center justify-between pb-4 border-b border-[#1e2433] mb-4">
+                    <div className="flex items-center gap-2.5">
+                      <FileSpreadsheet className="w-5 h-5 text-emerald-400" />
+                      <span className="font-semibold text-sm text-white">AsterDrive Sheets - {previewItem.name}</span>
+                    </div>
+                    <span className="text-xs bg-emerald-500/20 text-emerald-400 px-2.5 py-0.5 rounded font-mono">
+                      Sheet 1 (Anggaran Q4)
+                    </span>
+                  </div>
+
+                  <table className="w-full text-left text-xs text-slate-300">
+                    <thead className="bg-[#151924] text-slate-400 uppercase text-[11px] border-b border-[#1e2433]">
+                      <tr>
+                        <th className="px-4 py-2.5">Item</th>
+                        <th className="px-4 py-2.5">Kategori</th>
+                        <th className="px-4 py-2.5">Biaya (USD)</th>
+                        <th className="px-4 py-2.5">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[#1e2433]">
+                      <tr>
+                        <td className="px-4 py-3 font-medium text-white">Edge Storage Nodes (Multi-Region S3)</td>
+                        <td className="px-4 py-3 text-slate-400">Penyimpanan</td>
+                        <td className="px-4 py-3 font-mono text-emerald-400">$1,450.00</td>
+                        <td className="px-4 py-3"><span className="px-2 py-0.5 rounded text-[10px] bg-emerald-500/20 text-emerald-400">Disetujui</span></td>
+                      </tr>
+                      <tr>
+                        <td className="px-4 py-3 font-medium text-white">Video Transcoding GPU Fleet</td>
+                        <td className="px-4 py-3 text-slate-400">Komputasi Media</td>
+                        <td className="px-4 py-3 font-mono text-emerald-400">$3,200.00</td>
+                        <td className="px-4 py-3"><span className="px-2 py-0.5 rounded text-[10px] bg-emerald-500/20 text-emerald-400">Aktif</span></td>
+                      </tr>
+                      <tr>
+                        <td className="px-4 py-3 font-medium text-white">Global CDN Bandwidth Band</td>
+                        <td className="px-4 py-3 text-slate-400">Jaringan</td>
+                        <td className="px-4 py-3 font-mono text-emerald-400">$850.00</td>
+                        <td className="px-4 py-3"><span className="px-2 py-0.5 rounded text-[10px] bg-emerald-500/20 text-emerald-400">Aktif</span></td>
+                      </tr>
+                    </tbody>
+                    <tfoot className="bg-[#151924]/80 font-semibold text-white border-t border-[#1e2433]">
+                      <tr>
+                        <td className="px-4 py-3" colSpan={2}>Total Biaya Anggaran</td>
+                        <td className="px-4 py-3 font-mono text-orange-400" colSpan={2}>$5,500.00 USD</td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              )}
+
+              {/* ARCHIVE VIEWER */}
+              {previewItem.type === 'archive' && (
+                <div className="w-full max-w-3xl h-full max-h-[82vh] overflow-y-auto bg-[#0f121a] border border-[#1e2433] rounded-2xl shadow-2xl p-6">
+                  <div className="flex items-center justify-between pb-4 border-b border-[#1e2433] mb-4">
+                    <div className="flex items-center gap-2.5">
+                      <FileArchive className="w-5 h-5 text-purple-400" />
+                      <span className="font-semibold text-sm text-white">Isi Arsip - {previewItem.name}</span>
+                    </div>
+                    <span className="text-xs bg-purple-500/20 text-purple-400 px-2.5 py-0.5 rounded font-mono">
+                      5 Berkas Terkompresi
+                    </span>
+                  </div>
+
+                  <div className="divide-y divide-[#1e2433] text-xs">
+                    {[
+                      { name: 'src/video/playback_engine.ts', size: '24.5 KB', type: 'TypeScript' },
+                      { name: 'src/storage/indexed_db.ts', size: '18.2 KB', type: 'TypeScript' },
+                      { name: 'public/brand/logo.svg', size: '4.8 KB', type: 'Vector SVG' },
+                      { name: 'database/backup.sql', size: '15.1 MB', type: 'Database Backup' },
+                      { name: 'package.json', size: '1.2 KB', type: 'Config' }
+                    ].map((f, i) => (
+                      <div key={i} className="py-3 flex items-center justify-between">
+                        <div className="flex items-center gap-2.5 text-slate-200">
+                          <FileText className="w-4 h-4 text-purple-400" />
+                          <span className="font-mono text-[11px]">{f.name}</span>
+                        </div>
+                        <div className="flex items-center gap-3 text-slate-500 text-[11px]">
+                          <span>{f.type}</span>
+                          <span className="font-mono text-slate-300">{f.size}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
-            {/* Footer */}
-            <div className="px-5 py-3.5 bg-[#151924]/80 border-t border-[#1e2433] flex items-center justify-between gap-3 text-xs">
-              <div className="text-slate-400 text-[11px] hidden sm:block">
-                <span>Ukuran: <strong className="text-slate-200">{formatFileSize(previewItem.size)}</strong></span>
-                <span className="mx-2">•</span>
-                <span>Pemilik: <strong className="text-slate-200">{previewItem.owner}</strong></span>
+            {/* 3. Google Drive Collapsible Right Sidebar (Info / Details Panel) */}
+            {showPreviewInfo && (
+              <div className="w-80 sm:w-88 bg-[#11141d] border-l border-[#1e2433] h-full flex flex-col shrink-0 z-30 animate-in slide-in-from-right duration-200">
+                {/* Panel Header */}
+                <div className="px-5 py-3.5 border-b border-[#1e2433] flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-xs font-semibold text-white uppercase tracking-wider">
+                    <Info className="w-4 h-4 text-orange-400" />
+                    <span>Rincian Berkas</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowPreviewInfo(false)}
+                    className="text-slate-400 hover:text-white p-1"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                {/* Details / Activity Tabs */}
+                <div className="flex border-b border-[#1e2433] text-xs">
+                  <button
+                    type="button"
+                    onClick={() => setPreviewTab('details')}
+                    className={`flex-1 py-2.5 font-medium text-center transition-colors border-b-2 ${
+                      previewTab === 'details'
+                        ? 'border-orange-500 text-orange-400'
+                        : 'border-transparent text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    Rincian
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPreviewTab('activity')}
+                    className={`flex-1 py-2.5 font-medium text-center transition-colors border-b-2 ${
+                      previewTab === 'activity'
+                        ? 'border-orange-500 text-orange-400'
+                        : 'border-transparent text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    Aktivitas
+                  </button>
+                </div>
+
+                {/* Panel Content */}
+                <div className="p-5 flex-1 overflow-y-auto space-y-5 text-xs text-slate-300">
+                  {previewTab === 'details' ? (
+                    <>
+                      {/* Thumbnail Card */}
+                      <div className="w-full h-32 rounded-xl bg-black/40 border border-[#1e2433] flex items-center justify-center overflow-hidden">
+                        {previewItem.type === 'image' && (previewItem.thumbnailUrl || previewItem.previewUrl) ? (
+                          /* eslint-disable-next-line @next/next/no-img-element */
+                          <img
+                            src={previewItem.thumbnailUrl || previewItem.previewUrl}
+                            alt={previewItem.name}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : previewItem.type === 'video' && previewItem.thumbnailUrl ? (
+                          /* eslint-disable-next-line @next/next/no-img-element */
+                          <img
+                            src={previewItem.thumbnailUrl}
+                            alt={previewItem.name}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <div className="flex flex-col items-center gap-1.5 text-slate-500">
+                            {getItemIcon(previewItem.type)}
+                            <span className="text-[10px] uppercase font-mono">{previewItem.type}</span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Access Section */}
+                      <div>
+                        <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 block mb-2">
+                          Akses Berkas
+                        </span>
+                        <div className="p-3 bg-[#0c0e14] border border-[#1e2433] rounded-xl flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <div className="w-7 h-7 rounded-full bg-orange-500/20 text-orange-400 flex items-center justify-center font-bold text-xs">
+                              {previewItem.owner[0]}
+                            </div>
+                            <div>
+                              <p className="font-medium text-white">{previewItem.owner}</p>
+                              <p className="text-[10px] text-slate-500">Pemilik dokumen</p>
+                            </div>
+                          </div>
+                          <span className="text-[10px] bg-slate-800 text-slate-300 px-2 py-0.5 rounded">
+                            Pemilik
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* General Information */}
+                      <div className="space-y-3 pt-2 border-t border-[#1e2433]">
+                        <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 block">
+                          Informasi Umum
+                        </span>
+                        <div className="space-y-2.5">
+                          <div className="flex justify-between">
+                            <span className="text-slate-500">Tipe Berkas</span>
+                            <span className="text-slate-200 capitalize font-medium">{previewItem.type}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-slate-500">Ukuran</span>
+                            <span className="text-slate-200 font-mono font-medium">{formatFileSize(previewItem.size)}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-slate-500">Penyimpanan Terpakai</span>
+                            <span className="text-slate-200 font-mono font-medium">{formatFileSize(previewItem.size)}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-slate-500">Lokasi</span>
+                            <span className="text-slate-200 font-medium">My Drive / AsterDrive</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-slate-500">Terakhir Diubah</span>
+                            <span className="text-slate-200 font-medium">{new Date(previewItem.updatedAt).toLocaleDateString('id-ID')}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-slate-500">Enkripsi</span>
+                            <span className="text-emerald-400 font-medium flex items-center gap-1">
+                              <Shield className="w-3 h-3" /> AES-256-GCM
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </>
+                  ) : (
+                    /* Activity Log */
+                    <div className="space-y-4">
+                      <div className="relative pl-5 before:absolute before:left-1.5 before:top-2 before:bottom-0 before:w-0.5 before:bg-slate-800 space-y-4">
+                        <div className="relative">
+                          <span className="absolute -left-5 top-1 w-2.5 h-2.5 rounded-full bg-orange-500 ring-4 ring-[#11141d]" />
+                          <p className="text-slate-200 font-medium">Dibuka di AsterDrive Preview</p>
+                          <p className="text-[10px] text-slate-500">Baru saja oleh Anda</p>
+                        </div>
+                        <div className="relative">
+                          <span className="absolute -left-5 top-1 w-2.5 h-2.5 rounded-full bg-emerald-500 ring-4 ring-[#11141d]" />
+                          <p className="text-slate-200 font-medium">Diunggah ke Cloud Vault</p>
+                          <p className="text-[10px] text-slate-500">{new Date(previewItem.updatedAt).toLocaleDateString('id-ID')} oleh {previewItem.owner}</p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
-              <div className="flex items-center gap-2 ml-auto">
-                <button
-                  type="button"
-                  onClick={() => {
-                    const toShare = previewItem;
-                    setPreviewItem(null);
-                    setShareItem(toShare);
-                  }}
-                  className="px-3 py-1.5 text-xs text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 rounded-md transition-colors flex items-center gap-1.5"
-                >
-                  <Share2 className="w-3.5 h-3.5" />
-                  <span>Bagi Tautan</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleDownloadItem(previewItem)}
-                  className="px-3.5 py-1.5 text-xs font-medium bg-orange-500 hover:bg-orange-600 text-white rounded-md shadow-sm transition-colors flex items-center gap-1.5"
-                >
-                  <Download className="w-3.5 h-3.5" />
-                  <span>Unduh Berkas</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={handleClosePreview}
-                  className="px-3 py-1.5 text-xs text-slate-400 hover:text-white transition-colors"
-                >
-                  Tutup
-                </button>
-              </div>
-            </div>
+            )}
           </div>
         </div>
       )}
